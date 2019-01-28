@@ -70,7 +70,7 @@ int acpi_exec_method(acpi_state_t *state, acpi_object_t *method_return)
 		method_return->type = ACPI_INTEGER;
 		method_return->integer = osi_return;
 
-		acpi_debug("acpi: _OSI('%s') returned 0x%xd\n", state->arg[0].string, osi_return);
+		acpi_debug("acpi: _OSI('%s') returned 0x%X\n", state->arg[0].string, osi_return);
 		return 0;
 	}
 
@@ -195,7 +195,7 @@ int acpi_exec(uint8_t *method, size_t size, acpi_state_t *state, acpi_object_t *
 				i += acpi_exec_sleep(&method[i], state);
 				break;
 			default:
-				acpi_panic("acpi: undefined opcode in control method %s, sequence %xb %xb %xb %xb\n", state->name, method[i], method[i+1], method[i+2], method[i+3]);
+				acpi_panic("acpi: undefined opcode in control method %s, sequence %X %X %X %X\n", state->name, method[i], method[i+1], method[i+2], method[i+3]);
 			}
 			break;
 
@@ -321,7 +321,7 @@ int acpi_exec(uint8_t *method, size_t size, acpi_state_t *state, acpi_object_t *
 			break;
 
 		default:
-			acpi_panic("acpi: undefined opcode in control method %s, sequence %xb %xb %xb %xb\n", state->name, method[i], method[i+1], method[i+2], method[i+3]);
+			acpi_panic("acpi: undefined opcode in control method %s, sequence %X %X %X %X\n", state->name, method[i], method[i+1], method[i+2], method[i+3]);
 		}
 	}
 

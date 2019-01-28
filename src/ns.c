@@ -299,7 +299,7 @@ void acpins_register_scope(uint8_t *data, size_t size)
 				break;
 
 			default:
-				acpi_panic("acpi: undefined opcode, sequence: %xb %xb %xb %xb\n", data[count], data[count+1], data[count+2], data[count+3]);
+				acpi_panic("acpi: undefined opcode, sequence: %X %X %X %X\n", data[count], data[count+1], data[count+2], data[count+3]);
 			}
 			break;
 
@@ -323,7 +323,7 @@ void acpins_register_scope(uint8_t *data, size_t size)
 			break;
 
 		default:
-			acpi_panic("acpi: undefined opcode, sequence: %xb %xb %xb %xb\n", data[count], data[count+1], data[count+2], data[count+3]);
+			acpi_panic("acpi: undefined opcode, sequence: %X %X %X %X\n", data[count], data[count+1], data[count+2], data[count+3]);
 		}
 	}
 }
@@ -394,7 +394,7 @@ size_t acpins_create_opregion(void *data)
 	integer = object.integer;
 	if(integer_size == 0)
 	{
-		acpi_panic("acpi: undefined opcode, sequence: %xb %xb %xb %xb\n", opregion[size], opregion[size+1], opregion[size+2], opregion[size+3]);
+		acpi_panic("acpi: undefined opcode, sequence: %X %X %X %X\n", opregion[size], opregion[size+1], opregion[size+2], opregion[size+3]);
 	}
 
 	acpi_namespace[acpi_namespace_entries].op_base = integer;
@@ -403,7 +403,7 @@ size_t acpins_create_opregion(void *data)
 	integer_size = acpi_eval_integer(&opregion[size], &integer);
 	if(integer_size == 0)
 	{
-		acpi_panic("acpi: undefined opcode, sequence: %xb %xb %xb %xb\n", opregion[size], opregion[size+1], opregion[size+2], opregion[size+3]);
+		acpi_panic("acpi: undefined opcode, sequence: %X %X %X %X\n", opregion[size], opregion[size+1], opregion[size+2], opregion[size+3]);
 	}
 
 	acpi_namespace[acpi_namespace_entries].op_length = integer;
@@ -413,23 +413,23 @@ size_t acpins_create_opregion(void *data)
 	switch(acpi_namespace[acpi_namespace_entries].op_address_space)
 	{
 	case OPREGION_MEMORY:
-		acpi_debug("MMIO: 0x%xq-0x%xq\n", acpi_namespace[acpi_namespace_entries].op_base, acpi_namespace[acpi_namespace_entries].op_base + acpi_namespace[acpi_namespace_entries].op_length);
+		acpi_debug("MMIO: 0x%X-0x%X\n", acpi_namespace[acpi_namespace_entries].op_base, acpi_namespace[acpi_namespace_entries].op_base + acpi_namespace[acpi_namespace_entries].op_length);
 		break;
 	case OPREGION_IO:
-		acpi_debug("I/O port: 0x%xw-0x%xw\n", (uint16_t)(acpi_namespace[acpi_namespace_entries].op_base), (uint16_t)(acpi_namespace[acpi_namespace_entries].op_base + acpi_namespace[acpi_namespace_entries].op_length));
+		acpi_debug("I/O port: 0x%X-0x%X\n", (uint16_t)(acpi_namespace[acpi_namespace_entries].op_base), (uint16_t)(acpi_namespace[acpi_namespace_entries].op_base + acpi_namespace[acpi_namespace_entries].op_length));
 		break;
 	case OPREGION_PCI:
-		acpi_debug("PCI config: 0x%xw-0x%xw\n", (uint16_t)(acpi_namespace[acpi_namespace_entries].op_base), (uint16_t)(acpi_namespace[acpi_namespace_entries].op_base + acpi_namespace[acpi_namespace_entries].op_length));
+		acpi_debug("PCI config: 0x%X-0x%X\n", (uint16_t)(acpi_namespace[acpi_namespace_entries].op_base), (uint16_t)(acpi_namespace[acpi_namespace_entries].op_base + acpi_namespace[acpi_namespace_entries].op_length));
 		break;
 	case OPREGION_EC:
-		acpi_debug("embedded controller: 0x%xb-0x%xb\n", (uint8_t)(acpi_namespace[acpi_namespace_entries].op_base), (uint8_t)(acpi_namespace[acpi_namespace_entries].op_base + acpi_namespace[acpi_namespace_entries].op_length));
+		acpi_debug("embedded controller: 0x%X-0x%X\n", (uint8_t)(acpi_namespace[acpi_namespace_entries].op_base), (uint8_t)(acpi_namespace[acpi_namespace_entries].op_base + acpi_namespace[acpi_namespace_entries].op_length));
 		break;
 	case OPREGION_CMOS:
-		acpi_debug("CMOS RAM: 0x%xb-0x%xb\n", (uint8_t)(acpi_namespace[acpi_namespace_entries].op_base), (uint8_t)(acpi_namespace[acpi_namespace_entries].op_base + acpi_namespace[acpi_namespace_entries].op_length));
+		acpi_debug("CMOS RAM: 0x%X-0x%X\n", (uint8_t)(acpi_namespace[acpi_namespace_entries].op_base), (uint8_t)(acpi_namespace[acpi_namespace_entries].op_base + acpi_namespace[acpi_namespace_entries].op_length));
 		break;
 
 	default:
-		acpi_panic("unsupported address space ID 0x%xb\n", acpi_namespace[acpi_namespace_entries].op_address_space);
+		acpi_panic("unsupported address space ID 0x%X\n", acpi_namespace[acpi_namespace_entries].op_address_space);
 	}*/
 
 	acpins_increment_namespace();
@@ -470,7 +470,7 @@ size_t acpins_create_field(void *data)
 	field = (uint8_t*)data + 2 + pkgsize + name_size;
 	field_flags = field[0];
 
-	/*acpi_debug("field for OpRegion %s, flags 0x%xb (", opregion->path, field_flags);
+	/*acpi_debug("field for OpRegion %s, flags 0x%X (", opregion->path, field_flags);
 	switch(field_flags & 0x0F)
 	{
 	case FIELD_ANY_ACCESS:
@@ -601,7 +601,7 @@ size_t acpins_create_method(void *data)
 	acpi_namespace[acpi_namespace_entries].pointer = (void*)(method + 1);
 	acpi_namespace[acpi_namespace_entries].size = size - pkgsize - name_length - 1;
 
-	/*acpi_debug("control method %s, flags 0x%xb (argc %d ", acpi_namespace[acpi_namespace_entries].path, method[0], method[0] & METHOD_ARGC_MASK);
+	/*acpi_debug("control method %s, flags 0x%X (argc %d ", acpi_namespace[acpi_namespace_entries].path, method[0], method[0] & METHOD_ARGC_MASK);
 	if(method[0] & METHOD_SERIALIZED)
 		acpi_debug("serialized");
 	else
@@ -749,11 +749,11 @@ size_t acpins_create_name(void *data)
 		acpi_namespace[acpi_namespace_entries].object.string = (char*)&name[1];
 	} else
 	{
-		acpi_panic("acpi: undefined opcode in Name(), sequence: %xb %xb %xb %xb\n", name[0], name[1], name[2], name[3]);
+		acpi_panic("acpi: undefined opcode in Name(), sequence: %X %X %X %X\n", name[0], name[1], name[2], name[3]);
 	}
 
 	/*if(acpi_namespace[acpi_namespace_entries].object.type == ACPI_INTEGER)
-		acpi_debug("integer object %s, value 0x%xq\n", acpi_namespace[acpi_namespace_entries].path, acpi_namespace[acpi_namespace_entries].object.integer);
+		acpi_debug("integer object %s, value 0x%X\n", acpi_namespace[acpi_namespace_entries].path, acpi_namespace[acpi_namespace_entries].object.integer);
 	else if(acpi_namespace[acpi_namespace_entries].object.type == ACPI_BUFFER)
 		acpi_debug("buffer object %s\n", acpi_namespace[acpi_namespace_entries].path);
 	else if(acpi_namespace[acpi_namespace_entries].object.type == ACPI_STRING)
@@ -836,7 +836,7 @@ size_t acpins_create_indexfield(void *data)
 
 	uint8_t flags = indexfield[0];
 
-	/*acpi_debug("IndexField index %s data %s, flags 0x%xb (", indexr, datar, flags);
+	/*acpi_debug("IndexField index %s data %s, flags 0x%X (", indexr, datar, flags);
 	switch(flags & 0x0F)
 	{
 	case FIELD_ANY_ACCESS:
@@ -1007,7 +1007,7 @@ size_t acpins_create_package(acpi_object_t *destination, void *data)
 		} else
 		{
 			// Undefined here
-			acpi_panic("acpi: undefined opcode in Package(), sequence: %xb %xb %xb %xb\n", package[j], package[j+1], package[j+2], package[j+3]);
+			acpi_panic("acpi: undefined opcode in Package(), sequence: %X %X %X %X\n", package[j], package[j+1], package[j+2], package[j+3]);
 		}
 	}
 
