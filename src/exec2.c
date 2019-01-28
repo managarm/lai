@@ -1,7 +1,7 @@
 
 /*
  * Lux ACPI Implementation
- * Copyright (C) 2018 by Omar Mohammad
+ * Copyright (C) 2018-2019 by Omar Muhamed
  */
 
 #include "lai.h"
