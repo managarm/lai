@@ -15,7 +15,8 @@
 #include <debug.h>
 #include <mutex.h>
 
-#define acpi_printf			DEBUG
+#define acpi_debug			DEBUG
+#define acpi_warn			WARN
 
 #define acpi_panic(...)		ERROR(__VA_ARGS__); \
 							while(1);

@@ -13,8 +13,8 @@
 
 int acpi_exec(uint8_t *, size_t, acpi_state_t *, acpi_object_t *);
 
-char acpi_emulated_os[] = "Windows 2015";		// Windows 10
-uint64_t acpi_implemented_version = 2;			// ACPI 2.0
+char acpi_emulated_os[] = "Microsoft Windows NT";		// OS family
+uint64_t acpi_implemented_version = 2;					// ACPI 2.0
 
 // acpi_exec_method(): Finds and executes a control method
 // Param:	acpi_state_t *state - method name and arguments
@@ -32,7 +32,23 @@ int acpi_exec_method(acpi_state_t *state, acpi_object_t *method_return)
 	// for AML to let us use its features.
 	if(acpi_strcmp(state->name, "\\._OSI") == 0)
 	{
-		if(acpi_strcmp(state->arg[0].string, "Windows 2006") == 0)		// Windows Vista
+		if(acpi_strcmp(state->arg[0].string, "Windows 2000") == 0)			// Windows 2000
+			osi_return = 0xFFFFFFFF;
+		else if(acpi_strcmp(state->arg[0].string, "Windows 2001") == 0)		// Windows XP
+			osi_return = 0xFFFFFFFF;
+		else if(acpi_strcmp(state->arg[0].string, "Windows 2001 SP1") == 0)	// Windows XP SP1
+			osi_return = 0xFFFFFFFF;
+		else if(acpi_strcmp(state->arg[0].string, "Windows 2001.1") == 0)	// Windows Server 2003
+			osi_return = 0xFFFFFFFF;
+		else if(acpi_strcmp(state->arg[0].string, "Windows 2001 SP2") == 0)	// Windows XP SP2
+			osi_return = 0xFFFFFFFF;
+		else if(acpi_strcmp(state->arg[0].string, "Windows 2006") == 0)		// Windows Vista
+			osi_return = 0xFFFFFFFF;
+		else if(acpi_strcmp(state->arg[0].string, "Windows 2006.1") == 0)	// Windows Server 2008
+			osi_return = 0xFFFFFFFF;
+		else if(acpi_strcmp(state->arg[0].string, "Windows 2006 SP1") == 0)	// Windows Vista SP1
+			osi_return = 0xFFFFFFFF;
+		else if(acpi_strcmp(state->arg[0].string, "Windows 2006 SP2") == 0)	// Windows Vista SP2
 			osi_return = 0xFFFFFFFF;
 		else if(acpi_strcmp(state->arg[0].string, "Windows 2009") == 0)		// Windows 7
 			osi_return = 0xFFFFFFFF;
@@ -42,6 +58,11 @@ int acpi_exec_method(acpi_state_t *state, acpi_object_t *method_return)
 			osi_return = 0xFFFFFFFF;
 		else if(acpi_strcmp(state->arg[0].string, "Windows 2015") == 0)		// Windows 10
 			osi_return = 0xFFFFFFFF;
+		else if(acpi_strcmp(state->arg[0].string, "Linux") == 0)	// Linux aka buggy BIOS
+		{
+			osi_return = 0x00000000;
+			acpi_warn("buggy BIOS requested _OSI('Linux')\n");
+		}
 
 		else
 			osi_return = 0x00000000;	// unsupported OS
@@ -49,18 +70,18 @@ int acpi_exec_method(acpi_state_t *state, acpi_object_t *method_return)
 		method_return->type = ACPI_INTEGER;
 		method_return->integer = osi_return;
 
-		acpi_printf("acpi: _OSI('%s') returned 0x%xd\n", state->arg[0].string, osi_return);
+		acpi_debug("acpi: _OSI('%s') returned 0x%xd\n", state->arg[0].string, osi_return);
 		return 0;
 	}
 
-	// We'll tell the AML code we are Windows 10
+	// OS family -- pretend to be Windows
 	if(acpi_strcmp(state->name, "\\._OS_") == 0)
 	{
 		method_return->type = ACPI_STRING;
 		method_return->string = acpi_malloc(acpi_strlen(acpi_emulated_os));
 		acpi_strcpy(method_return->string, acpi_emulated_os);
 
-		acpi_printf("acpi: _OS_ returned '%s'\n", method_return->string);
+		acpi_debug("acpi: _OS_ returned '%s'\n", method_return->string);
 		return 0;
 	}
 
@@ -71,7 +92,7 @@ int acpi_exec_method(acpi_state_t *state, acpi_object_t *method_return)
 		method_return->type = ACPI_INTEGER;
 		method_return->integer = acpi_implemented_version;
 
-		acpi_printf("acpi: _REV returned %d\n", method_return->integer);
+		acpi_debug("acpi: _REV returned %d\n", method_return->integer);
 		return 0;
 	}
 
@@ -80,20 +101,20 @@ int acpi_exec_method(acpi_state_t *state, acpi_object_t *method_return)
 	if(!method)
 		return -1;
 
-	//acpi_printf("acpi: execute control method %s\n", state->name);
+	//acpi_debug("acpi: execute control method %s\n", state->name);
 
 	int status = acpi_exec(method->pointer, method->size, state, method_return);
 
-	/*acpi_printf("acpi: %s finished, ", state->name);
+	/*acpi_debug("acpi: %s finished, ", state->name);
 
 	if(method_return->type == ACPI_INTEGER)
-		acpi_printf("return value is integer: %d\n", method_return->integer);
+		acpi_debug("return value is integer: %d\n", method_return->integer);
 	else if(method_return->type == ACPI_STRING)
-		acpi_printf("return value is string: '%s'\n", method_return->string);
+		acpi_debug("return value is string: '%s'\n", method_return->string);
 	else if(method_return->type == ACPI_PACKAGE)
-		acpi_printf("return value is package\n");
+		acpi_debug("return value is package\n");
 	else if(method_return->type == ACPI_BUFFER)
-		acpi_printf("return value is buffer\n");*/
+		acpi_debug("return value is buffer\n");*/
 
 	return status;
 }

@@ -174,7 +174,7 @@ void acpi_create_namespace(void *dsdt)
 	// most of the functions are recursive
 	acpins_register_scope(acpi_acpins_code, acpi_acpins_size);
 
-	acpi_printf("ACPI namespace created, total of %d predefined objects.\n", acpi_namespace_entries);
+	acpi_debug("ACPI namespace created, total of %d predefined objects.\n", acpi_namespace_entries);
 }
 
 // acpins_load_table(): Loads an AML table
@@ -194,7 +194,7 @@ void acpins_load_table(void *ptr)
 	acpi_memcpy(acpi_acpins_code + acpi_acpins_size, table->data, table->header.length - sizeof(acpi_header_t));
 	acpi_acpins_size += (table->header.length - sizeof(acpi_header_t));
 
-	acpi_printf("loaded AML table '%c%c%c%c', total %d bytes of AML code.\n", table->header.signature[0], table->header.signature[1], table->header.signature[2], table->header.signature[3], acpi_acpins_size);
+	acpi_debug("loaded AML table '%c%c%c%c', total %d bytes of AML code.\n", table->header.signature[0], table->header.signature[1], table->header.signature[2], table->header.signature[3], acpi_acpins_size);
 
 	acpi_acpins_count++;
 }
@@ -344,7 +344,7 @@ size_t acpins_create_scope(void *data)
 	scope += pkgsize + 1;
 	size_t name_length = acpins_resolve_path(acpi_namespace[acpi_namespace_entries].path, scope);
 
-	//acpi_printf("scope %s, size %d bytes\n", acpi_namespace[acpi_namespace_entries].path, size);
+	//acpi_debug("scope %s, size %d bytes\n", acpi_namespace[acpi_namespace_entries].path, size);
 
 	// store the new current path
 	char current_path[ACPI_MAX_NAME];
@@ -409,23 +409,23 @@ size_t acpins_create_opregion(void *data)
 	acpi_namespace[acpi_namespace_entries].op_length = integer;
 	size += integer_size;
 
-	/*acpi_printf("OpRegion %s: ", acpi_namespace[acpi_namespace_entries].path);
+	/*acpi_debug("OpRegion %s: ", acpi_namespace[acpi_namespace_entries].path);
 	switch(acpi_namespace[acpi_namespace_entries].op_address_space)
 	{
 	case OPREGION_MEMORY:
-		acpi_printf("MMIO: 0x%xq-0x%xq\n", acpi_namespace[acpi_namespace_entries].op_base, acpi_namespace[acpi_namespace_entries].op_base + acpi_namespace[acpi_namespace_entries].op_length);
+		acpi_debug("MMIO: 0x%xq-0x%xq\n", acpi_namespace[acpi_namespace_entries].op_base, acpi_namespace[acpi_namespace_entries].op_base + acpi_namespace[acpi_namespace_entries].op_length);
 		break;
 	case OPREGION_IO:
-		acpi_printf("I/O port: 0x%xw-0x%xw\n", (uint16_t)(acpi_namespace[acpi_namespace_entries].op_base), (uint16_t)(acpi_namespace[acpi_namespace_entries].op_base + acpi_namespace[acpi_namespace_entries].op_length));
+		acpi_debug("I/O port: 0x%xw-0x%xw\n", (uint16_t)(acpi_namespace[acpi_namespace_entries].op_base), (uint16_t)(acpi_namespace[acpi_namespace_entries].op_base + acpi_namespace[acpi_namespace_entries].op_length));
 		break;
 	case OPREGION_PCI:
-		acpi_printf("PCI config: 0x%xw-0x%xw\n", (uint16_t)(acpi_namespace[acpi_namespace_entries].op_base), (uint16_t)(acpi_namespace[acpi_namespace_entries].op_base + acpi_namespace[acpi_namespace_entries].op_length));
+		acpi_debug("PCI config: 0x%xw-0x%xw\n", (uint16_t)(acpi_namespace[acpi_namespace_entries].op_base), (uint16_t)(acpi_namespace[acpi_namespace_entries].op_base + acpi_namespace[acpi_namespace_entries].op_length));
 		break;
 	case OPREGION_EC:
-		acpi_printf("embedded controller: 0x%xb-0x%xb\n", (uint8_t)(acpi_namespace[acpi_namespace_entries].op_base), (uint8_t)(acpi_namespace[acpi_namespace_entries].op_base + acpi_namespace[acpi_namespace_entries].op_length));
+		acpi_debug("embedded controller: 0x%xb-0x%xb\n", (uint8_t)(acpi_namespace[acpi_namespace_entries].op_base), (uint8_t)(acpi_namespace[acpi_namespace_entries].op_base + acpi_namespace[acpi_namespace_entries].op_length));
 		break;
 	case OPREGION_CMOS:
-		acpi_printf("CMOS RAM: 0x%xb-0x%xb\n", (uint8_t)(acpi_namespace[acpi_namespace_entries].op_base), (uint8_t)(acpi_namespace[acpi_namespace_entries].op_base + acpi_namespace[acpi_namespace_entries].op_length));
+		acpi_debug("CMOS RAM: 0x%xb-0x%xb\n", (uint8_t)(acpi_namespace[acpi_namespace_entries].op_base), (uint8_t)(acpi_namespace[acpi_namespace_entries].op_base + acpi_namespace[acpi_namespace_entries].op_length));
 		break;
 
 	default:
@@ -461,7 +461,7 @@ size_t acpins_create_field(void *data)
 	opregion = acpins_resolve(opregion_name);
 	if(!opregion)
 	{
-		acpi_printf("error parsing field for non-existant OpRegion %s, ignoring...\n", opregion_name);
+		acpi_debug("error parsing field for non-existant OpRegion %s, ignoring...\n", opregion_name);
 		return size + 2;
 	}
 
@@ -470,49 +470,49 @@ size_t acpins_create_field(void *data)
 	field = (uint8_t*)data + 2 + pkgsize + name_size;
 	field_flags = field[0];
 
-	/*acpi_printf("field for OpRegion %s, flags 0x%xb (", opregion->path, field_flags);
+	/*acpi_debug("field for OpRegion %s, flags 0x%xb (", opregion->path, field_flags);
 	switch(field_flags & 0x0F)
 	{
 	case FIELD_ANY_ACCESS:
-		acpi_printf("any ");
+		acpi_debug("any ");
 		break;
 	case FIELD_BYTE_ACCESS:
-		acpi_printf("byte ");
+		acpi_debug("byte ");
 		break;
 	case FIELD_WORD_ACCESS:
-		acpi_printf("word ");
+		acpi_debug("word ");
 		break;
 	case FIELD_DWORD_ACCESS:
-		acpi_printf("dword ");
+		acpi_debug("dword ");
 		break;
 	case FIELD_QWORD_ACCESS:
-		acpi_printf("qword ");
+		acpi_debug("qword ");
 		break;
 	default:
-		acpi_printf("undefined access size: assuming any, ");
+		acpi_debug("undefined access size: assuming any, ");
 		break;
 	}
 
 	if(field_flags & FIELD_LOCK)
-		acpi_printf("lock ");
+		acpi_debug("lock ");
 
 	switch((field_flags >> 5) & 0x0F)
 	{
 	case FIELD_PRESERVE:
-		acpi_printf("preserve");
+		acpi_debug("preserve");
 		break;
 	case FIELD_WRITE_ONES:
-		acpi_printf("ones");
+		acpi_debug("ones");
 		break;
 	case FIELD_WRITE_ZEROES:
-		acpi_printf("zeroes");
+		acpi_debug("zeroes");
 		break;
 	default:
-		acpi_printf("undefined update type");
+		acpi_debug("undefined update type");
 		break;
 	}
 
-	acpi_printf(")\n");*/
+	acpi_debug(")\n");*/
 
 	acpins_increment_namespace();
 
@@ -551,7 +551,7 @@ size_t acpins_create_field(void *data)
 		if(byte_count >= size)
 			break;
 
-		//acpi_printf("field %c%c%c%c: size %d bits, at bit offset %d\n", field[0], field[1], field[2], field[3], field[4], current_offset);
+		//acpi_debug("field %c%c%c%c: size %d bits, at bit offset %d\n", field[0], field[1], field[2], field[3], field[4], current_offset);
 		acpi_namespace[acpi_namespace_entries].type = ACPI_NAMESPACE_FIELD;
 		//acpi_memcpy(acpi_namespace[acpi_namespace_entries].path, acpins_path, acpi_strlen(acpins_path));
 
@@ -601,13 +601,13 @@ size_t acpins_create_method(void *data)
 	acpi_namespace[acpi_namespace_entries].pointer = (void*)(method + 1);
 	acpi_namespace[acpi_namespace_entries].size = size - pkgsize - name_length - 1;
 
-	/*acpi_printf("control method %s, flags 0x%xb (argc %d ", acpi_namespace[acpi_namespace_entries].path, method[0], method[0] & METHOD_ARGC_MASK);
+	/*acpi_debug("control method %s, flags 0x%xb (argc %d ", acpi_namespace[acpi_namespace_entries].path, method[0], method[0] & METHOD_ARGC_MASK);
 	if(method[0] & METHOD_SERIALIZED)
-		acpi_printf("serialized");
+		acpi_debug("serialized");
 	else
-		acpi_printf("non-serialized");
+		acpi_debug("non-serialized");
 
-	acpi_printf(")\n");*/
+	acpi_debug(")\n");*/
 
 	acpins_increment_namespace();
 	return size + 1;
@@ -630,7 +630,7 @@ size_t acpins_create_device(void *data)
 
 	size_t name_length = acpins_resolve_path(acpi_namespace[acpi_namespace_entries].path, device);
 
-	//acpi_printf("device scope %s, size %d bytes\n", acpi_namespace[acpi_namespace_entries].path, size);
+	//acpi_debug("device scope %s, size %d bytes\n", acpi_namespace[acpi_namespace_entries].path, size);
 
 	// store the new current path
 	char current_path[ACPI_MAX_NAME];
@@ -671,7 +671,7 @@ size_t acpins_create_thermalzone(void *data)
 
 	size_t name_length = acpins_resolve_path(acpi_namespace[acpi_namespace_entries].path, thermalzone);
 
-	//acpi_printf("thermal zone %s, size %d bytes\n", acpi_namespace[acpi_namespace_entries].path, size);
+	//acpi_debug("thermal zone %s, size %d bytes\n", acpi_namespace[acpi_namespace_entries].path, size);
 
 	// store the new current path
 	char current_path[ACPI_MAX_NAME];
@@ -719,7 +719,7 @@ size_t acpins_create_name(void *data)
 		acpi_namespace[acpi_namespace_entries].object.package = acpi_calloc(sizeof(acpi_object_t), ACPI_MAX_PACKAGE_ENTRIES);
 		acpi_namespace[acpi_namespace_entries].object.package_size = acpins_create_package(acpi_namespace[acpi_namespace_entries].object.package, &name[0]);
 
-		//acpi_printf("package object %s, entry count %d\n", acpi_namespace[acpi_namespace_entries].path, acpi_namespace[acpi_namespace_entries].object.package_size);
+		//acpi_debug("package object %s, entry count %d\n", acpi_namespace[acpi_namespace_entries].path, acpi_namespace[acpi_namespace_entries].object.package_size);
 		acpins_increment_namespace();
 		return return_size;
 	}
@@ -753,11 +753,11 @@ size_t acpins_create_name(void *data)
 	}
 
 	/*if(acpi_namespace[acpi_namespace_entries].object.type == ACPI_INTEGER)
-		acpi_printf("integer object %s, value 0x%xq\n", acpi_namespace[acpi_namespace_entries].path, acpi_namespace[acpi_namespace_entries].object.integer);
+		acpi_debug("integer object %s, value 0x%xq\n", acpi_namespace[acpi_namespace_entries].path, acpi_namespace[acpi_namespace_entries].object.integer);
 	else if(acpi_namespace[acpi_namespace_entries].object.type == ACPI_BUFFER)
-		acpi_printf("buffer object %s\n", acpi_namespace[acpi_namespace_entries].path);
+		acpi_debug("buffer object %s\n", acpi_namespace[acpi_namespace_entries].path);
 	else if(acpi_namespace[acpi_namespace_entries].object.type == ACPI_STRING)
-		acpi_printf("string object %s: '%s'\n", acpi_namespace[acpi_namespace_entries].path, acpi_namespace[acpi_namespace_entries].object.string);*/
+		acpi_debug("string object %s: '%s'\n", acpi_namespace[acpi_namespace_entries].path, acpi_namespace[acpi_namespace_entries].object.string);*/
 
 	acpins_increment_namespace();
 	return return_size;
@@ -783,7 +783,7 @@ size_t acpins_create_alias(void *data)
 
 	name_size = acpins_resolve_path(acpi_namespace[acpi_namespace_entries].path, alias);
 
-	//acpi_printf("alias %s for object %s\n", acpi_namespace[acpi_namespace_entries].path, acpi_namespace[acpi_namespace_entries].alias);
+	//acpi_debug("alias %s for object %s\n", acpi_namespace[acpi_namespace_entries].path, acpi_namespace[acpi_namespace_entries].alias);
 
 	acpins_increment_namespace();
 	return_size += name_size;
@@ -806,7 +806,7 @@ size_t acpins_create_mutex(void *data)
 	return_size += name_size;
 	return_size++;
 
-	//acpi_printf("mutex object %s\n", acpi_namespace[acpi_namespace_entries].path);
+	//acpi_debug("mutex object %s\n", acpi_namespace[acpi_namespace_entries].path);
 
 	acpins_increment_namespace();
 	return return_size;
@@ -836,49 +836,49 @@ size_t acpins_create_indexfield(void *data)
 
 	uint8_t flags = indexfield[0];
 
-	/*acpi_printf("IndexField index %s data %s, flags 0x%xb (", indexr, datar, flags);
+	/*acpi_debug("IndexField index %s data %s, flags 0x%xb (", indexr, datar, flags);
 	switch(flags & 0x0F)
 	{
 	case FIELD_ANY_ACCESS:
-		acpi_printf("any ");
+		acpi_debug("any ");
 		break;
 	case FIELD_BYTE_ACCESS:
-		acpi_printf("byte ");
+		acpi_debug("byte ");
 		break;
 	case FIELD_WORD_ACCESS:
-		acpi_printf("word ");
+		acpi_debug("word ");
 		break;
 	case FIELD_DWORD_ACCESS:
-		acpi_printf("dword ");
+		acpi_debug("dword ");
 		break;
 	case FIELD_QWORD_ACCESS:
-		acpi_printf("qword ");
+		acpi_debug("qword ");
 		break;
 	default:
-		acpi_printf("undefined access size: assuming any, ");
+		acpi_debug("undefined access size: assuming any, ");
 		break;
 	}
 
 	if(flags & FIELD_LOCK)
-		acpi_printf("lock ");
+		acpi_debug("lock ");
 
 	switch((flags >> 5) & 0x0F)
 	{
 	case FIELD_PRESERVE:
-		acpi_printf("preserve");
+		acpi_debug("preserve");
 		break;
 	case FIELD_WRITE_ONES:
-		acpi_printf("ones");
+		acpi_debug("ones");
 		break;
 	case FIELD_WRITE_ZEROES:
-		acpi_printf("zeroes");
+		acpi_debug("zeroes");
 		break;
 	default:
-		acpi_printf("undefined update type");
+		acpi_debug("undefined update type");
 		break;
 	}
 
-	acpi_printf(")\n");*/
+	acpi_debug(")\n");*/
 
 	indexfield++;			// actual field list
 	size_t byte_count = (size_t)((size_t)indexfield - (size_t)data);
@@ -900,7 +900,7 @@ size_t acpins_create_indexfield(void *data)
 			byte_count += skip_size;
 		}
 
-		//acpi_printf("indexfield %c%c%c%c: size %d bits, at bit offset %d\n", indexfield[0], indexfield[1], indexfield[2], indexfield[3], indexfield[4], current_offset);
+		//acpi_debug("indexfield %c%c%c%c: size %d bits, at bit offset %d\n", indexfield[0], indexfield[1], indexfield[2], indexfield[3], indexfield[4], current_offset);
 		acpi_namespace[acpi_namespace_entries].type = ACPI_NAMESPACE_INDEXFIELD;
 		acpi_memcpy(acpi_namespace[acpi_namespace_entries].path, acpins_path, acpi_strlen(acpins_path));
 		acpi_namespace[acpi_namespace_entries].path[acpi_strlen(acpins_path)] = '.';
@@ -948,7 +948,7 @@ size_t acpins_create_package(acpi_object_t *destination, void *data)
 	size_t integer_size;
 	uint64_t integer;
 
-	//acpi_printf("acpins_create_package: start:\n");
+	//acpi_debug("acpins_create_package: start:\n");
 
 	while(i < count && j + pkgsize + 1 < size_bak)
 	{
@@ -958,7 +958,7 @@ size_t acpins_create_package(acpi_object_t *destination, void *data)
 			destination[i].type = ACPI_INTEGER;
 			destination[i].integer = integer;
 
-			//acpi_printf("  index %d: integer %d\n", i, integer);
+			//acpi_debug("  index %d: integer %d\n", i, integer);
 			i++;
 			j += integer_size;
 		} else if(package[j] == STRINGPREFIX)
@@ -966,7 +966,7 @@ size_t acpins_create_package(acpi_object_t *destination, void *data)
 			destination[i].type = ACPI_STRING;
 			destination[i].string = (char*)&package[j+1];
 
-			//acpi_printf("  index %d: string %s\n", i, destination[i].string);
+			//acpi_debug("  index %d: string %s\n", i, destination[i].string);
 			i++;
 
 			j += acpi_strlen((char*)&package[j]) + 1;
@@ -975,7 +975,7 @@ size_t acpins_create_package(acpi_object_t *destination, void *data)
 			destination[i].type = ACPI_NAME;
 			j += acpins_resolve_path(destination[i].name, &package[j]);
 
-			//acpi_printf("  index %d: name %s\n", i, destination[i].name);
+			//acpi_debug("  index %d: name %s\n", i, destination[i].name);
 			i++;
 		} else if(package[j] == PACKAGE_OP)
 		{
@@ -983,7 +983,7 @@ size_t acpins_create_package(acpi_object_t *destination, void *data)
 			destination[i].type = ACPI_PACKAGE;
 			destination[i].package = acpi_calloc(sizeof(acpi_object_t), ACPI_MAX_PACKAGE_ENTRIES);
 
-			//acpi_printf("  index %d: package\n", i);
+			//acpi_debug("  index %d: package\n", i);
 
 			destination[i].package_size = acpins_create_package(destination[i].package, &package[j]);
 
@@ -1011,7 +1011,7 @@ size_t acpins_create_package(acpi_object_t *destination, void *data)
 		}
 	}
 
-	//acpi_printf("acpins_create_package: end.\n");
+	//acpi_debug("acpins_create_package: end.\n");
 	return (size_t)count;
 }
 
@@ -1034,7 +1034,7 @@ size_t acpins_create_processor(void *data)
 
 	acpi_namespace[acpi_namespace_entries].cpu_id = processor[0];
 
-	//acpi_printf("processor %s ACPI ID %d\n", acpi_namespace[acpi_namespace_entries].path, acpi_namespace[acpi_namespace_entries].cpu_id);
+	//acpi_debug("processor %s ACPI ID %d\n", acpi_namespace[acpi_namespace_entries].path, acpi_namespace[acpi_namespace_entries].cpu_id);
 
 	acpins_increment_namespace();
 
@@ -1108,7 +1108,7 @@ size_t acpins_create_wordfield(void *data)
 
 	name_size = acpins_resolve_path(acpi_namespace[acpi_namespace_entries].path, wordfield);
 
-	//acpi_printf("field %s for buffer %s, offset %d size %d bits\n", acpi_namespace[acpi_namespace_entries].path, acpi_namespace[acpi_namespace_entries].buffer, acpi_namespace[acpi_namespace_entries].buffer_offset, acpi_namespace[acpi_namespace_entries].buffer_size);
+	//acpi_debug("field %s for buffer %s, offset %d size %d bits\n", acpi_namespace[acpi_namespace_entries].path, acpi_namespace[acpi_namespace_entries].buffer, acpi_namespace[acpi_namespace_entries].buffer_offset, acpi_namespace[acpi_namespace_entries].buffer_size);
 
 	acpins_increment_namespace();
 	return_size += name_size;

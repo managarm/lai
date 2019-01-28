@@ -18,7 +18,7 @@ int acpi_enter_sleep(uint8_t state)
 {
 	if(state > 5)
 	{
-		acpi_printf("acpi: undefined sleep state %d\n", state);
+		acpi_debug("acpi: undefined sleep state %d\n", state);
 		return 1;
 	}
 
@@ -29,7 +29,7 @@ int acpi_enter_sleep(uint8_t state)
 	acpi_handle_t *handle = acpins_resolve((char*)sleep_object);
 	if(!handle)
 	{
-		acpi_printf("acpi: sleep state %d is not supported.\n", state);
+		acpi_debug("acpi: sleep state %d is not supported.\n", state);
 		return 1;
 	}
 
@@ -38,11 +38,11 @@ int acpi_enter_sleep(uint8_t state)
 	eval_status = acpi_eval(&package, handle->path);
 	if(eval_status != 0)
 	{
-		acpi_printf("acpi: sleep state %d is not supported.\n", state);
+		acpi_debug("acpi: sleep state %d is not supported.\n", state);
 		return 1;
 	}
 
-	acpi_printf("acpi: entering sleep state %d...\n", state);
+	acpi_debug("acpi: entering sleep state %d...\n", state);
 
 	// ACPI spec says we should call _PTS() and _GTS() before actually sleeping
 	// Who knows, it might do some required firmware-specific stuff
@@ -60,7 +60,7 @@ int acpi_enter_sleep(uint8_t state)
 		acpi_state.arg[0].type = ACPI_INTEGER;
 		acpi_state.arg[0].integer = (uint64_t)state & 0xFF;
 
-		acpi_printf("acpi: execute _PTS(%d)\n", state);
+		acpi_debug("acpi: execute _PTS(%d)\n", state);
 		acpi_exec_method(&acpi_state, &object);
 	}
 
@@ -75,7 +75,7 @@ int acpi_enter_sleep(uint8_t state)
 		acpi_state.arg[0].type = ACPI_INTEGER;
 		acpi_state.arg[0].integer = (uint64_t)state & 0xFF;
 
-		acpi_printf("acpi: execute _GTS(%d)\n", state);
+		acpi_debug("acpi: execute _GTS(%d)\n", state);
 		acpi_exec_method(&acpi_state, &object);
 	}
 

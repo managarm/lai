@@ -222,7 +222,7 @@ void acpi_write_buffer(acpi_handle_t *handle, acpi_object_t *source)
 	buffer_handle = acpins_resolve(handle->buffer);
 
 	if(!buffer_handle)
-		acpi_printf("acpi: undefined reference %s\n", handle->buffer);
+		acpi_debug("acpi: undefined reference %s\n", handle->buffer);
 
 	uint64_t value = source->integer;
 

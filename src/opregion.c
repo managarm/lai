@@ -118,16 +118,16 @@ void acpi_read_field(acpi_object_t *destination, acpi_handle_t *field)
 		{
 		case FIELD_BYTE_ACCESS:
 			value = (uint64_t)acpi_inb(opregion->op_base + offset) >> bit_offset;
-			//acpi_printf("acpi: read 0x%xb from I/O port 0x%xw, field %s\n", (uint8_t)value, opregion->op_base + offset, field->path);
+			//acpi_debug("acpi: read 0x%xb from I/O port 0x%xw, field %s\n", (uint8_t)value, opregion->op_base + offset, field->path);
 			break;
 		case FIELD_WORD_ACCESS:
 			value = (uint64_t)acpi_inw(opregion->op_base + offset) >> bit_offset;
-			//acpi_printf("acpi: read 0x%xw from I/O port 0x%xw, field %s\n", (uint16_t)value, opregion->op_base + offset, field->path);
+			//acpi_debug("acpi: read 0x%xw from I/O port 0x%xw, field %s\n", (uint16_t)value, opregion->op_base + offset, field->path);
 			break;
 		case FIELD_DWORD_ACCESS:
 		case FIELD_ANY_ACCESS:
 			value = (uint64_t)acpi_ind(opregion->op_base + offset) >> bit_offset;
-			//acpi_printf("acpi: read 0x%xd from I/O port 0x%xw, field %s\n", (uint32_t)value, opregion->op_base + offset, field->path);
+			//acpi_debug("acpi: read 0x%xd from I/O port 0x%xw, field %s\n", (uint32_t)value, opregion->op_base + offset, field->path);
 			break;
 		default:
 			acpi_panic("acpi: undefined field flags 0x%xb: %s\n", field->field_flags, field->path);
@@ -146,23 +146,23 @@ void acpi_read_field(acpi_object_t *destination, acpi_handle_t *field)
 		case FIELD_BYTE_ACCESS:
 			mmio_byte = (uint8_t*)mmio;
 			value = (uint64_t)mmio_byte[0] >> bit_offset;
-			//acpi_printf("acpi: read 0x%xb from MMIO 0x%xq, field %s\n", (uint8_t)value, opregion->op_base + offset, field->path);
+			//acpi_debug("acpi: read 0x%xb from MMIO 0x%xq, field %s\n", (uint8_t)value, opregion->op_base + offset, field->path);
 			break;
 		case FIELD_WORD_ACCESS:
 			mmio_word = (uint16_t*)mmio;
 			value = (uint64_t)mmio_word[0] >> bit_offset;
-			//acpi_printf("acpi: read 0x%xw from MMIO 0x%xq, field %s\n", (uint16_t)value, opregion->op_base + offset, field->path);
+			//acpi_debug("acpi: read 0x%xw from MMIO 0x%xq, field %s\n", (uint16_t)value, opregion->op_base + offset, field->path);
 			break;
 		case FIELD_DWORD_ACCESS:
 		case FIELD_ANY_ACCESS:
 			mmio_dword = (uint32_t*)mmio;
 			value = (uint64_t)mmio_dword[0] >> bit_offset;
-			//acpi_printf("acpi: read dword 0x%xd from MMIO 0x%xq, field %s\n", (uint32_t)value, opregion->op_base + offset, field->path);
+			//acpi_debug("acpi: read dword 0x%xd from MMIO 0x%xq, field %s\n", (uint32_t)value, opregion->op_base + offset, field->path);
 			break;
 		case FIELD_QWORD_ACCESS:
 			mmio_qword = (uint64_t*)mmio;
 			value = mmio_qword[0] >> bit_offset;
-			//acpi_printf("acpi: read 0x%xq from MMIO 0x%xq, field %s\n", value, opregion->op_base + offset, field->path);
+			//acpi_debug("acpi: read 0x%xq from MMIO 0x%xq, field %s\n", value, opregion->op_base + offset, field->path);
 			break;
 		default:
 			acpi_panic("acpi: undefined field flags 0x%xb: %s\n", field->field_flags, field->path);
@@ -195,7 +195,7 @@ void acpi_read_field(acpi_object_t *destination, acpi_handle_t *field)
 
 		value = acpi_pci_read((uint8_t)bus_number.integer, (uint8_t)(address_number.integer >> 16) & 0xFF, (uint8_t)(address_number.integer & 0xFF), (offset & 0xFFFC) + opregion->op_base);
 
-		//acpi_printf("acpi: read 0x%xd from PCI config 0x%xw, %xb:%xb:%xb\n", value, (uint16_t)(offset & 0xFFFC) + opregion->op_base, (uint8_t)bus_number.integer, (uint8_t)(address_number.integer >> 16) & 0xFF, (uint8_t)address_number.integer & 0xFF);
+		//acpi_debug("acpi: read 0x%xd from PCI config 0x%xw, %xb:%xb:%xb\n", value, (uint16_t)(offset & 0xFFFC) + opregion->op_base, (uint8_t)bus_number.integer, (uint8_t)(address_number.integer >> 16) & 0xFF, (uint8_t)address_number.integer & 0xFF);
 		value >>= bit_offset;
 	} else
 	{
@@ -374,16 +374,16 @@ void acpi_write_field(acpi_handle_t *field, acpi_object_t *source)
 		{
 		case FIELD_BYTE_ACCESS:
 			acpi_outb(opregion->op_base + offset, (uint8_t)value);
-			//acpi_printf("acpi: wrote 0x%xb to I/O port 0x%xw\n", (uint8_t)value, opregion->op_base + offset);
+			//acpi_debug("acpi: wrote 0x%xb to I/O port 0x%xw\n", (uint8_t)value, opregion->op_base + offset);
 			break;
 		case FIELD_WORD_ACCESS:
 			acpi_outw(opregion->op_base + offset, (uint16_t)value);
-			//acpi_printf("acpi: wrote 0x%xw to I/O port 0x%xw\n", (uint16_t)value, opregion->op_base + offset);
+			//acpi_debug("acpi: wrote 0x%xw to I/O port 0x%xw\n", (uint16_t)value, opregion->op_base + offset);
 			break;
 		case FIELD_DWORD_ACCESS:
 		case FIELD_ANY_ACCESS:
 			acpi_outd(opregion->op_base + offset, (uint32_t)value);
-			//acpi_printf("acpi: wrote 0x%xd to I/O port 0x%xw\n", (uint32_t)value, opregion->op_base + offset);
+			//acpi_debug("acpi: wrote 0x%xd to I/O port 0x%xw\n", (uint32_t)value, opregion->op_base + offset);
 			break;
 		default:
 			acpi_panic("acpi: undefined field flags 0x%xb: %s\n", field->field_flags, field->path);
@@ -406,23 +406,23 @@ void acpi_write_field(acpi_handle_t *field, acpi_object_t *source)
 		case FIELD_BYTE_ACCESS:
 			mmio_byte = (uint8_t*)mmio;
 			mmio_byte[0] = (uint8_t)value;
-			//acpi_printf("acpi: wrote 0x%xb to MMIO address 0x%xq\n", (uint8_t)value, opregion->op_base + offset);
+			//acpi_debug("acpi: wrote 0x%xb to MMIO address 0x%xq\n", (uint8_t)value, opregion->op_base + offset);
 			break;
 		case FIELD_WORD_ACCESS:
 			mmio_word = (uint16_t*)mmio;
 			mmio_word[0] = (uint16_t)value;
-			//acpi_printf("acpi: wrote 0x%xw to MMIO address 0x%xq\n", (uint16_t)value, opregion->op_base + offset);
+			//acpi_debug("acpi: wrote 0x%xw to MMIO address 0x%xq\n", (uint16_t)value, opregion->op_base + offset);
 			break;
 		case FIELD_DWORD_ACCESS:
 		case FIELD_ANY_ACCESS:
 			mmio_dword = (uint32_t*)mmio;
 			mmio_dword[0] = (uint32_t)value;
-			//acpi_printf("acpi: wrote 0x%xd to MMIO address 0x%xq\n", (uint32_t)value, opregion->op_base + offset);
+			//acpi_debug("acpi: wrote 0x%xd to MMIO address 0x%xq\n", (uint32_t)value, opregion->op_base + offset);
 			break;
 		case FIELD_QWORD_ACCESS:
 			mmio_qword = (uint64_t*)mmio;
 			mmio_qword[0] = value;
-			//acpi_printf("acpi: wrote 0x%xq to MMIO address 0x%xq\n", value, opregion->op_base + offset);
+			//acpi_debug("acpi: wrote 0x%xq to MMIO address 0x%xq\n", value, opregion->op_base + offset);
 			break;
 		default:
 			acpi_panic("acpi: undefined field flags 0x%xb\n", field->field_flags);
