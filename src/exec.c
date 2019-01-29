@@ -13,8 +13,24 @@
 
 int acpi_exec(uint8_t *, size_t, acpi_state_t *, acpi_object_t *);
 
-char acpi_emulated_os[] = "Microsoft Windows NT";		// OS family
-uint64_t acpi_implemented_version = 2;					// ACPI 2.0
+const char *acpi_emulated_os = "Microsoft Windows NT";		// OS family
+uint64_t acpi_implemented_version = 2;				// ACPI 2.0
+
+const char *supported_osi_strings[] = 
+{
+	"Windows 2000",		/* Windows 2000 */
+	"Windows 2001",		/* Windows XP */
+	"Windows 2001 SP1",	/* Windows XP SP1 */
+	"Windows 2001.1",	/* Windows Server 2003 */
+	"Windows 2006",		/* Windows Vista */
+	"Windows 2006.1",	/* Windows Server 2008 */
+	"Windows 2006 SP1",	/* Windows Vista SP1 */
+	"Windows 2006 SP2",	/* Windows Vista SP2 */
+	"Windows 2009",		/* Windows 7 */
+	"Windows 2012",		/* Windows 8 */
+	"Windows 2013",		/* Windows 8.1 */
+	"Windows 2015",		/* Windows 10 */
+};
 
 // acpi_exec_method(): Finds and executes a control method
 // Param:	acpi_state_t *state - method name and arguments
@@ -30,42 +46,19 @@ int acpi_exec_method(acpi_state_t *state, acpi_object_t *method_return)
 	// When executing the _OSI() method, we'll have one parameter which contains
 	// the name of an OS. We have to pretend to be a modern version of Windows,
 	// for AML to let us use its features.
-	if(acpi_strcmp(state->name, "\\._OSI") == 0)
+	if(!acpi_strcmp(state->name, "\\._OSI"))
 	{
-		if(acpi_strcmp(state->arg[0].string, "Windows 2000") == 0)			// Windows 2000
-			osi_return = 0xFFFFFFFF;
-		else if(acpi_strcmp(state->arg[0].string, "Windows 2001") == 0)		// Windows XP
-			osi_return = 0xFFFFFFFF;
-		else if(acpi_strcmp(state->arg[0].string, "Windows 2001 SP1") == 0)	// Windows XP SP1
-			osi_return = 0xFFFFFFFF;
-		else if(acpi_strcmp(state->arg[0].string, "Windows 2001.1") == 0)	// Windows Server 2003
-			osi_return = 0xFFFFFFFF;
-		else if(acpi_strcmp(state->arg[0].string, "Windows 2001 SP2") == 0)	// Windows XP SP2
-			osi_return = 0xFFFFFFFF;
-		else if(acpi_strcmp(state->arg[0].string, "Windows 2006") == 0)		// Windows Vista
-			osi_return = 0xFFFFFFFF;
-		else if(acpi_strcmp(state->arg[0].string, "Windows 2006.1") == 0)	// Windows Server 2008
-			osi_return = 0xFFFFFFFF;
-		else if(acpi_strcmp(state->arg[0].string, "Windows 2006 SP1") == 0)	// Windows Vista SP1
-			osi_return = 0xFFFFFFFF;
-		else if(acpi_strcmp(state->arg[0].string, "Windows 2006 SP2") == 0)	// Windows Vista SP2
-			osi_return = 0xFFFFFFFF;
-		else if(acpi_strcmp(state->arg[0].string, "Windows 2009") == 0)		// Windows 7
-			osi_return = 0xFFFFFFFF;
-		else if(acpi_strcmp(state->arg[0].string, "Windows 2012") == 0)		// Windows 8
-			osi_return = 0xFFFFFFFF;
-		else if(acpi_strcmp(state->arg[0].string, "Windows 2013") == 0)		// Windows 8.1
-			osi_return = 0xFFFFFFFF;
-		else if(acpi_strcmp(state->arg[0].string, "Windows 2015") == 0)		// Windows 10
-			osi_return = 0xFFFFFFFF;
-		else if(acpi_strcmp(state->arg[0].string, "Linux") == 0)	// Linux aka buggy BIOS
+		for(int i = 0; i < (sizeof(supported_osi_strings) / sizeof(uintptr_t)); i++)
 		{
-			osi_return = 0x00000000;
-			acpi_warn("buggy BIOS requested _OSI('Linux')\n");
+			if(!acpi_strcmp(state->arg[0].string, supported_osi_strings[i]))
+			{
+				osi_return = 0xFFFFFFFF;
+				break;
+			}
 		}
 
-		else
-			osi_return = 0x00000000;	// unsupported OS
+		if(!osi_return && !acpi_strcmp(state->arg[0].string, "Linux"))
+			acpi_warn("buggy BIOS requested _OSI('Linux'), ignoring...\n");
 
 		method_return->type = ACPI_INTEGER;
 		method_return->integer = osi_return;
@@ -75,7 +68,7 @@ int acpi_exec_method(acpi_state_t *state, acpi_object_t *method_return)
 	}
 
 	// OS family -- pretend to be Windows
-	if(acpi_strcmp(state->name, "\\._OS_") == 0)
+	if(!acpi_strcmp(state->name, "\\._OS_"))
 	{
 		method_return->type = ACPI_STRING;
 		method_return->string = acpi_malloc(acpi_strlen(acpi_emulated_os));
@@ -87,7 +80,7 @@ int acpi_exec_method(acpi_state_t *state, acpi_object_t *method_return)
 
 	// All versions of Windows starting from Windows Vista claim to implement
 	// at least ACPI 2.0. Therefore we also need to do the same.
-	if(acpi_strcmp(state->name, "\\._REV") == 0)
+	if(!acpi_strcmp(state->name, "\\._REV"))
 	{
 		method_return->type = ACPI_INTEGER;
 		method_return->integer = acpi_implemented_version;
