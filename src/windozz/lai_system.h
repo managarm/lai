@@ -8,17 +8,15 @@
 
 #pragma once
 
-#define MODULE				"acpi"
-
 #include <stddef.h>
 #include <stdint.h>
 #include <debug.h>
 #include <mutex.h>
 
-#define acpi_debug			DEBUG
-#define acpi_warn			WARN
+#define acpi_debug(...)			debug_printf(LEVEL_DEBUG, "acpi", __VA_ARGS__)
+#define acpi_warn(...)			debug_printf(LEVEL_WARN, "acpi", __VA_ARGS__)
 
-#define acpi_panic(...)		ERROR(__VA_ARGS__); \
+#define acpi_panic(...)			debug_printf(LEVEL_ERROR, "acpi", __VA_ARGS__); \
 							while(1);
 
 typedef mutex_t acpi_lock_t;
