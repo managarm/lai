@@ -12,17 +12,17 @@
 
 #include "lai.h"
 
-void acpi_read_field(acpi_object_t *, acpi_handle_t *);
-void acpi_write_field(acpi_handle_t *, acpi_object_t *);
-void acpi_read_indexfield(acpi_object_t *, acpi_handle_t *);
-void acpi_write_indexfield(acpi_handle_t *, acpi_object_t *);
+void acpi_read_field(acpi_object_t *, acpi_nsnode_t *);
+void acpi_write_field(acpi_nsnode_t *, acpi_object_t *);
+void acpi_read_indexfield(acpi_object_t *, acpi_nsnode_t *);
+void acpi_write_indexfield(acpi_nsnode_t *, acpi_object_t *);
 
 // acpi_read_opregion(): Reads from an OpRegion Field or IndexField
 // Param:    acpi_object_t *destination - where to read data
-// Param:    acpi_handle_t *field - field or index field
+// Param:    acpi_nsnode_t *field - field or index field
 // Return:    Nothing
 
-void acpi_read_opregion(acpi_object_t *destination, acpi_handle_t *field)
+void acpi_read_opregion(acpi_object_t *destination, acpi_nsnode_t *field)
 {
     if(field->type == ACPI_NAMESPACE_FIELD)
         return acpi_read_field(destination, field);
@@ -34,11 +34,11 @@ void acpi_read_opregion(acpi_object_t *destination, acpi_handle_t *field)
 }
 
 // acpi_write_opregion(): Writes to a OpRegion Field or IndexField
-// Param:    acpi_handle_t *field - field or index field
+// Param:    acpi_nsnode_t *field - field or index field
 // Param:    acpi_object_t *source - data to write
 // Return:    Nothing
 
-void acpi_write_opregion(acpi_handle_t *field, acpi_object_t *source)
+void acpi_write_opregion(acpi_nsnode_t *field, acpi_object_t *source)
 {
     if(field->type == ACPI_NAMESPACE_FIELD)
         return acpi_write_field(field, source);
@@ -51,12 +51,12 @@ void acpi_write_opregion(acpi_handle_t *field, acpi_object_t *source)
 
 // acpi_read_field(): Reads from a normal field
 // Param:    acpi_object_t *destination - where to read data
-// Param:    acpi_handle_t *field - field
+// Param:    acpi_nsnode_t *field - field
 // Return:    Nothing
 
-void acpi_read_field(acpi_object_t *destination, acpi_handle_t *field)
+void acpi_read_field(acpi_object_t *destination, acpi_nsnode_t *field)
 {
-    acpi_handle_t *opregion;
+    acpi_nsnode_t *opregion;
     opregion = acpins_resolve(field->field_opregion);
     if(!opregion)
     {
@@ -207,14 +207,14 @@ void acpi_read_field(acpi_object_t *destination, acpi_handle_t *field)
 }
 
 // acpi_write_field(): Writes to a normal field
-// Param:    acpi_handle_t *field - field
+// Param:    acpi_nsnode_t *field - field
 // Param:    acpi_object_t *source - data to write
 // Return:    Nothing
 
-void acpi_write_field(acpi_handle_t *field, acpi_object_t *source)
+void acpi_write_field(acpi_nsnode_t *field, acpi_object_t *source)
 {
     // determine the flags we need in order to write
-    acpi_handle_t *opregion;
+    acpi_nsnode_t *opregion;
     opregion = acpins_resolve(field->field_opregion);
     if(!opregion)
     {
@@ -438,12 +438,12 @@ void acpi_write_field(acpi_handle_t *field, acpi_object_t *source)
 
 // acpi_read_indexfield(): Reads from an IndexField
 // Param:    acpi_object_t *destination - destination to read into
-// Param:    acpi_handle_t *indexfield - index field
+// Param:    acpi_nsnode_t *indexfield - index field
 // Return:    Nothing
 
-void acpi_read_indexfield(acpi_object_t *destination, acpi_handle_t *indexfield)
+void acpi_read_indexfield(acpi_object_t *destination, acpi_nsnode_t *indexfield)
 {
-    acpi_handle_t *field;
+    acpi_nsnode_t *field;
     field = acpins_resolve(indexfield->indexfield_index);
     if(!field)
     {
@@ -466,13 +466,13 @@ void acpi_read_indexfield(acpi_object_t *destination, acpi_handle_t *indexfield)
 }
 
 // acpi_write_indexfield(): Writes to an IndexField
-// Param:    acpi_handle_t *indexfield - index field
+// Param:    acpi_nsnode_t *indexfield - index field
 // Param:    acpi_object_t *source - data to write
 // Return:    Nothing
 
-void acpi_write_indexfield(acpi_handle_t *indexfield, acpi_object_t *source)
+void acpi_write_indexfield(acpi_nsnode_t *indexfield, acpi_object_t *source)
 {
-    acpi_handle_t *field;
+    acpi_nsnode_t *field;
     field = acpins_resolve(indexfield->indexfield_index);
     if(!field)
     {

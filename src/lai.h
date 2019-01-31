@@ -203,7 +203,7 @@ typedef struct acpi_object_t
     char name[ACPI_MAX_NAME];    // for Name References
 } acpi_object_t;
 
-typedef struct acpi_handle_t
+typedef struct acpi_nsnode_t
 {
     char path[ACPI_MAX_NAME];    // full path of object
     int type;
@@ -237,7 +237,7 @@ typedef struct acpi_handle_t
     char buffer[ACPI_MAX_NAME];        // for Buffer field
     uint64_t buffer_offset;        // for Buffer field, in bits
     uint64_t buffer_size;        // for Buffer field, in bits
-} acpi_handle_t;
+} acpi_nsnode_t;
 
 typedef struct acpi_condition_t
 {
@@ -299,7 +299,7 @@ typedef struct acpi_large_irq_t
 
 acpi_fadt_t *acpi_fadt;
 acpi_aml_t *acpi_dsdt;
-acpi_handle_t *acpi_namespace;
+acpi_nsnode_t *acpi_namespace;
 extern char acpins_path[];
 size_t acpi_namespace_entries;
 
@@ -353,22 +353,22 @@ size_t acpins_create_bytefield(void *);
 size_t acpins_create_wordfield(void *);
 size_t acpins_create_dwordfield(void *);
 size_t acpins_create_qwordfield(void *);
-acpi_handle_t *acpins_resolve(char *);
-acpi_handle_t *acpins_get_device(size_t);
-acpi_handle_t *acpins_get_deviceid(size_t, acpi_object_t *);
+acpi_nsnode_t *acpins_resolve(char *);
+acpi_nsnode_t *acpins_get_device(size_t);
+acpi_nsnode_t *acpins_get_deviceid(size_t, acpi_object_t *);
 void acpi_eisaid(acpi_object_t *, char *);
-size_t acpi_read_resource(acpi_handle_t *, acpi_resource_t *);
+size_t acpi_read_resource(acpi_nsnode_t *, acpi_resource_t *);
 
 // ACPI Control Methods
 size_t acpi_eval_object(acpi_object_t *, acpi_state_t *, void *);
 int acpi_eval(acpi_object_t *, char *);
 void acpi_copy_object(acpi_object_t *, acpi_object_t *);
 size_t acpi_write_object(void *, acpi_object_t *, acpi_state_t *);
-acpi_handle_t *acpi_exec_resolve(char *);
+acpi_nsnode_t *acpi_exec_resolve(char *);
 int acpi_exec_method(acpi_state_t *, acpi_object_t *);
 size_t acpi_methodinvoke(void *, acpi_state_t *, acpi_object_t *);
-void acpi_read_opregion(acpi_object_t *, acpi_handle_t *);
-void acpi_write_opregion(acpi_handle_t *, acpi_object_t *);
+void acpi_read_opregion(acpi_object_t *, acpi_nsnode_t *);
+void acpi_write_opregion(acpi_nsnode_t *, acpi_object_t *);
 size_t acpi_exec_store(void *, acpi_state_t *);
 size_t acpi_exec_add(void *, acpi_state_t *);
 size_t acpi_exec_name(void *, acpi_state_t *);
@@ -388,7 +388,7 @@ uint32_t acpi_bswap32(uint32_t);
 uint8_t acpi_char_to_hex(char);
 size_t acpi_exec_multiply(void *, acpi_state_t *);
 size_t acpi_exec_divide(void *, acpi_state_t *);
-void acpi_write_buffer(acpi_handle_t *, acpi_object_t *);
+void acpi_write_buffer(acpi_nsnode_t *, acpi_object_t *);
 size_t acpi_exec_bytefield(void *, acpi_state_t *);
 size_t acpi_exec_wordfield(void *, acpi_state_t *);
 size_t acpi_exec_dwordfield(void *, acpi_state_t *);

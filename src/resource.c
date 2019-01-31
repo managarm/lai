@@ -25,11 +25,11 @@
 #define ACPI_LARGE_IRQ            0x89
 
 // acpi_read_resource(): Reads a device's resource settings
-// Param:    acpi_handle_t *device - device handle
+// Param:    acpi_nsnode_t *device - device handle
 // Param:    acpi_resource_t *dest - destination array
 // Return:    size_t - count of entries successfully read
 
-size_t acpi_read_resource(acpi_handle_t *device, acpi_resource_t *dest)
+size_t acpi_read_resource(acpi_nsnode_t *device, acpi_resource_t *dest)
 {
     char crs[ACPI_MAX_NAME];
     acpi_strcpy(crs, device->path);

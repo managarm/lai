@@ -17,7 +17,7 @@ size_t acpi_acpins_count = 0;
 extern char aml_test[];
 char acpins_path[ACPI_MAX_NAME];
 
-acpi_handle_t *acpi_namespace;
+acpi_nsnode_t *acpi_namespace;
 size_t acpi_namespace_entries = 0;
 
 acpi_state_t acpins_state;    // not really used
@@ -113,7 +113,7 @@ void acpins_increment_namespace()
 {
     acpi_namespace_entries++;
     if((acpi_namespace_entries % ACPI_MAX_NAMESPACE_ENTRIES) == 0)
-        acpi_namespace = acpi_realloc(acpi_namespace, (acpi_namespace_entries + ACPI_MAX_NAMESPACE_ENTRIES + 1) * sizeof(acpi_handle_t));
+        acpi_namespace = acpi_realloc(acpi_namespace, (acpi_namespace_entries + ACPI_MAX_NAMESPACE_ENTRIES + 1) * sizeof(acpi_nsnode_t));
 }
 
 // acpi_create_namespace(): Initializes the AML interpreter and creates the ACPI namespace
@@ -127,7 +127,7 @@ void acpi_create_namespace(void *dsdt)
 
     acpi_acpins_code = acpi_malloc(CODE_WINDOW);
     acpi_acpins_allocation = CODE_WINDOW;
-    acpi_namespace = acpi_calloc(sizeof(acpi_handle_t), ACPI_MAX_NAMESPACE_ENTRIES);
+    acpi_namespace = acpi_calloc(sizeof(acpi_nsnode_t), ACPI_MAX_NAMESPACE_ENTRIES);
 
     //acpins_load_table(aml_test);    // custom AML table just for testing
 
@@ -452,7 +452,7 @@ size_t acpins_create_field(void *data)
     field += pkgsize;
 
     // determine name of opregion
-    acpi_handle_t *opregion;
+    acpi_nsnode_t *opregion;
     char opregion_name[ACPI_MAX_NAME];
     size_t name_size = 0;
 
@@ -1189,9 +1189,9 @@ size_t acpins_create_qwordfield(void *data)
 
 // acpins_resolve(): Returns a namespace object from its path
 // Param:    char *path - 4-char object name or full path
-// Return:    acpi_handle_t * - pointer to namespace object, NULL on error
+// Return:    acpi_nsnode_t * - pointer to namespace object, NULL on error
 
-acpi_handle_t *acpins_resolve(char *path)
+acpi_nsnode_t *acpins_resolve(char *path)
 {
     size_t i = 0;
 
@@ -1225,9 +1225,9 @@ acpi_handle_t *acpins_resolve(char *path)
 
 // acpins_get_device(): Returns a device by its index
 // Param:    size_t index - index
-// Return:    acpi_handle_t * - device handle, NULL on error
+// Return:    acpi_nsnode_t * - device handle, NULL on error
 
-acpi_handle_t *acpins_get_device(size_t index)
+acpi_nsnode_t *acpins_get_device(size_t index)
 {
     size_t i = 0, j = 0;
     while(j < acpi_namespace_entries)
@@ -1247,13 +1247,13 @@ acpi_handle_t *acpins_get_device(size_t index)
 // acpins_get_deviceid(): Returns a device by its index and its ID
 // Param:    size_t index - index
 // Param:    acpi_object_t *id - device ID
-// Return:    acpi_handle_t * - device handle, NULL on error
+// Return:    acpi_nsnode_t * - device handle, NULL on error
 
-acpi_handle_t *acpins_get_deviceid(size_t index, acpi_object_t *id)
+acpi_nsnode_t *acpins_get_deviceid(size_t index, acpi_object_t *id)
 {
     size_t i = 0, j = 0;
 
-    acpi_handle_t *handle;
+    acpi_nsnode_t *handle;
     char path[ACPI_MAX_NAME];
     acpi_object_t device_id;
 

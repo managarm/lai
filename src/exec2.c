@@ -21,11 +21,11 @@
 
 // acpi_exec_resolve(): Resolves a name during control method execution
 // Param:    char *path - 4-char object name or full path
-// Return:    acpi_handle_t * - pointer to namespace object, NULL on error
+// Return:    acpi_nsnode_t * - pointer to namespace object, NULL on error
 
-acpi_handle_t *acpi_exec_resolve(char *path)
+acpi_nsnode_t *acpi_exec_resolve(char *path)
 {
-    acpi_handle_t *object;
+    acpi_nsnode_t *object;
     object = acpins_resolve(path);
 
     if(acpi_strlen(path) == 4)
@@ -164,7 +164,7 @@ size_t acpi_write_object(void *data, acpi_object_t *source, acpi_state_t *state)
         char name[ACPI_MAX_NAME];
         size_t name_size;
         name_size = acpins_resolve_path(name, dest);
-        acpi_handle_t *handle = acpi_exec_resolve(name);
+        acpi_nsnode_t *handle = acpi_exec_resolve(name);
         if(!handle)
         {
             acpi_panic("acpi: undefined reference %s\n", name);
@@ -212,13 +212,13 @@ size_t acpi_write_object(void *data, acpi_object_t *source, acpi_state_t *state)
 }
 
 // acpi_write_buffer(): Writes to a Buffer Field
-// Param:    acpi_handle_t *handle - handle of buffer field
+// Param:    acpi_nsnode_t *handle - handle of buffer field
 // Param:    acpi_object_t *source - object to write
 // Return:    Nothing
 
-void acpi_write_buffer(acpi_handle_t *handle, acpi_object_t *source)
+void acpi_write_buffer(acpi_nsnode_t *handle, acpi_object_t *source)
 {
-    acpi_handle_t *buffer_handle;
+    acpi_nsnode_t *buffer_handle;
     buffer_handle = acpins_resolve(handle->buffer);
 
     if(!buffer_handle)

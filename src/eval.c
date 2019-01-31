@@ -120,7 +120,7 @@ size_t acpi_eval_object(acpi_object_t *destination, acpi_state_t *state, void *d
     size_t integer_size;
     uint64_t integer;
     size_t name_size;
-    acpi_handle_t *handle;
+    acpi_nsnode_t *handle;
     char name[ACPI_MAX_NAME];
     acpi_object_t *destination_reg;
     acpi_object_t *sizeof_object;
@@ -585,7 +585,7 @@ size_t acpi_eval_object(acpi_object_t *destination, acpi_state_t *state, void *d
         name_size = acpins_resolve_path(name, &object[0]);
         return_size += name_size;
 
-        acpi_handle_t *handle = acpi_exec_resolve(name);
+        acpi_nsnode_t *handle = acpi_exec_resolve(name);
         destination->type = ACPI_INTEGER;
 
         if(!handle)
@@ -650,7 +650,7 @@ size_t acpi_eval_object(acpi_object_t *destination, acpi_state_t *state, void *d
 
 int acpi_eval(acpi_object_t *destination, char *path)
 {
-    acpi_handle_t *handle;
+    acpi_nsnode_t *handle;
     handle = acpi_exec_resolve(path);
     if(!handle)
         return 1;

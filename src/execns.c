@@ -22,7 +22,7 @@ size_t acpi_exec_name(void *data, acpi_state_t *state)
     char path[ACPI_MAX_NAME];
     size_t size = acpins_resolve_path(path, name);
 
-    acpi_handle_t *handle;
+    acpi_nsnode_t *handle;
     handle = acpins_resolve(path);
     if(!handle)
     {

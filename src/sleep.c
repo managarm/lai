@@ -26,7 +26,7 @@ int acpi_enter_sleep(uint8_t state)
     sleep_object[2] = state + '0';
 
     // get sleeping package
-    acpi_handle_t *handle = acpins_resolve((char*)sleep_object);
+    acpi_nsnode_t *handle = acpins_resolve((char*)sleep_object);
     if(!handle)
     {
         acpi_debug("acpi: sleep state %d is not supported.\n", state);

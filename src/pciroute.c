@@ -41,7 +41,7 @@ int acpi_pci_route(acpi_resource_t *dest, uint8_t bus, uint8_t slot, uint8_t fun
     acpi_eisaid(&pnp_id, PCI_PNP_ID);
 
     size_t index = 0;
-    acpi_handle_t *handle = acpins_get_deviceid(index, &pnp_id);
+    acpi_nsnode_t *handle = acpins_get_deviceid(index, &pnp_id);
     char path[ACPI_MAX_NAME];
     int status;
 
@@ -137,7 +137,7 @@ resolve_pin:
     if(status != 0)
         return 1;
 
-    acpi_handle_t *link;        // PCI link device
+    acpi_nsnode_t *link;        // PCI link device
     acpi_resource_t *res;
     size_t res_count;
 

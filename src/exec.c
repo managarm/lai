@@ -39,7 +39,7 @@ const char *supported_osi_strings[] =
 
 int acpi_exec_method(acpi_state_t *state, acpi_object_t *method_return)
 {
-    acpi_handle_t *method;
+    acpi_nsnode_t *method;
 
     uint32_t osi_return = 0;
 
@@ -347,7 +347,7 @@ size_t acpi_methodinvoke(void *data, acpi_state_t *old_state, acpi_object_t *met
     return_size += name_size;
     methodinvokation += name_size;
 
-    acpi_handle_t *method;
+    acpi_nsnode_t *method;
     method = acpi_exec_resolve(state->name);
     if(!method)
     {
