@@ -7,6 +7,7 @@
 /* ACPI Namespace Management During Control Method Execution */
 
 #include "lai.h"
+#include "ns_impl.h"
 
 // acpi_exec_name(): Creates a Name() object in a Method's private namespace
 // Param:    void *data - data
@@ -27,11 +28,10 @@ size_t acpi_exec_name(void *data, acpi_state_t *state)
     if(!handle)
     {
         // create it if it doesn't already exist
-        acpi_namespace[acpi_namespace_entries].type = ACPI_NAMESPACE_NAME;
-        acpi_strcpy(acpi_namespace[acpi_namespace_entries].path, path);
-        handle = &acpi_namespace[acpi_namespace_entries];
-
-        acpins_increment_namespace();
+        handle = acpins_create_nsnode_or_die();
+        handle->type = ACPI_NAMESPACE_NAME;
+        acpi_strcpy(handle->path, path);
+        acpins_install_nsnode(handle);
     }
 
     return_size += size;

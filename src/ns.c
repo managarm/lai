@@ -7,6 +7,7 @@
 /* Generic ACPI Namespace Management */
 
 #include "lai.h"
+#include "ns_impl.h"
 
 #define CODE_WINDOW        65536
 
@@ -17,12 +18,41 @@ size_t acpi_acpins_count = 0;
 extern char aml_test[];
 char acpins_path[ACPI_MAX_NAME];
 
-acpi_nsnode_t *acpi_namespace;
+acpi_nsnode_t **acpi_namespace;
 size_t acpi_namespace_entries = 0;
 
 acpi_state_t acpins_state;    // not really used
 
 void acpins_load_table(void *);
+
+// Helper function to allocate a acpi_nsnode_t.
+acpi_nsnode_t *acpins_create_nsnode()
+{
+    acpi_nsnode_t *node = acpi_malloc(sizeof(acpi_nsnode_t));
+    if(!node)
+        return NULL;
+    acpi_memset(node, 0, sizeof(acpi_nsnode_t));
+    return node;
+}
+
+// Helper function to allocate a acpi_nsnode_t.
+acpi_nsnode_t *acpins_create_nsnode_or_die()
+{
+    acpi_nsnode_t *node = acpins_create_nsnode();
+    if(!node)
+        acpi_panic("acpi: could not allocate new namespace node\n");
+    return node;
+}
+
+// Installs the nsnode to the namespace.
+void acpins_install_nsnode(acpi_nsnode_t *node)
+{
+    acpi_namespace[acpi_namespace_entries] = node;
+    acpi_namespace_entries++;
+
+    if((acpi_namespace_entries % ACPI_MAX_NAMESPACE_ENTRIES) == 0)
+        acpi_namespace = acpi_realloc(acpi_namespace, (acpi_namespace_entries + ACPI_MAX_NAMESPACE_ENTRIES + 1) * sizeof(acpi_nsnode_t));
+}
 
 // acpins_resolve_path(): Resolves a path
 // Param:    char *fullpath - destination
@@ -105,17 +135,6 @@ start:
     return name_size;
 }
 
-// acpins_increment_namespace(): Increments the namespace counter
-// Param:    Nothing
-// Return:    Nothing
-
-void acpins_increment_namespace()
-{
-    acpi_namespace_entries++;
-    if((acpi_namespace_entries % ACPI_MAX_NAMESPACE_ENTRIES) == 0)
-        acpi_namespace = acpi_realloc(acpi_namespace, (acpi_namespace_entries + ACPI_MAX_NAMESPACE_ENTRIES + 1) * sizeof(acpi_nsnode_t));
-}
-
 // acpi_create_namespace(): Initializes the AML interpreter and creates the ACPI namespace
 // Param:    void *dsdt - pointer to the DSDT
 // Return:    Nothing
@@ -127,7 +146,7 @@ void acpi_create_namespace(void *dsdt)
 
     acpi_acpins_code = acpi_malloc(CODE_WINDOW);
     acpi_acpins_allocation = CODE_WINDOW;
-    acpi_namespace = acpi_calloc(sizeof(acpi_nsnode_t), ACPI_MAX_NAMESPACE_ENTRIES);
+    acpi_namespace = acpi_calloc(sizeof(acpi_nsnode_t *), ACPI_MAX_NAMESPACE_ENTRIES);
 
     //acpins_load_table(aml_test);    // custom AML table just for testing
 
@@ -156,19 +175,23 @@ void acpi_create_namespace(void *dsdt)
     }
 
     // create the OS-defined objects first
-    acpi_namespace[0].type = ACPI_NAMESPACE_METHOD;
-    acpi_strcpy(acpi_namespace[0].path, "\\._OSI");
-    acpi_namespace[0].method_flags = 0x01;
+    acpi_nsnode_t *osi_node = acpins_create_nsnode_or_die();
+    osi_node->type = ACPI_NAMESPACE_METHOD;
+    acpi_strcpy(osi_node->path, "\\._OSI");
+    osi_node->method_flags = 0x01;
+    acpins_install_nsnode(osi_node);
 
-    acpi_namespace[1].type = ACPI_NAMESPACE_METHOD;
-    acpi_strcpy(acpi_namespace[1].path, "\\._OS_");
-    acpi_namespace[1].method_flags = 0x00;
+    acpi_nsnode_t *os_node = acpins_create_nsnode_or_die();
+    os_node->type = ACPI_NAMESPACE_METHOD;
+    acpi_strcpy(os_node->path, "\\._OS_");
+    os_node->method_flags = 0x00;
+    acpins_install_nsnode(os_node);
 
-    acpi_namespace[2].type = ACPI_NAMESPACE_METHOD;
-    acpi_strcpy(acpi_namespace[2].path, "\\._REV");
-    acpi_namespace[2].method_flags = 0x00;
-
-    acpi_namespace_entries = 3;
+    acpi_nsnode_t *rev_node = acpins_create_nsnode_or_die();
+    rev_node->type = ACPI_NAMESPACE_METHOD;
+    acpi_strcpy(rev_node->path, "\\._REV");
+    rev_node->method_flags = 0x00;
+    acpins_install_nsnode(rev_node);
 
     // create the namespace with all the objects
     // most of the functions are recursive
@@ -342,23 +365,23 @@ size_t acpins_create_scope(void *data)
 
     // register the scope
     scope += pkgsize + 1;
-    size_t name_length = acpins_resolve_path(acpi_namespace[acpi_namespace_entries].path, scope);
+    acpi_nsnode_t *node = acpins_create_nsnode_or_die();
+    size_t name_length = acpins_resolve_path(node->path, scope);
 
-    //acpi_debug("scope %s, size %d bytes\n", acpi_namespace[acpi_namespace_entries].path, size);
+    //acpi_debug("scope %s, size %d bytes\n", node->path, size);
 
     // store the new current path
     char current_path[ACPI_MAX_NAME];
     acpi_strcpy(current_path, acpins_path);
 
     // and update the path
-    acpi_strcpy(acpins_path, acpi_namespace[acpi_namespace_entries].path);
+    acpi_strcpy(acpins_path, node->path);
 
     // put the scope in the namespace
-    acpi_namespace[acpi_namespace_entries].type = ACPI_NAMESPACE_SCOPE;
-    acpi_namespace[acpi_namespace_entries].size = size - pkgsize - name_length;
-    acpi_namespace[acpi_namespace_entries].pointer = (void*)(data + 1 + pkgsize + name_length);
-
-    acpins_increment_namespace();
+    node->type = ACPI_NAMESPACE_SCOPE;
+    node->size = size - pkgsize - name_length;
+    node->pointer = (void*)(data + 1 + pkgsize + name_length);
+    acpins_install_nsnode(node);
 
     // register the child objects of the scope
     acpins_register_scope((uint8_t*)data + 1 + pkgsize + name_length, size - pkgsize - name_length);
@@ -378,7 +401,8 @@ size_t acpins_create_opregion(void *data)
     opregion += 2;        // skip EXTOP_PREFIX and OPREGION opcodes
 
     // create a namespace object for the opregion
-    size_t name_length = acpins_resolve_path(acpi_namespace[acpi_namespace_entries].path, opregion);
+    acpi_nsnode_t *node = acpins_create_nsnode_or_die();
+    size_t name_length = acpins_resolve_path(node->path, opregion);
 
     opregion = (uint8_t*)data;
 
@@ -387,7 +411,7 @@ size_t acpins_create_opregion(void *data)
     uint64_t integer;
     size_t integer_size;
 
-    acpi_namespace[acpi_namespace_entries].op_address_space = opregion[size];
+    node->op_address_space = opregion[size];
     size++;
 
     integer_size = acpi_eval_object(&object, &acpins_state, &opregion[size]);
@@ -397,7 +421,7 @@ size_t acpins_create_opregion(void *data)
         acpi_panic("acpi: undefined opcode, sequence: %X %X %X %X\n", opregion[size], opregion[size+1], opregion[size+2], opregion[size+3]);
     }
 
-    acpi_namespace[acpi_namespace_entries].op_base = integer;
+    node->op_base = integer;
     size += integer_size;
 
     integer_size = acpi_eval_integer(&opregion[size], &integer);
@@ -406,33 +430,33 @@ size_t acpins_create_opregion(void *data)
         acpi_panic("acpi: undefined opcode, sequence: %X %X %X %X\n", opregion[size], opregion[size+1], opregion[size+2], opregion[size+3]);
     }
 
-    acpi_namespace[acpi_namespace_entries].op_length = integer;
+    node->op_length = integer;
     size += integer_size;
 
-    /*acpi_debug("OpRegion %s: ", acpi_namespace[acpi_namespace_entries].path);
-    switch(acpi_namespace[acpi_namespace_entries].op_address_space)
+    /*acpi_debug("OpRegion %s: ", node->path);
+    switch(node->op_address_space)
     {
     case OPREGION_MEMORY:
-        acpi_debug("MMIO: 0x%X-0x%X\n", acpi_namespace[acpi_namespace_entries].op_base, acpi_namespace[acpi_namespace_entries].op_base + acpi_namespace[acpi_namespace_entries].op_length);
+        acpi_debug("MMIO: 0x%X-0x%X\n", node->op_base, node->op_base + node->op_length);
         break;
     case OPREGION_IO:
-        acpi_debug("I/O port: 0x%X-0x%X\n", (uint16_t)(acpi_namespace[acpi_namespace_entries].op_base), (uint16_t)(acpi_namespace[acpi_namespace_entries].op_base + acpi_namespace[acpi_namespace_entries].op_length));
+        acpi_debug("I/O port: 0x%X-0x%X\n", (uint16_t)(node->op_base), (uint16_t)(node->op_base + node->op_length));
         break;
     case OPREGION_PCI:
-        acpi_debug("PCI config: 0x%X-0x%X\n", (uint16_t)(acpi_namespace[acpi_namespace_entries].op_base), (uint16_t)(acpi_namespace[acpi_namespace_entries].op_base + acpi_namespace[acpi_namespace_entries].op_length));
+        acpi_debug("PCI config: 0x%X-0x%X\n", (uint16_t)(node->op_base), (uint16_t)(node->op_base + node->op_length));
         break;
     case OPREGION_EC:
-        acpi_debug("embedded controller: 0x%X-0x%X\n", (uint8_t)(acpi_namespace[acpi_namespace_entries].op_base), (uint8_t)(acpi_namespace[acpi_namespace_entries].op_base + acpi_namespace[acpi_namespace_entries].op_length));
+        acpi_debug("embedded controller: 0x%X-0x%X\n", (uint8_t)(node->op_base), (uint8_t)(node->op_base + node->op_length));
         break;
     case OPREGION_CMOS:
-        acpi_debug("CMOS RAM: 0x%X-0x%X\n", (uint8_t)(acpi_namespace[acpi_namespace_entries].op_base), (uint8_t)(acpi_namespace[acpi_namespace_entries].op_base + acpi_namespace[acpi_namespace_entries].op_length));
+        acpi_debug("CMOS RAM: 0x%X-0x%X\n", (uint8_t)(node->op_base), (uint8_t)(node->op_base + node->op_length));
         break;
 
     default:
-        acpi_panic("unsupported address space ID 0x%X\n", acpi_namespace[acpi_namespace_entries].op_address_space);
+        acpi_panic("unsupported address space ID 0x%X\n", node->op_address_space);
     }*/
 
-    acpins_increment_namespace();
+    acpins_install_nsnode(node);
     return size;
 }
 
@@ -514,7 +538,8 @@ size_t acpins_create_field(void *data)
 
     acpi_debug(")\n");*/
 
-    acpins_increment_namespace();
+    // FIXME: Why this increment_namespace()?
+    //acpins_increment_namespace();
 
     field++;        // actual field objects
     size_t byte_count = (size_t)((size_t)field - (size_t)data);
@@ -552,21 +577,22 @@ size_t acpins_create_field(void *data)
             break;
 
         //acpi_debug("field %c%c%c%c: size %d bits, at bit offset %d\n", field[0], field[1], field[2], field[3], field[4], current_offset);
-        acpi_namespace[acpi_namespace_entries].type = ACPI_NAMESPACE_FIELD;
-        //acpi_memcpy(acpi_namespace[acpi_namespace_entries].path, acpins_path, acpi_strlen(acpins_path));
+        acpi_nsnode_t *node = acpins_create_nsnode_or_die();
+        node->type = ACPI_NAMESPACE_FIELD;
+        //acpi_memcpy(node->path, acpins_path, acpi_strlen(acpins_path));
 
-        name_size = acpins_resolve_path(acpi_namespace[acpi_namespace_entries].path, &field[0]);
+        name_size = acpins_resolve_path(node->path, &field[0]);
         field += name_size;
         byte_count += name_size;
 
-        acpi_namespace[acpi_namespace_entries].path[acpi_strlen(acpins_path)] = '.';
-        acpi_strcpy(acpi_namespace[acpi_namespace_entries].field_opregion, opregion->path);
-        acpi_namespace[acpi_namespace_entries].field_flags = field_flags;
-        acpi_namespace[acpi_namespace_entries].field_size = field[0];
-        acpi_namespace[acpi_namespace_entries].field_offset = current_offset;
+        node->path[acpi_strlen(acpins_path)] = '.';
+        acpi_strcpy(node->field_opregion, opregion->path);
+        node->field_flags = field_flags;
+        node->field_size = field[0];
+        node->field_offset = current_offset;
 
         current_offset += (uint64_t)(field[0]);
-        acpins_increment_namespace();
+        acpins_install_nsnode(node);
 
         field++;
         byte_count++;
@@ -589,19 +615,20 @@ size_t acpins_create_method(void *data)
     method += pkgsize;
 
     // create a namespace object for the method
-    size_t name_length = acpins_resolve_path(acpi_namespace[acpi_namespace_entries].path, method);
+    acpi_nsnode_t *node = acpins_create_nsnode_or_die();
+    size_t name_length = acpins_resolve_path(node->path, method);
 
     // get the method's flags
     method = (uint8_t*)data;
     method += pkgsize + name_length + 1;
 
     // put the method in the namespace
-    acpi_namespace[acpi_namespace_entries].type = ACPI_NAMESPACE_METHOD;
-    acpi_namespace[acpi_namespace_entries].method_flags = method[0];
-    acpi_namespace[acpi_namespace_entries].pointer = (void*)(method + 1);
-    acpi_namespace[acpi_namespace_entries].size = size - pkgsize - name_length - 1;
+    node->type = ACPI_NAMESPACE_METHOD;
+    node->method_flags = method[0];
+    node->pointer = (void*)(method + 1);
+    node->size = size - pkgsize - name_length - 1;
 
-    /*acpi_debug("control method %s, flags 0x%X (argc %d ", acpi_namespace[acpi_namespace_entries].path, method[0], method[0] & METHOD_ARGC_MASK);
+    /*acpi_debug("control method %s, flags 0x%X (argc %d ", node->path, method[0], method[0] & METHOD_ARGC_MASK);
     if(method[0] & METHOD_SERIALIZED)
         acpi_debug("serialized");
     else
@@ -609,7 +636,7 @@ size_t acpins_create_method(void *data)
 
     acpi_debug(")\n");*/
 
-    acpins_increment_namespace();
+    acpins_install_nsnode(node);
     return size + 1;
 }
 
@@ -628,23 +655,23 @@ size_t acpins_create_device(void *data)
     // register the device
     device += pkgsize + 2;
 
-    size_t name_length = acpins_resolve_path(acpi_namespace[acpi_namespace_entries].path, device);
+    acpi_nsnode_t *node = acpins_create_nsnode_or_die();
+    size_t name_length = acpins_resolve_path(node->path, device);
 
-    //acpi_debug("device scope %s, size %d bytes\n", acpi_namespace[acpi_namespace_entries].path, size);
+    //acpi_debug("device scope %s, size %d bytes\n", node->path, size);
 
     // store the new current path
     char current_path[ACPI_MAX_NAME];
     acpi_strcpy(current_path, acpins_path);
 
     // and update the path
-    acpi_strcpy(acpins_path, acpi_namespace[acpi_namespace_entries].path);
+    acpi_strcpy(acpins_path, node->path);
 
     // put the device scope in the namespace
-    acpi_namespace[acpi_namespace_entries].type = ACPI_NAMESPACE_DEVICE;
-    acpi_namespace[acpi_namespace_entries].size = size - pkgsize - name_length;
-    acpi_namespace[acpi_namespace_entries].pointer = (void*)(data + 2 + pkgsize + name_length);
-
-    acpins_increment_namespace();
+    node->type = ACPI_NAMESPACE_DEVICE;
+    node->size = size - pkgsize - name_length;
+    node->pointer = (void*)(data + 2 + pkgsize + name_length);
+    acpins_install_nsnode(node);
 
     // register the child objects of the device scope
     acpins_register_scope((uint8_t*)data + 2 + pkgsize + name_length, size - pkgsize - name_length);
@@ -669,23 +696,24 @@ size_t acpins_create_thermalzone(void *data)
     // register the thermalzone
     thermalzone += pkgsize + 2;
 
-    size_t name_length = acpins_resolve_path(acpi_namespace[acpi_namespace_entries].path, thermalzone);
+    acpi_nsnode_t *node = acpins_create_nsnode_or_die();
+    size_t name_length = acpins_resolve_path(node->path, thermalzone);
 
-    //acpi_debug("thermal zone %s, size %d bytes\n", acpi_namespace[acpi_namespace_entries].path, size);
+    //acpi_debug("thermal zone %s, size %d bytes\n", node->path, size);
 
     // store the new current path
     char current_path[ACPI_MAX_NAME];
     acpi_strcpy(current_path, acpins_path);
 
     // and update the path
-    acpi_strcpy(acpins_path, acpi_namespace[acpi_namespace_entries].path);
+    acpi_strcpy(acpins_path, node->path);
 
     // put the device scope in the namespace
-    acpi_namespace[acpi_namespace_entries].type = ACPI_NAMESPACE_THERMALZONE;
-    acpi_namespace[acpi_namespace_entries].size = size - pkgsize - name_length;
-    acpi_namespace[acpi_namespace_entries].pointer = (void*)(data + 2 + pkgsize + name_length);
+    node->type = ACPI_NAMESPACE_THERMALZONE;
+    node->size = size - pkgsize - name_length;
+    node->pointer = (void*)(data + 2 + pkgsize + name_length);
 
-    acpins_increment_namespace();
+    acpins_install_nsnode(node);
 
     // register the child objects of the thermal zone scope
     acpins_register_scope((uint8_t*)data + 2 + pkgsize + name_length, size - pkgsize - name_length);
@@ -706,21 +734,22 @@ size_t acpins_create_name(void *data)
     name++;            // skip NAME_OP
 
     // create a namespace object for the name object
-    size_t name_length = acpins_resolve_path(acpi_namespace[acpi_namespace_entries].path, name);
+    acpi_nsnode_t *node = acpins_create_nsnode_or_die();
+    size_t name_length = acpins_resolve_path(node->path, name);
 
     name += name_length;
-    acpi_namespace[acpi_namespace_entries].type = ACPI_NAMESPACE_NAME;
+    node->type = ACPI_NAMESPACE_NAME;
 
     size_t return_size = name_length + 1;
 
     if(name[0] == PACKAGE_OP)
     {
-        acpi_namespace[acpi_namespace_entries].object.type = ACPI_PACKAGE;
-        acpi_namespace[acpi_namespace_entries].object.package = acpi_calloc(sizeof(acpi_object_t), ACPI_MAX_PACKAGE_ENTRIES);
-        acpi_namespace[acpi_namespace_entries].object.package_size = acpins_create_package(acpi_namespace[acpi_namespace_entries].object.package, &name[0]);
+        node->object.type = ACPI_PACKAGE;
+        node->object.package = acpi_calloc(sizeof(acpi_object_t), ACPI_MAX_PACKAGE_ENTRIES);
+        node->object.package_size = acpins_create_package(node->object.package, &name[0]);
 
-        //acpi_debug("package object %s, entry count %d\n", acpi_namespace[acpi_namespace_entries].path, acpi_namespace[acpi_namespace_entries].object.package_size);
-        acpins_increment_namespace();
+        //acpi_debug("package object %s, entry count %d\n", node->path, node->object.package_size);
+        acpins_install_nsnode(node);
         return return_size;
     }
 
@@ -732,34 +761,34 @@ size_t acpins_create_name(void *data)
 
     if(integer_size != 0)
     {
-        acpi_namespace[acpi_namespace_entries].object.type = ACPI_INTEGER;
-        acpi_namespace[acpi_namespace_entries].object.integer = integer;
+        node->object.type = ACPI_INTEGER;
+        node->object.integer = integer;
     } else if(name[0] == BUFFER_OP)
     {
-        acpi_namespace[acpi_namespace_entries].object.type = ACPI_BUFFER;
-        pkgsize = acpi_parse_pkgsize(&name[1], &acpi_namespace[acpi_namespace_entries].object.buffer_size);
-        acpi_namespace[acpi_namespace_entries].object.buffer = &name[0] + pkgsize + 1;
+        node->object.type = ACPI_BUFFER;
+        pkgsize = acpi_parse_pkgsize(&name[1], &node->object.buffer_size);
+        node->object.buffer = &name[0] + pkgsize + 1;
 
-        object_size = acpi_eval_object(&object, &acpins_state, acpi_namespace[acpi_namespace_entries].object.buffer);
-        acpi_namespace[acpi_namespace_entries].object.buffer += object_size;
-        acpi_namespace[acpi_namespace_entries].object.buffer_size = object.integer;
+        object_size = acpi_eval_object(&object, &acpins_state, node->object.buffer);
+        node->object.buffer += object_size;
+        node->object.buffer_size = object.integer;
     } else if(name[0] == STRINGPREFIX)
     {
-        acpi_namespace[acpi_namespace_entries].object.type = ACPI_STRING;
-        acpi_namespace[acpi_namespace_entries].object.string = (char*)&name[1];
+        node->object.type = ACPI_STRING;
+        node->object.string = (char*)&name[1];
     } else
     {
         acpi_panic("acpi: undefined opcode in Name(), sequence: %X %X %X %X\n", name[0], name[1], name[2], name[3]);
     }
 
-    /*if(acpi_namespace[acpi_namespace_entries].object.type == ACPI_INTEGER)
-        acpi_debug("integer object %s, value 0x%X\n", acpi_namespace[acpi_namespace_entries].path, acpi_namespace[acpi_namespace_entries].object.integer);
-    else if(acpi_namespace[acpi_namespace_entries].object.type == ACPI_BUFFER)
-        acpi_debug("buffer object %s\n", acpi_namespace[acpi_namespace_entries].path);
-    else if(acpi_namespace[acpi_namespace_entries].object.type == ACPI_STRING)
-        acpi_debug("string object %s: '%s'\n", acpi_namespace[acpi_namespace_entries].path, acpi_namespace[acpi_namespace_entries].object.string);*/
+    /*if(node->object.type == ACPI_INTEGER)
+        acpi_debug("integer object %s, value 0x%X\n", node->path, node->object.integer);
+    else if(node->object.type == ACPI_BUFFER)
+        acpi_debug("buffer object %s\n", node->path);
+    else if(node->object.type == ACPI_STRING)
+        acpi_debug("string object %s: '%s'\n", node->path, node->object.string);*/
 
-    acpins_increment_namespace();
+    acpins_install_nsnode(node);
     return return_size;
 }
 
@@ -775,17 +804,18 @@ size_t acpins_create_alias(void *data)
 
     size_t name_size;
 
-    acpi_namespace[acpi_namespace_entries].type = ACPI_NAMESPACE_ALIAS;
-    name_size = acpins_resolve_path(acpi_namespace[acpi_namespace_entries].alias, alias);
+    acpi_nsnode_t *node = acpins_create_nsnode_or_die();
+    node->type = ACPI_NAMESPACE_ALIAS;
+    name_size = acpins_resolve_path(node->alias, alias);
 
     return_size += name_size;
     alias += name_size;
 
-    name_size = acpins_resolve_path(acpi_namespace[acpi_namespace_entries].path, alias);
+    name_size = acpins_resolve_path(node->path, alias);
 
-    //acpi_debug("alias %s for object %s\n", acpi_namespace[acpi_namespace_entries].path, acpi_namespace[acpi_namespace_entries].alias);
+    //acpi_debug("alias %s for object %s\n", node->path, node->alias);
 
-    acpins_increment_namespace();
+    acpins_install_nsnode(node);
     return_size += name_size;
     return return_size;
 }
@@ -800,15 +830,16 @@ size_t acpins_create_mutex(void *data)
     uint8_t *mutex = (uint8_t*)data;
     mutex += 2;        // skip MUTEX_OP
 
-    acpi_namespace[acpi_namespace_entries].type = ACPI_NAMESPACE_MUTEX;
-    size_t name_size = acpins_resolve_path(acpi_namespace[acpi_namespace_entries].path, mutex);
+    acpi_nsnode_t *node = acpins_create_nsnode_or_die();
+    node->type = ACPI_NAMESPACE_MUTEX;
+    size_t name_size = acpins_resolve_path(node->path, mutex);
 
     return_size += name_size;
     return_size++;
 
-    //acpi_debug("mutex object %s\n", acpi_namespace[acpi_namespace_entries].path);
+    //acpi_debug("mutex object %s\n", node->path);
 
-    acpins_increment_namespace();
+    acpins_install_nsnode(node);
     return return_size;
 }
 
@@ -901,19 +932,20 @@ size_t acpins_create_indexfield(void *data)
         }
 
         //acpi_debug("indexfield %c%c%c%c: size %d bits, at bit offset %d\n", indexfield[0], indexfield[1], indexfield[2], indexfield[3], indexfield[4], current_offset);
-        acpi_namespace[acpi_namespace_entries].type = ACPI_NAMESPACE_INDEXFIELD;
-        acpi_memcpy(acpi_namespace[acpi_namespace_entries].path, acpins_path, acpi_strlen(acpins_path));
-        acpi_namespace[acpi_namespace_entries].path[acpi_strlen(acpins_path)] = '.';
-        acpi_memcpy(acpi_namespace[acpi_namespace_entries].path + acpi_strlen(acpins_path) + 1, indexfield, 4);
+        acpi_nsnode_t *node = acpins_create_nsnode_or_die();
+        node->type = ACPI_NAMESPACE_INDEXFIELD;
+        acpi_memcpy(node->path, acpins_path, acpi_strlen(acpins_path));
+        node->path[acpi_strlen(acpins_path)] = '.';
+        acpi_memcpy(node->path + acpi_strlen(acpins_path) + 1, indexfield, 4);
 
-        acpi_strcpy(acpi_namespace[acpi_namespace_entries].indexfield_data, datar);
-        acpi_strcpy(acpi_namespace[acpi_namespace_entries].indexfield_index, indexr);
-        acpi_namespace[acpi_namespace_entries].indexfield_flags = flags;
-        acpi_namespace[acpi_namespace_entries].indexfield_size = indexfield[4];
-        acpi_namespace[acpi_namespace_entries].indexfield_offset = current_offset;
+        acpi_strcpy(node->indexfield_data, datar);
+        acpi_strcpy(node->indexfield_index, indexr);
+        node->indexfield_flags = flags;
+        node->indexfield_size = indexfield[4];
+        node->indexfield_offset = current_offset;
 
         current_offset += (uint64_t)(indexfield[4]);
-        acpins_increment_namespace();
+        acpins_install_nsnode(node);
 
         indexfield += 5;
         byte_count += 5;
@@ -1028,15 +1060,16 @@ size_t acpins_create_processor(void *data)
     pkgsize = acpi_parse_pkgsize(processor, &size);
     processor += pkgsize;
 
-    acpi_namespace[acpi_namespace_entries].type = ACPI_NAMESPACE_PROCESSOR;
-    size_t name_size = acpins_resolve_path(acpi_namespace[acpi_namespace_entries].path, processor);
+    acpi_nsnode_t *node = acpins_create_nsnode_or_die();
+    node->type = ACPI_NAMESPACE_PROCESSOR;
+    size_t name_size = acpins_resolve_path(node->path, processor);
     processor += name_size;
 
-    acpi_namespace[acpi_namespace_entries].cpu_id = processor[0];
+    node->cpu_id = processor[0];
 
-    //acpi_debug("processor %s ACPI ID %d\n", acpi_namespace[acpi_namespace_entries].path, acpi_namespace[acpi_namespace_entries].cpu_id);
+    //acpi_debug("processor %s ACPI ID %d\n", node->path, node->cpu_id);
 
-    acpins_increment_namespace();
+    acpins_install_nsnode(node);
 
     return size + 2;
 }
@@ -1051,11 +1084,12 @@ size_t acpins_create_bytefield(void *data)
     bytefield++;        // skip BYTEFIELD_OP
     size_t return_size = 1;
 
-    acpi_namespace[acpi_namespace_entries].type = ACPI_NAMESPACE_BUFFER_FIELD;
+    acpi_nsnode_t *node = acpins_create_nsnode_or_die();
+    node->type = ACPI_NAMESPACE_BUFFER_FIELD;
 
     // buffer name
     size_t name_size;
-    name_size = acpins_resolve_path(acpi_namespace[acpi_namespace_entries].buffer, bytefield);
+    name_size = acpins_resolve_path(node->buffer, bytefield);
 
     return_size += name_size;
     bytefield += name_size;
@@ -1064,15 +1098,15 @@ size_t acpins_create_bytefield(void *data)
     uint64_t integer;
     integer_size = acpi_eval_integer(bytefield, &integer);
 
-    acpi_namespace[acpi_namespace_entries].buffer_offset = integer * 8;
-    acpi_namespace[acpi_namespace_entries].buffer_size = 8;
+    node->buffer_offset = integer * 8;
+    node->buffer_size = 8;
 
     return_size += integer_size;
     bytefield += integer_size;
 
-    name_size = acpins_resolve_path(acpi_namespace[acpi_namespace_entries].path, bytefield);
+    name_size = acpins_resolve_path(node->path, bytefield);
 
-    acpins_increment_namespace();
+    acpins_install_nsnode(node);
     return_size += name_size;
     return return_size;
 }
@@ -1087,11 +1121,12 @@ size_t acpins_create_wordfield(void *data)
     wordfield++;        // skip WORDFIELD_OP
     size_t return_size = 1;
 
-    acpi_namespace[acpi_namespace_entries].type = ACPI_NAMESPACE_BUFFER_FIELD;
+    acpi_nsnode_t *node = acpins_create_nsnode_or_die();
+    node->type = ACPI_NAMESPACE_BUFFER_FIELD;
 
     // buffer name
     size_t name_size;
-    name_size = acpins_resolve_path(acpi_namespace[acpi_namespace_entries].buffer, wordfield);
+    name_size = acpins_resolve_path(node->buffer, wordfield);
 
     return_size += name_size;
     wordfield += name_size;
@@ -1100,17 +1135,17 @@ size_t acpins_create_wordfield(void *data)
     uint64_t integer;
     integer_size = acpi_eval_integer(wordfield, &integer);
 
-    acpi_namespace[acpi_namespace_entries].buffer_offset = integer * 8;
-    acpi_namespace[acpi_namespace_entries].buffer_size = 16;    // bits
+    node->buffer_offset = integer * 8;
+    node->buffer_size = 16;    // bits
 
     return_size += integer_size;
     wordfield += integer_size;
 
-    name_size = acpins_resolve_path(acpi_namespace[acpi_namespace_entries].path, wordfield);
+    name_size = acpins_resolve_path(node->path, wordfield);
 
-    //acpi_debug("field %s for buffer %s, offset %d size %d bits\n", acpi_namespace[acpi_namespace_entries].path, acpi_namespace[acpi_namespace_entries].buffer, acpi_namespace[acpi_namespace_entries].buffer_offset, acpi_namespace[acpi_namespace_entries].buffer_size);
+    //acpi_debug("field %s for buffer %s, offset %d size %d bits\n", node->path, node->buffer, node->buffer_offset, node->buffer_size);
 
-    acpins_increment_namespace();
+    acpins_install_nsnode(node);
     return_size += name_size;
     return return_size;
 }
@@ -1125,11 +1160,12 @@ size_t acpins_create_dwordfield(void *data)
     dwordfield++;        // skip DWORDFIELD_OP
     size_t return_size = 1;
 
-    acpi_namespace[acpi_namespace_entries].type = ACPI_NAMESPACE_BUFFER_FIELD;
+    acpi_nsnode_t *node = acpins_create_nsnode_or_die();
+    node->type = ACPI_NAMESPACE_BUFFER_FIELD;
 
     // buffer name
     size_t name_size;
-    name_size = acpins_resolve_path(acpi_namespace[acpi_namespace_entries].buffer, dwordfield);
+    name_size = acpins_resolve_path(node->buffer, dwordfield);
 
     return_size += name_size;
     dwordfield += name_size;
@@ -1138,15 +1174,15 @@ size_t acpins_create_dwordfield(void *data)
     uint64_t integer;
     integer_size = acpi_eval_integer(dwordfield, &integer);
 
-    acpi_namespace[acpi_namespace_entries].buffer_offset = integer * 8;
-    acpi_namespace[acpi_namespace_entries].buffer_size = 32;
+    node->buffer_offset = integer * 8;
+    node->buffer_size = 32;
 
     return_size += integer_size;
     dwordfield += integer_size;
 
-    name_size = acpins_resolve_path(acpi_namespace[acpi_namespace_entries].path, dwordfield);
+    name_size = acpins_resolve_path(node->path, dwordfield);
 
-    acpins_increment_namespace();
+    acpins_install_nsnode(node);
     return_size += name_size;
     return return_size;
 }
@@ -1161,11 +1197,12 @@ size_t acpins_create_qwordfield(void *data)
     qwordfield++;        // skip QWORDFIELD_OP
     size_t return_size = 1;
 
-    acpi_namespace[acpi_namespace_entries].type = ACPI_NAMESPACE_BUFFER_FIELD;
+    acpi_nsnode_t *node = acpins_create_nsnode_or_die();
+    node->type = ACPI_NAMESPACE_BUFFER_FIELD;
 
     // buffer name
     size_t name_size;
-    name_size = acpins_resolve_path(acpi_namespace[acpi_namespace_entries].buffer, qwordfield);
+    name_size = acpins_resolve_path(node->buffer, qwordfield);
 
     return_size += name_size;
     qwordfield += name_size;
@@ -1174,15 +1211,15 @@ size_t acpins_create_qwordfield(void *data)
     uint64_t integer;
     integer_size = acpi_eval_integer(qwordfield, &integer);
 
-    acpi_namespace[acpi_namespace_entries].buffer_offset = integer * 8;
-    acpi_namespace[acpi_namespace_entries].buffer_size = 64;
+    node->buffer_offset = integer * 8;
+    node->buffer_size = 64;
 
     return_size += integer_size;
     qwordfield += integer_size;
 
-    name_size = acpins_resolve_path(acpi_namespace[acpi_namespace_entries].path, qwordfield);
+    name_size = acpins_resolve_path(node->path, qwordfield);
 
-    acpins_increment_namespace();
+    acpins_install_nsnode(node);
     return_size += name_size;
     return return_size;
 }
@@ -1200,8 +1237,8 @@ acpi_nsnode_t *acpins_resolve(char *path)
         // yep, search for the absolute path
         while(i < acpi_namespace_entries)
         {
-            if(acpi_strcmp(acpi_namespace[i].path, path) == 0)
-                return &acpi_namespace[i];
+            if(acpi_strcmp(acpi_namespace[i]->path, path) == 0)
+                return acpi_namespace[i];
 
             else
                 i++;
@@ -1212,8 +1249,8 @@ acpi_nsnode_t *acpins_resolve(char *path)
     {
         while(i < acpi_namespace_entries)
         {
-            if(acpi_memcmp(acpi_namespace[i].path + acpi_strlen(acpi_namespace[i].path) - 4, path, 4) == 0)
-                return &acpi_namespace[i];
+            if(acpi_memcmp(acpi_namespace[i]->path + acpi_strlen(acpi_namespace[i]->path) - 4, path, 4) == 0)
+                return acpi_namespace[i];
 
             else
                 i++;
@@ -1232,11 +1269,11 @@ acpi_nsnode_t *acpins_get_device(size_t index)
     size_t i = 0, j = 0;
     while(j < acpi_namespace_entries)
     {
-        if(acpi_namespace[j].type == ACPI_NAMESPACE_DEVICE)
+        if(acpi_namespace[j]->type == ACPI_NAMESPACE_DEVICE)
             i++;
 
         if(i > index)
-            return &acpi_namespace[j];
+            return acpi_namespace[j];
 
         j++;
     }

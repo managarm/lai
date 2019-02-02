@@ -299,9 +299,7 @@ typedef struct acpi_large_irq_t
 
 acpi_fadt_t *acpi_fadt;
 acpi_aml_t *acpi_dsdt;
-acpi_nsnode_t *acpi_namespace;
 extern char acpins_path[];
-size_t acpi_namespace_entries;
 
 // OS-specific functions
 void *acpi_scan(char *, size_t);
@@ -329,7 +327,6 @@ void acpi_sleep(uint64_t);
 
 // The remaining of these functions are OS independent!
 // ACPI namespace functions
-void acpins_increment_namespace();
 size_t acpins_resolve_path(char *, uint8_t *);
 void acpi_create_namespace(void *);
 int acpi_is_name(char);
