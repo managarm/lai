@@ -16,7 +16,6 @@
 #define ACPI_GAS_IO            1
 #define ACPI_GAS_PCI            2
 
-#define ACPI_MAX_NAMESPACE_ENTRIES    128    // realloc()'d, to save memory
 #define ACPI_MAX_PACKAGE_ENTRIES    256    // for Package() because the size is 8 bits, VarPackage() is unlimited
 
 #define ACPI_NAMESPACE_NAME        1

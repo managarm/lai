@@ -19,7 +19,8 @@ extern char aml_test[];
 char acpins_path[ACPI_MAX_NAME];
 
 acpi_nsnode_t **acpi_namespace;
-size_t acpi_namespace_entries = 0;
+size_t acpi_ns_size = 0;
+size_t acpi_ns_capacity = 0;
 
 acpi_state_t acpins_state;    // not really used
 
@@ -47,11 +48,21 @@ acpi_nsnode_t *acpins_create_nsnode_or_die()
 // Installs the nsnode to the namespace.
 void acpins_install_nsnode(acpi_nsnode_t *node)
 {
-    acpi_namespace[acpi_namespace_entries] = node;
-    acpi_namespace_entries++;
+    // Classical doubling strategy to grow the namespace table.
+    if(acpi_ns_size == acpi_ns_capacity)
+    {
+        size_t new_capacity = acpi_ns_capacity * 2;
+        if(!new_capacity)
+            new_capacity = 128;
+        acpi_nsnode_t **new_array;
+        new_array = acpi_realloc(acpi_namespace, sizeof(acpi_nsnode_t *) * new_capacity);
+        if(!new_array)
+            acpi_panic("acpi: could not reallocate namespace table\n");
+        acpi_namespace = new_array;
+        acpi_ns_capacity = new_capacity;
+    }
 
-    if((acpi_namespace_entries % ACPI_MAX_NAMESPACE_ENTRIES) == 0)
-        acpi_namespace = acpi_realloc(acpi_namespace, (acpi_namespace_entries + ACPI_MAX_NAMESPACE_ENTRIES + 1) * sizeof(acpi_nsnode_t));
+    acpi_namespace[acpi_ns_size++] = node;
 }
 
 // acpins_resolve_path(): Resolves a path
@@ -146,7 +157,6 @@ void acpi_create_namespace(void *dsdt)
 
     acpi_acpins_code = acpi_malloc(CODE_WINDOW);
     acpi_acpins_allocation = CODE_WINDOW;
-    acpi_namespace = acpi_calloc(sizeof(acpi_nsnode_t *), ACPI_MAX_NAMESPACE_ENTRIES);
 
     //acpins_load_table(aml_test);    // custom AML table just for testing
 
@@ -197,7 +207,7 @@ void acpi_create_namespace(void *dsdt)
     // most of the functions are recursive
     acpins_register_scope(acpi_acpins_code, acpi_acpins_size);
 
-    acpi_debug("ACPI namespace created, total of %d predefined objects.\n", acpi_namespace_entries);
+    acpi_debug("ACPI namespace created, total of %d predefined objects.\n", acpi_ns_size);
 }
 
 // acpins_load_table(): Loads an AML table
@@ -1235,7 +1245,7 @@ acpi_nsnode_t *acpins_resolve(char *path)
     if(path[0] == ROOT_CHAR)        // full path?
     {
         // yep, search for the absolute path
-        while(i < acpi_namespace_entries)
+        while(i < acpi_ns_size)
         {
             if(acpi_strcmp(acpi_namespace[i]->path, path) == 0)
                 return acpi_namespace[i];
@@ -1247,7 +1257,7 @@ acpi_nsnode_t *acpins_resolve(char *path)
         return NULL;
     } else            // 4-char name here
     {
-        while(i < acpi_namespace_entries)
+        while(i < acpi_ns_size)
         {
             if(acpi_memcmp(acpi_namespace[i]->path + acpi_strlen(acpi_namespace[i]->path) - 4, path, 4) == 0)
                 return acpi_namespace[i];
@@ -1267,7 +1277,7 @@ acpi_nsnode_t *acpins_resolve(char *path)
 acpi_nsnode_t *acpins_get_device(size_t index)
 {
     size_t i = 0, j = 0;
-    while(j < acpi_namespace_entries)
+    while(j < acpi_ns_size)
     {
         if(acpi_namespace[j]->type == ACPI_NAMESPACE_DEVICE)
             i++;
