@@ -300,6 +300,7 @@ acpi_fadt_t *acpi_fadt;
 acpi_aml_t *acpi_dsdt;
 extern char acpins_path[];
 size_t acpi_ns_size;
+volatile uint16_t acpi_last_event;
 
 // OS-specific functions
 void *acpi_scan(char *, size_t);

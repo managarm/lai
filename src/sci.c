@@ -10,6 +10,8 @@
 
 static void acpi_init_children(char *);
 
+volatile uint16_t acpi_last_event = 0;
+
 // acpi_read_event(): Reads the contents of the event register
 // Return:  uint16_t - contents of event register
 
@@ -28,7 +30,8 @@ uint16_t acpi_read_event()
         acpi_outw(acpi_fadt->pm1b_event_block, b);
     }
 
-    return a | b;
+    acpi_last_event = a | b;
+    return acpi_last_event;
 }
 
 // acpi_set_event(): Sets the event enable registers

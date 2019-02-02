@@ -18,7 +18,7 @@ int acpi_enter_sleep(uint8_t state)
 {
     if(state > 5)
     {
-        acpi_debug("undefined sleep state %d\n", state);
+        acpi_debug("undefined sleep state S%d\n", state);
         return 1;
     }
 
@@ -29,7 +29,7 @@ int acpi_enter_sleep(uint8_t state)
     acpi_nsnode_t *handle = acpins_resolve((char*)sleep_object);
     if(!handle)
     {
-        acpi_debug("sleep state %d is not supported.\n", state);
+        acpi_debug("sleep state S%d is not supported.\n", state);
         return 1;
     }
 
@@ -38,11 +38,11 @@ int acpi_enter_sleep(uint8_t state)
     eval_status = acpi_eval(&package, handle->path);
     if(eval_status != 0)
     {
-        acpi_debug("sleep state %d is not supported.\n", state);
+        acpi_debug("sleep state S%d is not supported.\n", state);
         return 1;
     }
 
-    acpi_debug("entering sleep state %d...\n", state);
+    acpi_debug("entering sleep state S%d...\n", state);
 
     // ACPI spec says we should call _PTS() and _GTS() before actually sleeping
     // Who knows, it might do some required firmware-specific stuff
@@ -97,17 +97,9 @@ int acpi_enter_sleep(uint8_t state)
         acpi_outw(acpi_fadt->pm1b_control_block, data);
     }
 
-    // like an iowait()
-    acpi_outb(0x80, 0x00);
-    acpi_outb(0x80, 0x00);
-    acpi_outb(0x80, 0x00);
-    acpi_outb(0x80, 0x00);
-    acpi_outb(0x80, 0x00);
-    acpi_outb(0x80, 0x00);
-    acpi_outb(0x80, 0x00);
-    acpi_outb(0x80, 0x00);
+    /* poll the wake status */
+    while(!(acpi_last_event & ACPI_WAKE));
 
-    acpi_sleep(100);
     return 0;
 }
 
