@@ -25,7 +25,7 @@
 
 int acpi_pci_route(acpi_resource_t *dest, uint8_t bus, uint8_t slot, uint8_t function)
 {
-    //acpi_debug("acpi: attempt to resolve PCI IRQ for device %X:%X:%X\n", bus, slot, function);
+    //acpi_debug("attempt to resolve PCI IRQ for device %X:%X:%X\n", bus, slot, function);
 
     // determine the interrupt pin
     uint8_t pin = (uint8_t)(acpi_pci_read(bus, slot, function, 0x3C) >> 8);
@@ -152,7 +152,7 @@ resolve_pin:
         dest->base = prt_entry.integer;
         dest->irq_flags = ACPI_IRQ_LEVEL | ACPI_IRQ_ACTIVE_HIGH | ACPI_IRQ_SHARED;
 
-        acpi_debug("acpi: PCI device %X:%X:%X is using IRQ %d\n", bus, slot, function, (int)dest->base);
+        acpi_debug("PCI device %02X:%02X:%02X is using IRQ %d\n", bus, slot, function, (int)dest->base);
         return 0;
     } else if(prt_entry.type == ACPI_NAME)
     {
@@ -161,7 +161,7 @@ resolve_pin:
         if(!link)
             return 1;
 
-        acpi_debug("acpi: PCI interrupt link is %s\n", link->path);
+        acpi_debug("PCI interrupt link is %s\n", link->path);
 
         // read the resource template of the device
         res = acpi_calloc(sizeof(acpi_resource_t), ACPI_MAX_RESOURCES);
@@ -181,7 +181,7 @@ resolve_pin:
 
                 acpi_free(res);
 
-                acpi_debug("acpi: PCI device %X:%X:%X is using IRQ %d\n", bus, slot, function, (int)dest->base);
+                acpi_debug("PCI device %02X:%02X:%02X is using IRQ %d\n", bus, slot, function, (int)dest->base);
                 return 0;
             }
 

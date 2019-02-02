@@ -299,6 +299,7 @@ typedef struct acpi_large_irq_t
 acpi_fadt_t *acpi_fadt;
 acpi_aml_t *acpi_dsdt;
 extern char acpins_path[];
+size_t acpi_ns_size;
 
 // OS-specific functions
 void *acpi_scan(char *, size_t);
@@ -352,6 +353,7 @@ size_t acpins_create_qwordfield(void *);
 acpi_nsnode_t *acpins_resolve(char *);
 acpi_nsnode_t *acpins_get_device(size_t);
 acpi_nsnode_t *acpins_get_deviceid(size_t, acpi_object_t *);
+acpi_nsnode_t *acpins_enum(char *, size_t);
 void acpi_eisaid(acpi_object_t *, char *);
 size_t acpi_read_resource(acpi_nsnode_t *, acpi_resource_t *);
 
@@ -390,6 +392,10 @@ size_t acpi_exec_wordfield(void *, acpi_state_t *);
 size_t acpi_exec_dwordfield(void *, acpi_state_t *);
 
 // Generic Functions
+int acpi_enable(uint32_t);
+int acpi_disable();
+uint16_t acpi_read_event();
+void acpi_set_event(uint16_t);
 int acpi_enter_sleep(uint8_t);
 int acpi_pci_route(acpi_resource_t *, uint8_t, uint8_t, uint8_t);
 

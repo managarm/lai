@@ -12,6 +12,7 @@
 #include <io.h>
 #include <pci.h>
 #include <acpi.h>
+#include <timer.h>
 
 // Any OS using lai must provide implementations of the following functions
 
@@ -139,7 +140,7 @@ uint32_t acpi_pci_read(uint8_t bus, uint8_t slot, uint8_t function, uint16_t off
 
 void acpi_sleep(uint64_t time)
 {
-    return;
+    timer_sleep(time);
 }
 
 

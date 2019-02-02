@@ -224,7 +224,7 @@ size_t acpi_eval_object(acpi_object_t *destination, acpi_state_t *state, void *d
         handle = acpi_exec_resolve(name);
         if(!handle)
         {
-            acpi_panic("acpi: undefined reference %s\n", name);
+            acpi_panic("undefined reference %s\n", name);
         }
 
         // could be a named object
@@ -244,7 +244,7 @@ size_t acpi_eval_object(acpi_object_t *destination, acpi_state_t *state, void *d
             return_size += name_size;
         } else
         {
-            acpi_panic("acpi: undefined behavior when path doesn't resolve into valid data or code.\n");
+            acpi_panic("undefined behavior when path doesn't resolve into valid data or code.\n");
         }
     } else if(object[0] == SIZEOF_OP)
     {
@@ -317,7 +317,7 @@ size_t acpi_eval_object(acpi_object_t *destination, acpi_state_t *state, void *d
             return_size += acpi_eval_object(sizeof_object, state, &object[0]);*/
         } else
         {
-            acpi_panic("acpi: undefined object for SizeOf\n");
+            acpi_panic("undefined object for SizeOf\n");
         }
 
         // now determine the actual size
@@ -334,7 +334,7 @@ size_t acpi_eval_object(acpi_object_t *destination, acpi_state_t *state, void *d
 
         else
         {
-            acpi_panic("acpi: can't perform SizeOf on object type %d\n", sizeof_object->type);
+            acpi_panic("can't perform SizeOf on object type %d\n", sizeof_object->type);
         }
     } else if(object[0] == DEREF_OP)
     {
@@ -637,7 +637,7 @@ size_t acpi_eval_object(acpi_object_t *destination, acpi_state_t *state, void *d
         destination->integer = n1.integer / n2.integer;
     } else
     {
-        acpi_panic("acpi: undefined opcode, sequence: %xb %xb %xb %xb\n", object[0], object[1], object[2], object[3]);
+        acpi_panic("undefined opcode, sequence: %xb %xb %xb %xb\n", object[0], object[1], object[2], object[3]);
     }
 
     return return_size;
@@ -651,7 +651,10 @@ size_t acpi_eval_object(acpi_object_t *destination, acpi_state_t *state, void *d
 int acpi_eval(acpi_object_t *destination, char *path)
 {
     acpi_nsnode_t *handle;
-    handle = acpi_exec_resolve(path);
+    char *path_copy = acpi_malloc(acpi_strlen(path) + 1);
+    acpi_strcpy(path_copy, path);
+    handle = acpi_exec_resolve(path_copy);
+    acpi_free(path_copy);
     if(!handle)
         return 1;
 

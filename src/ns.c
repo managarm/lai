@@ -41,7 +41,7 @@ acpi_nsnode_t *acpins_create_nsnode_or_die()
 {
     acpi_nsnode_t *node = acpins_create_nsnode();
     if(!node)
-        acpi_panic("acpi: could not allocate new namespace node\n");
+        acpi_panic("could not allocate new namespace node\n");
     return node;
 }
 
@@ -57,7 +57,7 @@ void acpins_install_nsnode(acpi_nsnode_t *node)
         acpi_nsnode_t **new_array;
         new_array = acpi_realloc(acpi_namespace, sizeof(acpi_nsnode_t *) * new_capacity);
         if(!new_array)
-            acpi_panic("acpi: could not reallocate namespace table\n");
+            acpi_panic("could not reallocate namespace table\n");
         acpi_namespace = new_array;
         acpi_ns_capacity = new_capacity;
     }
@@ -159,6 +159,13 @@ void acpi_create_namespace(void *dsdt)
     acpi_acpins_allocation = CODE_WINDOW;
 
     //acpins_load_table(aml_test);    // custom AML table just for testing
+
+    // we need the FADT
+    acpi_fadt = acpi_scan("FACP", 0);
+    if(!acpi_fadt)
+    {
+        acpi_panic("unable to find ACPI FADT.\n");
+    }
 
     // load the DSDT
     acpins_load_table(dsdt);
@@ -332,7 +339,7 @@ void acpins_register_scope(uint8_t *data, size_t size)
                 break;
 
             default:
-                acpi_panic("acpi: undefined opcode, sequence: %X %X %X %X\n", data[count], data[count+1], data[count+2], data[count+3]);
+                acpi_panic("undefined opcode, sequence: %X %X %X %X\n", data[count], data[count+1], data[count+2], data[count+3]);
             }
             break;
 
@@ -356,7 +363,7 @@ void acpins_register_scope(uint8_t *data, size_t size)
             break;
 
         default:
-            acpi_panic("acpi: undefined opcode, sequence: %X %X %X %X\n", data[count], data[count+1], data[count+2], data[count+3]);
+            acpi_panic("undefined opcode, sequence: %X %X %X %X\n", data[count], data[count+1], data[count+2], data[count+3]);
         }
     }
 }
@@ -428,7 +435,7 @@ size_t acpins_create_opregion(void *data)
     integer = object.integer;
     if(integer_size == 0)
     {
-        acpi_panic("acpi: undefined opcode, sequence: %X %X %X %X\n", opregion[size], opregion[size+1], opregion[size+2], opregion[size+3]);
+        acpi_panic("undefined opcode, sequence: %X %X %X %X\n", opregion[size], opregion[size+1], opregion[size+2], opregion[size+3]);
     }
 
     node->op_base = integer;
@@ -437,7 +444,7 @@ size_t acpins_create_opregion(void *data)
     integer_size = acpi_eval_integer(&opregion[size], &integer);
     if(integer_size == 0)
     {
-        acpi_panic("acpi: undefined opcode, sequence: %X %X %X %X\n", opregion[size], opregion[size+1], opregion[size+2], opregion[size+3]);
+        acpi_panic("undefined opcode, sequence: %X %X %X %X\n", opregion[size], opregion[size+1], opregion[size+2], opregion[size+3]);
     }
 
     node->op_length = integer;
@@ -788,7 +795,7 @@ size_t acpins_create_name(void *data)
         node->object.string = (char*)&name[1];
     } else
     {
-        acpi_panic("acpi: undefined opcode in Name(), sequence: %X %X %X %X\n", name[0], name[1], name[2], name[3]);
+        acpi_panic("undefined opcode in Name(), sequence: %X %X %X %X\n", name[0], name[1], name[2], name[3]);
     }
 
     /*if(node->object.type == ACPI_INTEGER)
@@ -1049,7 +1056,7 @@ size_t acpins_create_package(acpi_object_t *destination, void *data)
         } else
         {
             // Undefined here
-            acpi_panic("acpi: undefined opcode in Package(), sequence: %X %X %X %X\n", package[j], package[j+1], package[j+2], package[j+3]);
+            acpi_panic("undefined opcode in Package(), sequence: %X %X %X %X\n", package[j], package[j+1], package[j+2], package[j+3]);
         }
     }
 
@@ -1338,6 +1345,26 @@ acpi_nsnode_t *acpins_get_deviceid(size_t index, acpi_object_t *id)
     return NULL;
 }
 
+// acpins_enum(): Enumerates children of an ACPI namespace node
+// Param:   char *parent - parent to enumerate
+// Param:   size_t index - child index
+// Return:  acpi_nsnode_t * - child node, NULL if non-existant
 
+acpi_nsnode_t *acpins_enum(char *parent, size_t index)
+{
+    index++;
+    size_t parent_size = acpi_strlen(parent);
+    for(size_t i = 0; i < acpi_ns_size; i++)
+    {
+        if(!acpi_memcmp(parent, acpi_namespace[i]->path, parent_size))
+        {
+            if(!index)
+                return acpi_namespace[i];
+            else
+                index--;
+        }
+    }
 
+    return NULL;
+}
 

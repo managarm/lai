@@ -63,7 +63,7 @@ int acpi_exec_method(acpi_state_t *state, acpi_object_t *method_return)
         method_return->type = ACPI_INTEGER;
         method_return->integer = osi_return;
 
-        acpi_debug("acpi: _OSI('%s') returned 0x%X\n", state->arg[0].string, osi_return);
+        acpi_debug("_OSI('%s') returned 0x%X\n", state->arg[0].string, osi_return);
         return 0;
     }
 
@@ -74,7 +74,7 @@ int acpi_exec_method(acpi_state_t *state, acpi_object_t *method_return)
         method_return->string = acpi_malloc(acpi_strlen(acpi_emulated_os));
         acpi_strcpy(method_return->string, acpi_emulated_os);
 
-        acpi_debug("acpi: _OS_ returned '%s'\n", method_return->string);
+        acpi_debug("_OS_ returned '%s'\n", method_return->string);
         return 0;
     }
 
@@ -85,7 +85,7 @@ int acpi_exec_method(acpi_state_t *state, acpi_object_t *method_return)
         method_return->type = ACPI_INTEGER;
         method_return->integer = acpi_implemented_version;
 
-        acpi_debug("acpi: _REV returned %d\n", method_return->integer);
+        acpi_debug("_REV returned %d\n", method_return->integer);
         return 0;
     }
 
@@ -94,11 +94,11 @@ int acpi_exec_method(acpi_state_t *state, acpi_object_t *method_return)
     if(!method)
         return -1;
 
-    //acpi_debug("acpi: execute control method %s\n", state->name);
+    //acpi_debug("execute control method %s\n", state->name);
 
     int status = acpi_exec(method->pointer, method->size, state, method_return);
 
-    /*acpi_debug("acpi: %s finished, ", state->name);
+    /*acpi_debug("%s finished, ", state->name);
 
     if(method_return->type == ACPI_INTEGER)
         acpi_debug("return value is integer: %d\n", method_return->integer);
@@ -188,7 +188,7 @@ int acpi_exec(uint8_t *method, size_t size, acpi_state_t *state, acpi_object_t *
                 i += acpi_exec_sleep(&method[i], state);
                 break;
             default:
-                acpi_panic("acpi: undefined opcode in control method %s, sequence %X %X %X %X\n", state->name, method[i], method[i+1], method[i+2], method[i+3]);
+                acpi_panic("undefined opcode in control method %s, sequence %X %X %X %X\n", state->name, method[i], method[i+1], method[i+2], method[i+3]);
             }
             break;
 
@@ -314,7 +314,7 @@ int acpi_exec(uint8_t *method, size_t size, acpi_state_t *state, acpi_object_t *
             break;
 
         default:
-            acpi_panic("acpi: undefined opcode in control method %s, sequence %X %X %X %X\n", state->name, method[i], method[i+1], method[i+2], method[i+3]);
+            acpi_panic("undefined opcode in control method %s, sequence %X %X %X %X\n", state->name, method[i], method[i+1], method[i+2], method[i+3]);
         }
     }
 
@@ -351,7 +351,7 @@ size_t acpi_methodinvoke(void *data, acpi_state_t *old_state, acpi_object_t *met
     method = acpi_exec_resolve(state->name);
     if(!method)
     {
-        acpi_panic("acpi: undefined MethodInvokation %s\n", state->name);
+        acpi_panic("undefined MethodInvokation %s\n", state->name);
     }
 
     uint8_t argc = method->method_flags & METHOD_ARGC_MASK;

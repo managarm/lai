@@ -95,7 +95,7 @@ size_t acpi_read_resource(acpi_nsnode_t *device, acpi_resource_t *dest)
                 break;
 
             default:
-                acpi_debug("acpi warning: undefined small resource, byte 0 is %xb, ignoring...\n", data[0]);
+                acpi_debug("acpi warning: undefined small resource, byte 0 is %02X, ignoring...\n", data[0]);
                 return 0;
             }
         } else
@@ -118,7 +118,7 @@ size_t acpi_read_resource(acpi_nsnode_t *device, acpi_resource_t *dest)
                 break;
 
             default:
-                acpi_debug("acpi warning: undefined large resource, byte 0 is %xb, ignoring...\n", data[0]);
+                acpi_debug("acpi warning: undefined large resource, byte 0 is %02X, ignoring...\n", data[0]);
                 return 0;
             }
         }

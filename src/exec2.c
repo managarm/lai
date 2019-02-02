@@ -167,7 +167,7 @@ size_t acpi_write_object(void *data, acpi_object_t *source, acpi_state_t *state)
         acpi_nsnode_t *handle = acpi_exec_resolve(name);
         if(!handle)
         {
-            acpi_panic("acpi: undefined reference %s\n", name);
+            acpi_panic("undefined reference %s\n", name);
         }
 
         if(handle->type == ACPI_NAMESPACE_NAME)
@@ -178,7 +178,7 @@ size_t acpi_write_object(void *data, acpi_object_t *source, acpi_state_t *state)
             acpi_write_buffer(handle, source);
         else
         {
-            acpi_panic("acpi: NameSpec destination is not a writeable object.\n");
+            acpi_panic("NameSpec destination is not a writeable object.\n");
         }
 
         return name_size;
@@ -204,11 +204,11 @@ size_t acpi_write_object(void *data, acpi_object_t *source, acpi_state_t *state)
             return return_size;
         } else
         {
-            acpi_panic("acpi: cannot write Index() to non-package object: %d\n", object.type);
+            acpi_panic("cannot write Index() to non-package object: %d\n", object.type);
         }
     }
 
-    acpi_panic("acpi: undefined opcode, sequence %X %X %X %X\n", dest[0], dest[1], dest[2], dest[3]);
+    acpi_panic("undefined opcode, sequence %X %X %X %X\n", dest[0], dest[1], dest[2], dest[3]);
 }
 
 // acpi_write_buffer(): Writes to a Buffer Field
@@ -222,7 +222,7 @@ void acpi_write_buffer(acpi_nsnode_t *handle, acpi_object_t *source)
     buffer_handle = acpins_resolve(handle->buffer);
 
     if(!buffer_handle)
-        acpi_debug("acpi: undefined reference %s\n", handle->buffer);
+        acpi_debug("undefined reference %s\n", handle->buffer);
 
     uint64_t value = source->integer;
 
