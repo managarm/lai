@@ -9,7 +9,8 @@
 #include "lai.h"
 #include "ns_impl.h"
 
-#define CODE_WINDOW        65536
+#define CODE_WINDOW            131072
+#define NAMESPACE_WINDOW       2048
 
 uint8_t *acpi_acpins_code;
 size_t acpi_acpins_allocation = 0;
@@ -20,7 +21,7 @@ char acpins_path[ACPI_MAX_NAME];
 
 acpi_nsnode_t **acpi_namespace;
 size_t acpi_ns_size = 0;
-size_t acpi_ns_capacity = 0;
+size_t acpi_ns_capacity = NAMESPACE_WINDOW;
 
 acpi_state_t acpins_state;    // not really used
 
@@ -53,7 +54,7 @@ void acpins_install_nsnode(acpi_nsnode_t *node)
     {
         size_t new_capacity = acpi_ns_capacity * 2;
         if(!new_capacity)
-            new_capacity = 128;
+            new_capacity = NAMESPACE_WINDOW;
         acpi_nsnode_t **new_array;
         new_array = acpi_realloc(acpi_namespace, sizeof(acpi_nsnode_t *) * new_capacity);
         if(!new_array)
@@ -62,6 +63,7 @@ void acpins_install_nsnode(acpi_nsnode_t *node)
         acpi_ns_capacity = new_capacity;
     }
 
+    /*acpi_debug("created %s\n", node->path);*/
     acpi_namespace[acpi_ns_size++] = node;
 }
 
@@ -152,6 +154,10 @@ start:
 
 void acpi_create_namespace(void *dsdt)
 {
+    acpi_namespace = acpi_calloc(sizeof(acpi_nsnode_t *), acpi_ns_capacity);
+    if(!acpi_namespace)
+        acpi_panic("unable to allocate memory.\n");
+
     acpi_memset(acpins_path, 0, ACPI_MAX_NAME);
     acpins_path[0] = ROOT_CHAR;
 
@@ -171,7 +177,7 @@ void acpi_create_namespace(void *dsdt)
     acpins_load_table(dsdt);
 
     // load all SSDTs
-    size_t index = 0;
+    /*size_t index = 0;
     acpi_aml_t *ssdt = acpi_scan("SSDT", index);
     while(ssdt != NULL)
     {
@@ -189,7 +195,9 @@ void acpi_create_namespace(void *dsdt)
         acpins_load_table(psdt);
         index++;
         psdt = acpi_scan("PSDT", index);
-    }
+    }*/
+
+    acpi_debug("starting...\n");
 
     // create the OS-defined objects first
     acpi_nsnode_t *osi_node = acpins_create_nsnode_or_die();
@@ -209,6 +217,8 @@ void acpi_create_namespace(void *dsdt)
     acpi_strcpy(rev_node->path, "\\._REV");
     rev_node->method_flags = 0x00;
     acpins_install_nsnode(rev_node);
+
+    acpi_debug("created OS-defined objects.\n");
 
     // create the namespace with all the objects
     // most of the functions are recursive
@@ -715,8 +725,6 @@ size_t acpins_create_thermalzone(void *data)
 
     acpi_nsnode_t *node = acpins_create_nsnode_or_die();
     size_t name_length = acpins_resolve_path(node->path, thermalzone);
-
-    //acpi_debug("thermal zone %s, size %d bytes\n", node->path, size);
 
     // store the new current path
     char current_path[ACPI_MAX_NAME];
