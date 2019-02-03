@@ -99,10 +99,17 @@ size_t acpi_parse_pkgsize(uint8_t *data, size_t *destination)
 
 int acpi_eval_package(acpi_object_t *package, size_t index, acpi_object_t *destination)
 {
-    if(index >= package->package_size)
+    if(package->type != ACPI_PACKAGE)
+    {
+        acpi_warn("attempt to evaluate non-package object.\n");
         return 1;
+    } else if(index >= package->package_size)
+    {
+        acpi_warn("attempt to evaluate index %d of package of size %d\n", index, package->package_size);
+        return 1;
+    }
 
-    acpi_memcpy(destination, &package->package[index], sizeof(acpi_object_t));
+    acpi_copy_object(destination, &package->package[index]);
     return 0;
 }
 

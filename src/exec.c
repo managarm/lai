@@ -40,6 +40,7 @@ const char *supported_osi_strings[] =
 int acpi_exec_method(acpi_state_t *state, acpi_object_t *method_return)
 {
     acpi_nsnode_t *method;
+    acpi_memset(state->local, 0, sizeof(acpi_object_t) * 8);
 
     uint32_t osi_return = 0;
 
@@ -194,6 +195,20 @@ int acpi_exec(uint8_t *method, size_t size, acpi_state_t *state, acpi_object_t *
                     acpi_panic("execution escaped out of While() body\n");
             }else if(item->kind == LAI_COND_STACKITEM)
             {
+                // If the condition wasn't taken, execute the Else() block if it exists
+                if(!item->cond_taken)
+                {
+                    if(method[i] == ELSE_OP)
+                    {
+                        size_t else_size;
+                        i++;
+                        i += acpi_parse_pkgsize(method + i, &else_size);
+                    }
+
+                    acpi_exec_pop_stack_back(state);
+                    continue;
+                }
+
                 // Clean up the execution stack at the end of If().
                 if(i == item->cond_end)
                 {
@@ -204,9 +219,7 @@ int acpi_exec(uint8_t *method, size_t size, acpi_state_t *state, acpi_object_t *
                         size_t j = i;
                         i += acpi_parse_pkgsize(method + i, &else_size);
 
-                        // If the condition was true, we skip the else.
-                        if(item->cond_taken)
-                            i = j + else_size;
+                        i = j + else_size;
                     }
 
                     acpi_exec_pop_stack_back(state);
@@ -329,8 +342,12 @@ int acpi_exec(uint8_t *method, size_t size, acpi_state_t *state, acpi_object_t *
 
             acpi_stackitem_t *cond_item = acpi_exec_push_stack_or_die(state);
             cond_item->kind = LAI_COND_STACKITEM;
-            cond_item->cond_taken = !!predicate.integer;
+            cond_item->cond_taken = predicate.integer;
             cond_item->cond_end = j + if_size;
+
+            if(!cond_item->cond_taken)
+                i = cond_item->cond_end;
+
             break;
         }
         case ELSE_OP:

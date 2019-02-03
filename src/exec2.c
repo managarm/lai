@@ -54,14 +54,93 @@ resolve_alias:
     return object;
 }
 
+// acpi_free_package(): Frees a package object and all its children
+// Param:   acpi_object_t *object
+// Return:  Nothing
+
+static void acpi_free_package(acpi_object_t *object)
+{
+    for(int i = 0; i < object->package_size; i++)
+    {
+        if(object->package[i].type == ACPI_PACKAGE)
+            acpi_free_package(&object->package[i]);
+        else if(object->package[i].type == ACPI_BUFFER)
+            acpi_free(&object->package[i].buffer);
+    }
+
+    acpi_free(object->package);
+}
+
+// acpi_copy_buffer(): Copies a buffer object
+// Param:    acpi_object_t *destination - destination
+// Param:    acpi_object_t *source - source
+// Return:   Nothing
+
+static void acpi_copy_buffer(acpi_object_t *destination, acpi_object_t *source)
+{
+    destination->type = ACPI_BUFFER;
+    destination->buffer_size = source->buffer_size;
+    destination->buffer = acpi_malloc(source->buffer_size);
+    if(!destination->buffer)
+        acpi_panic("unable to allocate memory for buffer object.\n");
+
+    acpi_memcpy(destination->buffer, source->buffer, source->buffer_size);
+}
+
+// acpi_copy_string(): Copies a string object
+// Param:    acpi_object_t *destination - destination
+// Param:    acpi_object_t *source - source
+// Return:   Nothing
+
+static void acpi_copy_string(acpi_object_t *destination, acpi_object_t *source)
+{
+    destination->type = ACPI_STRING;
+    destination->string = acpi_malloc(acpi_strlen(source->string) + 1);
+    if(!destination->string)
+        acpi_panic("unable to allocate memory for string object.\n");
+
+    acpi_strcpy(destination->string, source->string);
+}
+
+// acpi_copy_package(): Copies a package object
+// Param:    acpi_object_t *destination - destination
+// Param:    acpi_object_t *source - source
+// Return:   Nothing
+
+static void acpi_copy_package(acpi_object_t *destination, acpi_object_t *source)
+{
+    destination->type = ACPI_PACKAGE;
+    destination->package_size = source->package_size;
+    destination->package = acpi_calloc(ACPI_MAX_PACKAGE_ENTRIES, sizeof(acpi_object_t));
+
+    if(!source->package_size)
+    {
+        destination->package_size = ACPI_MAX_PACKAGE_ENTRIES;
+        return;
+    }
+
+    for(int i = 0; i < source->package_size; i++)
+        acpi_copy_object(&destination->package[i], &source->package[i]);
+}
+
 // acpi_copy_object(): Copies an object
 // Param:    acpi_object_t *destination - destination
 // Param:    acpi_object_t *source - source
-// Return:    Nothing
+// Return:   Nothing
 
 void acpi_copy_object(acpi_object_t *destination, acpi_object_t *source)
 {
-    acpi_memcpy(destination, source, sizeof(acpi_object_t));
+    if(destination == source) return;
+
+    /*if(destination->type == ACPI_BUFFER)
+        acpi_free(destination->buffer);
+    else if(destination->type == ACPI_PACKAGE)
+        acpi_free_package(destination);*/
+
+    /*if(source->type == ACPI_PACKAGE)
+        acpi_copy_package(destination, source);
+    else*/
+        acpi_memcpy(destination, source, sizeof(acpi_object_t));
 }
 
 // acpi_write_object(): Writes to an object
@@ -200,6 +279,9 @@ size_t acpi_write_object(void *data, acpi_object_t *source, acpi_state_t *state)
 
         if(object.type == ACPI_PACKAGE)
         {
+            if(index.integer >= object.package_size)
+                acpi_panic("attempt to write to index %d of package of length %d\n", index.integer, object.package_size);
+
             acpi_copy_object(&object.package[index.integer], source);
             return return_size;
         } else
