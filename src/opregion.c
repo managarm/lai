@@ -103,7 +103,7 @@ void acpi_read_field(acpi_object_t *destination, acpi_nsnode_t *field)
             break;
 
         default:
-            acpi_panic("undefined field flags 0x%X: %s\n", field->field_flags, field->path);
+            acpi_panic("undefined field flags 0x%02X: %s\n", field->field_flags, field->path);
         }
     } else
     {
@@ -131,7 +131,7 @@ void acpi_read_field(acpi_object_t *destination, acpi_nsnode_t *field)
             //acpi_debug("read 0x%X from I/O port 0x%X, field %s\n", (uint32_t)value, opregion->op_base + offset, field->path);
             break;
         default:
-            acpi_panic("undefined field flags 0x%X: %s\n", field->field_flags, field->path);
+            acpi_panic("undefined field flags 0x%02X: %s\n", field->field_flags, field->path);
         }
     } else if(opregion->op_address_space == OPREGION_MEMORY)
     {
@@ -166,7 +166,7 @@ void acpi_read_field(acpi_object_t *destination, acpi_nsnode_t *field)
             //acpi_debug("read 0x%lX from MMIO 0x%lX, field %s\n", value, opregion->op_base + offset, field->path);
             break;
         default:
-            acpi_panic("undefined field flags 0x%X: %s\n", field->field_flags, field->path);
+            acpi_panic("undefined field flags 0x%02X: %s\n", field->field_flags, field->path);
         }
     } else if(opregion->op_address_space == OPREGION_PCI)
     {
@@ -262,7 +262,7 @@ void acpi_write_field(acpi_nsnode_t *field, acpi_object_t *source)
             break;
 
         default:
-            acpi_panic("undefined field flags 0x%X: %s\n", field->field_flags, field->path);
+            acpi_panic("undefined field flags 0x%02X: %s\n", field->field_flags, field->path);
         }
     } else
     {
@@ -287,7 +287,7 @@ void acpi_write_field(acpi_nsnode_t *field, acpi_object_t *source)
             value = (uint64_t)acpi_ind(opregion->op_base + offset);
             break;
         default:
-            acpi_panic("undefined field flags 0x%X: %s\n", field->field_flags, field->path);
+            acpi_panic("undefined field flags 0x%02X: %s\n", field->field_flags, field->path);
         }
     } else if(opregion->op_address_space == OPREGION_MEMORY)
     {
@@ -318,7 +318,7 @@ void acpi_write_field(acpi_nsnode_t *field, acpi_object_t *source)
             value = mmio_qword[0];
             break;
         default:
-            acpi_panic("undefined field flags 0x%X: %s\n", field->field_flags, field->path);
+            acpi_panic("undefined field flags 0x%02X: %s\n", field->field_flags, field->path);
         }
     } else if(opregion->op_address_space == OPREGION_PCI)
     {
@@ -388,7 +388,7 @@ void acpi_write_field(acpi_nsnode_t *field, acpi_object_t *source)
             //acpi_debug("wrote 0x%X to I/O port 0x%X\n", (uint32_t)value, opregion->op_base + offset);
             break;
         default:
-            acpi_panic("undefined field flags 0x%X: %s\n", field->field_flags, field->path);
+            acpi_panic("undefined field flags 0x%02X: %s\n", field->field_flags, field->path);
         }
 
         // iowait() equivalent
@@ -427,7 +427,7 @@ void acpi_write_field(acpi_nsnode_t *field, acpi_object_t *source)
             //acpi_debug("wrote 0x%lX to MMIO address 0x%lX\n", value, opregion->op_base + offset);
             break;
         default:
-            acpi_panic("undefined field flags 0x%X\n", field->field_flags);
+            acpi_panic("undefined field flags 0x%02X\n", field->field_flags);
         }
     } else if(opregion->op_address_space == OPREGION_PCI)
     {

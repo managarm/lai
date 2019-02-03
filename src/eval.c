@@ -647,7 +647,7 @@ size_t acpi_eval_object(acpi_object_t *destination, acpi_state_t *state, void *d
         destination->integer = n1.integer / n2.integer;
     } else
     {
-        acpi_panic("undefined opcode, sequence: %xb %xb %xb %xb\n", object[0], object[1], object[2], object[3]);
+        acpi_panic("undefined opcode, sequence: %02X %02X %02X %02X\n", object[0], object[1], object[2], object[3]);
     }
 
     return return_size;

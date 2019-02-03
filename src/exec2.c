@@ -308,7 +308,7 @@ size_t acpi_write_object(void *data, acpi_object_t *source, acpi_state_t *state)
         }
     }
 
-    acpi_panic("undefined opcode, sequence %X %X %X %X\n", dest[0], dest[1], dest[2], dest[3]);
+    acpi_panic("undefined opcode, sequence %02X %02X %02X %02X\n", dest[0], dest[1], dest[2], dest[3]);
 }
 
 // acpi_write_buffer(): Writes to a Buffer Field

@@ -345,7 +345,7 @@ void acpins_register_scope(uint8_t *data, size_t size)
                 break;
 
             default:
-                acpi_panic("undefined opcode, sequence: %X %X %X %X\n", data[count], data[count+1], data[count+2], data[count+3]);
+                acpi_panic("undefined opcode, sequence: %02X %02X %02X %02X\n", data[count], data[count+1], data[count+2], data[count+3]);
             }
             break;
 
@@ -369,7 +369,7 @@ void acpins_register_scope(uint8_t *data, size_t size)
             break;
 
         default:
-            acpi_panic("undefined opcode, sequence: %X %X %X %X\n", data[count], data[count+1], data[count+2], data[count+3]);
+            acpi_panic("undefined opcode, sequence: %02X %02X %02X %02X\n", data[count], data[count+1], data[count+2], data[count+3]);
         }
     }
 }
@@ -441,7 +441,7 @@ size_t acpins_create_opregion(void *data)
     integer = object.integer;
     if(integer_size == 0)
     {
-        acpi_panic("undefined opcode, sequence: %X %X %X %X\n", opregion[size], opregion[size+1], opregion[size+2], opregion[size+3]);
+        acpi_panic("undefined opcode, sequence: %02X %02X %02X %02X\n", opregion[size], opregion[size+1], opregion[size+2], opregion[size+3]);
     }
 
     node->op_base = integer;
@@ -450,7 +450,7 @@ size_t acpins_create_opregion(void *data)
     integer_size = acpi_eval_integer(&opregion[size], &integer);
     if(integer_size == 0)
     {
-        acpi_panic("undefined opcode, sequence: %X %X %X %X\n", opregion[size], opregion[size+1], opregion[size+2], opregion[size+3]);
+        acpi_panic("undefined opcode, sequence: %02X %02X %02X %02X\n", opregion[size], opregion[size+1], opregion[size+2], opregion[size+3]);
     }
 
     node->op_length = integer;
@@ -799,7 +799,7 @@ size_t acpins_create_name(void *data)
         node->object.string = (char*)&name[1];
     } else
     {
-        acpi_panic("undefined opcode in Name(), sequence: %X %X %X %X\n", name[0], name[1], name[2], name[3]);
+        acpi_panic("undefined opcode in Name(), sequence: %02X %02X %02X %02X\n", name[0], name[1], name[2], name[3]);
     }
 
     /*if(node->object.type == ACPI_INTEGER)
@@ -1060,7 +1060,7 @@ size_t acpins_create_package(acpi_object_t *destination, void *data)
         } else
         {
             // Undefined here
-            acpi_panic("undefined opcode in Package(), sequence: %X %X %X %X\n", package[j], package[j+1], package[j+2], package[j+3]);
+            acpi_panic("undefined opcode in Package(), sequence: %02X %02X %02X %02X\n", package[j], package[j+1], package[j+2], package[j+3]);
         }
     }
 
