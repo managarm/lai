@@ -37,7 +37,6 @@
 #define ACPI_NAME            5
 
 // AML VM States
-#define ACPI_STATUS_WHILE        1
 #define ACPI_STATUS_CONDITIONAL        2
 
 // Device _STA object
@@ -246,6 +245,18 @@ typedef struct acpi_condition_t
     size_t end;
 } acpi_condition_t;
 
+#define LAI_LOOP_STACKITEM 1
+
+typedef struct acpi_stackitem_ {
+    int kind;
+    union {
+        struct {
+            size_t loop_pred;
+            size_t loop_end;
+        };
+    };
+} acpi_stackitem_t;
+
 typedef struct acpi_state_t
 {
     char name[ACPI_MAX_NAME];
@@ -254,15 +265,12 @@ typedef struct acpi_state_t
 
     // for looping
     int status;
-    acpi_object_t loop_predicate;
-    size_t loop_predicate_size;
-    size_t loop_pkgsize;
-    size_t loop_start;
-    size_t loop_end;
 
-    // conditional
+    // Stack to track the current execution state.
     int condition_level;
     acpi_condition_t condition[16];
+    int stack_ptr;
+    acpi_stackitem_t stack[16];
 } acpi_state_t;
 
 typedef struct acpi_resource_t
