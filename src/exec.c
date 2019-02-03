@@ -162,9 +162,7 @@ int acpi_exec(uint8_t *method, size_t size, acpi_state_t *state, acpi_object_t *
 
     size_t i = 0;
     acpi_object_t invoke_return;
-    state->status = 0;
     state->stack_ptr = -1;
-    size_t pkgsize, condition_size;
 
     while(i <= size)
     {
@@ -194,6 +192,26 @@ int acpi_exec(uint8_t *method, size_t size, acpi_state_t *state, acpi_object_t *
 
                 if (i > item->loop_end) // This would be an interpreter bug.
                     acpi_panic("execution escaped out of While() body\n");
+            }else if(item->kind == LAI_COND_STACKITEM)
+            {
+                // Clean up the execution stack at the end of If().
+                if(i == item->cond_end)
+                {
+                    // Consume a follow-up Else() opcode.
+                    if(i < size && method[i] == ELSE_OP) {
+                        size_t else_size;
+                        i++;
+                        size_t j = i;
+                        i += acpi_parse_pkgsize(method + i, &else_size);
+
+                        // If the condition was true, we skip the else.
+                        if(item->cond_taken)
+                            i = j + else_size;
+                    }
+
+                    acpi_exec_pop_stack_back(state);
+                    continue;
+                }
             }else
                 acpi_panic("unexpected acpi_stackitem_t\n");
         }
@@ -202,23 +220,6 @@ int acpi_exec(uint8_t *method, size_t size, acpi_state_t *state, acpi_object_t *
             break;
         if(i > size) // This would be an interpreter bug.
             acpi_panic("execution escaped out of method body\n");
-
-        /* If/Else Conditional */
-        if(!state->condition_level)
-            state->status &= ~ACPI_STATUS_CONDITIONAL;
-
-        if((state->status & ACPI_STATUS_CONDITIONAL) != 0 && i >= state->condition[state->condition_level].end)
-        {
-            if(method[i] == ELSE_OP)
-            {
-                i++;
-                pkgsize = acpi_parse_pkgsize(&method[i], &condition_size);
-                i += condition_size;
-            }
-
-            state->condition_level--;
-            continue;
-        }
 
         /* Method Invokation? */
         if(acpi_is_name(method[i]))
@@ -316,30 +317,24 @@ int acpi_exec(uint8_t *method, size_t size, acpi_state_t *state, acpi_object_t *
         }
         /* If/Else Conditional */
         case IF_OP:
+        {
+            size_t if_size;
             i++;
-            state->condition_level++;
-            state->condition[state->condition_level].end = i;
-            i += acpi_parse_pkgsize(&method[i], &state->condition[state->condition_level].pkgsize);
-            state->condition[state->condition_level].end += state->condition[state->condition_level].pkgsize;
+            size_t j = i;
+            i += acpi_parse_pkgsize(method + i, &if_size);
 
-            // evaluate the predicate
-            state->condition[state->condition_level].predicate_size = acpi_eval_object(&state->condition[state->condition_level].predicate, state, &method[i]);
-            if(state->condition[state->condition_level].predicate.integer == 0)
-            {
-                i = state->condition[state->condition_level].end;
-                state->condition_level--;
-            } else
-            {
-                state->status |= ACPI_STATUS_CONDITIONAL;
-                i += state->condition[state->condition_level].predicate_size;
-            }
+            // Evaluate the predicate
+            acpi_object_t predicate = {};
+            i += acpi_eval_object(&predicate, state, method + i);
 
+            acpi_stackitem_t *cond_item = acpi_exec_push_stack_or_die(state);
+            cond_item->kind = LAI_COND_STACKITEM;
+            cond_item->cond_taken = !!predicate.integer;
+            cond_item->cond_end = j + if_size;
             break;
-
+        }
         case ELSE_OP:
-            i++;
-            pkgsize = acpi_parse_pkgsize(&method[i], &condition_size);
-            i += pkgsize;
+            acpi_panic("Else() outside of If()\n");
             break;
 
         /* Most of the type 2 opcodes are implemented in exec2.c */
