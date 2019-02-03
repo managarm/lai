@@ -380,6 +380,7 @@ size_t acpi_read_resource(acpi_nsnode_t *, acpi_resource_t *);
 // ACPI Control Methods
 size_t acpi_eval_object(acpi_object_t *, acpi_state_t *, void *);
 int acpi_eval(acpi_object_t *, char *);
+void acpi_free_object(acpi_object_t *);
 void acpi_move_object(acpi_object_t *, acpi_object_t *);
 void acpi_copy_object(acpi_object_t *, acpi_object_t *);
 size_t acpi_write_object(void *, acpi_object_t *, acpi_state_t *);

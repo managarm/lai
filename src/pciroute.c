@@ -35,8 +35,8 @@ int acpi_pci_route(acpi_resource_t *dest, uint8_t bus, uint8_t slot, uint8_t fun
     pin--;        // because PCI numbers the pins from 1, but ACPI numbers them from 0
 
     // find the PCI bus in the namespace
-    acpi_object_t bus_number;
-    acpi_object_t pnp_id;
+    acpi_object_t bus_number = {0};
+    acpi_object_t pnp_id = {0};
 
     acpi_eisaid(&pnp_id, PCI_PNP_ID);
 
@@ -72,7 +72,9 @@ int acpi_pci_route(acpi_resource_t *dest, uint8_t bus, uint8_t slot, uint8_t fun
     acpi_strcpy(path, handle->path);
     acpi_strcpy(path + acpi_strlen(path), "._PRT");    // _PRT: PCI Routing Table
 
-    acpi_object_t prt, prt_package, prt_entry;
+    acpi_object_t prt = {0};
+    acpi_object_t prt_package = {0};
+    acpi_object_t prt_entry = {0};
 
     /* _PRT is a package of packages. Each package within the PRT is in the following format:
        0: Integer:    Address of device. Low WORD = function, high WORD = slot

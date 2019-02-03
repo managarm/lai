@@ -60,7 +60,7 @@ size_t acpi_exec_buffer(acpi_object_t *destination, acpi_state_t *state, void *d
     pkgsize = acpi_parse_pkgsize(buffer, &size);
     return_size += size;
 
-    acpi_object_t buffer_size;
+    acpi_object_t buffer_size = {0};
     buffer += pkgsize;
     buffer += acpi_eval_object(&buffer_size, state, buffer);
 

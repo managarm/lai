@@ -35,7 +35,7 @@ size_t acpi_read_resource(acpi_nsnode_t *device, acpi_resource_t *dest)
     acpi_strcpy(crs, device->path);
     acpi_strcpy(crs + acpi_strlen(crs), "._CRS");    // _CRS: current resource settings
 
-    acpi_object_t buffer;
+    acpi_object_t buffer = {0};
     int status = acpi_eval(&buffer, crs);
     if(status != 0)
         return 0;

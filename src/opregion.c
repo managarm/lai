@@ -73,7 +73,8 @@ void acpi_read_field(acpi_object_t *destination, acpi_nsnode_t *field)
 
     // these are for PCI
     char name[ACPI_MAX_NAME];
-    acpi_object_t bus_number, address_number;
+    acpi_object_t bus_number = {0};
+    acpi_object_t address_number = {0};
     int eval_status;
     size_t pci_byte_offset;
 
@@ -231,7 +232,8 @@ void acpi_write_field(acpi_nsnode_t *field, acpi_object_t *source)
 
     // these are for PCI
     char name[ACPI_MAX_NAME];
-    acpi_object_t bus_number, address_number;
+    acpi_object_t bus_number = {0};
+    acpi_object_t address_number = {0};
     int eval_status;
     size_t pci_byte_offset;
 
@@ -450,7 +452,7 @@ void acpi_read_indexfield(acpi_object_t *destination, acpi_nsnode_t *indexfield)
         acpi_panic("undefined reference %s\n", indexfield->indexfield_index);
     }
 
-    acpi_object_t index;
+    acpi_object_t index = {0};
     index.type = ACPI_INTEGER;
     index.integer = indexfield->indexfield_offset / 8;    // always byte-aligned
 
@@ -479,7 +481,7 @@ void acpi_write_indexfield(acpi_nsnode_t *indexfield, acpi_object_t *source)
         acpi_panic("undefined reference %s\n", indexfield->indexfield_index);
     }
 
-    acpi_object_t index;
+    acpi_object_t index = {0};
     index.type = ACPI_INTEGER;
     index.integer = indexfield->indexfield_offset / 8;    // always byte-aligned
 

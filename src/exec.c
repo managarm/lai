@@ -177,7 +177,7 @@ int acpi_exec(uint8_t *method, size_t size, acpi_state_t *state, acpi_object_t *
     acpi_strcpy(acpins_path, state->name);
 
     size_t i = 0;
-    acpi_object_t invoke_return;
+    acpi_object_t invoke_return = {0};
     state->stack_ptr = -1;
 
     while(i <= size)
@@ -191,7 +191,7 @@ int acpi_exec(uint8_t *method, size_t size, acpi_state_t *state, acpi_object_t *
                 {
                     // We are at the beginning of a loop. We check the predicate; if it is false,
                     // we jump to the end of the loop and remove the stack item.
-                    acpi_object_t predicate = {};
+                    acpi_object_t predicate = {0};
                     i += acpi_eval_object(&predicate, state, method + i);
                     if(!predicate.integer)
                     {
@@ -352,7 +352,7 @@ int acpi_exec(uint8_t *method, size_t size, acpi_state_t *state, acpi_object_t *
             i += acpi_parse_pkgsize(method + i, &if_size);
 
             // Evaluate the predicate
-            acpi_object_t predicate = {};
+            acpi_object_t predicate = {0};
             i += acpi_eval_object(&predicate, state, method + i);
 
             acpi_stackitem_t *cond_item = acpi_exec_push_stack_or_die(state);
@@ -499,7 +499,7 @@ size_t acpi_exec_sleep(void *data, acpi_state_t *state)
     uint8_t *opcode = (uint8_t*)data;
     opcode += 2;        // skip EXTOP_PREFIX and SLEEP_OP
 
-    acpi_object_t time;
+    acpi_object_t time = {0};
     return_size += acpi_eval_object(&time, state, &opcode[0]);
 
     if(time.integer == 0)

@@ -54,16 +54,6 @@ resolve_alias:
     return object;
 }
 
-// acpi_move_object(): Moves an object: instead of making a deep copy,
-//                     the pointers are exchanged and the source object is reset to zero.
-// Param & Return: See acpi_copy_object().
-
-void acpi_move_object(acpi_object_t *destination, acpi_object_t *source)
-{
-    acpi_memcpy(destination, source, sizeof(acpi_object_t));
-    acpi_memset(source, 0, sizeof(acpi_object_t));
-}
-
 // acpi_free_package(): Frees a package object and all its children
 // Param:   acpi_object_t *object
 // Return:  Nothing
@@ -71,14 +61,29 @@ void acpi_move_object(acpi_object_t *destination, acpi_object_t *source)
 static void acpi_free_package(acpi_object_t *object)
 {
     for(int i = 0; i < object->package_size; i++)
-    {
-        if(object->package[i].type == ACPI_PACKAGE)
-            acpi_free_package(&object->package[i]);
-        else if(object->package[i].type == ACPI_BUFFER)
-            acpi_free(&object->package[i].buffer);
-    }
-
+        acpi_free_object(&object->package[i]);
     acpi_free(object->package);
+}
+
+void acpi_free_object(acpi_object_t *object)
+{
+    if(object->type == ACPI_BUFFER)
+        acpi_free(object->buffer);
+    else if(object->type == ACPI_PACKAGE)
+        acpi_free_package(object);
+
+    acpi_memset(object, 0, sizeof(acpi_object_t));
+}
+
+// acpi_move_object(): Moves an object: instead of making a deep copy,
+//                     the pointers are exchanged and the source object is reset to zero.
+// Param & Return: See acpi_copy_object().
+
+void acpi_move_object(acpi_object_t *destination, acpi_object_t *source)
+{
+    acpi_free_object(destination);
+    acpi_memcpy(destination, source, sizeof(acpi_object_t));
+    acpi_memset(source, 0, sizeof(acpi_object_t));
 }
 
 // acpi_copy_buffer(): Copies a buffer object
@@ -140,16 +145,18 @@ static void acpi_copy_package(acpi_object_t *destination, acpi_object_t *source)
 
 void acpi_copy_object(acpi_object_t *destination, acpi_object_t *source)
 {
-    if(destination == source) return;
+    if(destination == source)
+        return;
 
-    /*if(destination->type == ACPI_BUFFER)
-        acpi_free(destination->buffer);
-    else if(destination->type == ACPI_PACKAGE)
-        acpi_free_package(destination);*/
+    acpi_free_object(destination);
 
-    /*if(source->type == ACPI_PACKAGE)
+    if(source->type == ACPI_PACKAGE)
         acpi_copy_package(destination, source);
-    else*/
+    else if(source->type == ACPI_STRING)
+        acpi_copy_string(destination, source);
+    else if(source->type == ACPI_BUFFER)
+        acpi_copy_buffer(destination, source);
+    else
         acpi_memcpy(destination, source, sizeof(acpi_object_t));
 }
 
@@ -277,7 +284,8 @@ size_t acpi_write_object(void *data, acpi_object_t *source, acpi_state_t *state)
         dest++;
 
         // the first object should be a package
-        acpi_object_t object, index;
+        acpi_object_t object = {0};
+        acpi_object_t index = {0};
 
         size_t object_size;
         object_size = acpi_eval_object(&object, state, &dest[0]);
@@ -364,7 +372,7 @@ size_t acpi_exec_store(void *data, acpi_state_t *state)
     store++;        // skip STORE_OP
 
     size_t dest_size, source_size;
-    acpi_object_t source;
+    acpi_object_t source = {0};
 
     // determine the source project
     source_size = acpi_eval_object(&source, state, &store[0]);
@@ -390,7 +398,8 @@ size_t acpi_exec_add(void *data, acpi_state_t *state)
     uint8_t *opcode = (uint8_t*)data;
     opcode++;
 
-    acpi_object_t n1, n2;
+    acpi_object_t n1 = {0};
+    acpi_object_t n2 = {0};
     size_t size;
 
     size = acpi_eval_object(&n1, state, &opcode[0]);
@@ -420,7 +429,7 @@ size_t acpi_exec_increment(void *data, acpi_state_t *state)
     uint8_t *opcode = (uint8_t*)data;
     opcode++;
 
-    acpi_object_t n;
+    acpi_object_t n = {0};
     size_t size;
 
     size = acpi_eval_object(&n, state, &opcode[0]);
@@ -442,7 +451,7 @@ size_t acpi_exec_decrement(void *data, acpi_state_t *state)
     uint8_t *opcode = (uint8_t*)data;
     opcode++;
 
-    acpi_object_t n;
+    acpi_object_t n = {0};
     size_t size;
 
     size = acpi_eval_object(&n, state, &opcode[0]);
@@ -464,7 +473,8 @@ size_t acpi_exec_and(void *data, acpi_state_t *state)
     uint8_t *opcode = (uint8_t*)data;
     opcode++;
 
-    acpi_object_t n1, n2;
+    acpi_object_t n1 = {0};
+    acpi_object_t n2 = {0};
     size_t size;
 
     size = acpi_eval_object(&n1, state, &opcode[0]);
@@ -494,7 +504,8 @@ size_t acpi_exec_or(void *data, acpi_state_t *state)
     uint8_t *opcode = (uint8_t*)data;
     opcode++;
 
-    acpi_object_t n1, n2;
+    acpi_object_t n1 = {0};
+    acpi_object_t n2 = {0};
     size_t size;
 
     size = acpi_eval_object(&n1, state, &opcode[0]);
@@ -524,7 +535,8 @@ size_t acpi_exec_subtract(void *data, acpi_state_t *state)
     uint8_t *opcode = (uint8_t*)data;
     opcode++;
 
-    acpi_object_t n1, n2;
+    acpi_object_t n1 = {0};
+    acpi_object_t n2 = {0};
     size_t size;
 
     size = acpi_eval_object(&n1, state, &opcode[0]);
@@ -554,7 +566,7 @@ size_t acpi_exec_not(void *data, acpi_state_t *state)
     uint8_t *opcode = (uint8_t*)data;
     opcode++;
 
-    acpi_object_t n1;
+    acpi_object_t n1 = {0};
     size_t size;
 
     size = acpi_eval_object(&n1, state, &opcode[0]);
@@ -579,7 +591,8 @@ size_t acpi_exec_xor(void *data, acpi_state_t *state)
     uint8_t *opcode = (uint8_t*)data;
     opcode++;
 
-    acpi_object_t n1, n2;
+    acpi_object_t n1 = {0};
+    acpi_object_t n2 = {0};
     size_t size;
 
     size = acpi_eval_object(&n1, state, &opcode[0]);
@@ -609,7 +622,8 @@ size_t acpi_exec_shl(void *data, acpi_state_t *state)
     uint8_t *opcode = (uint8_t*)data;
     opcode++;
 
-    acpi_object_t n1, n2;
+    acpi_object_t n1 = {0};
+    acpi_object_t n2 = {0};
     size_t size;
 
     size = acpi_eval_object(&n1, state, &opcode[0]);
@@ -639,7 +653,8 @@ size_t acpi_exec_shr(void *data, acpi_state_t *state)
     uint8_t *opcode = (uint8_t*)data;
     opcode++;
 
-    acpi_object_t n1, n2;
+    acpi_object_t n1 = {0};
+    acpi_object_t n2 = {0};
     size_t size;
 
     size = acpi_eval_object(&n1, state, &opcode[0]);
@@ -669,7 +684,8 @@ size_t acpi_exec_multiply(void *data, acpi_state_t *state)
     uint8_t *opcode = (uint8_t*)data;
     opcode++;
 
-    acpi_object_t n1, n2;
+    acpi_object_t n1 = {0};
+    acpi_object_t n2 = {0};
     size_t size;
 
     size = acpi_eval_object(&n1, state, &opcode[0]);
@@ -699,8 +715,10 @@ size_t acpi_exec_divide(void *data, acpi_state_t *state)
     uint8_t *opcode = (uint8_t*)data;
     opcode++;
 
-    acpi_object_t n1, n2;
-    acpi_object_t mod, quo;
+    acpi_object_t n1 = {0};
+    acpi_object_t n2 = {0};
+    acpi_object_t mod = {0};
+    acpi_object_t quo = {0};
     size_t size;
 
     size = acpi_eval_object(&n1, state, &opcode[0]);

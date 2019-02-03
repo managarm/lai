@@ -111,7 +111,7 @@ int acpi_enable(uint32_t mode)
 static void acpi_init_children(char *parent)
 {
     acpi_nsnode_t *node;
-    acpi_object_t object;
+    acpi_object_t object = {0};
     acpi_nsnode_t *handle;
     acpi_state_t state;
     char path[ACPI_MAX_NAME];

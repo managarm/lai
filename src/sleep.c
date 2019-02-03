@@ -33,7 +33,9 @@ int acpi_enter_sleep(uint8_t state)
         return 1;
     }
 
-    acpi_object_t package, slp_typa, slp_typb;
+    acpi_object_t package = {0};
+    acpi_object_t slp_typa = {0};
+    acpi_object_t slp_typb = {0};
     int eval_status;
     eval_status = acpi_eval(&package, handle->path);
     if(eval_status != 0)

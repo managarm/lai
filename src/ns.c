@@ -248,7 +248,7 @@ void acpins_register_scope(uint8_t *data, size_t size)
 {
     size_t count = 0;
     size_t pkgsize;
-    acpi_object_t predicate;
+    acpi_object_t predicate = {0};
     while(count < size)
     {
         switch(data[count])
@@ -424,7 +424,7 @@ size_t acpins_create_opregion(void *data)
     opregion = (uint8_t*)data;
 
     size_t size = name_length + 2;
-    acpi_object_t object;
+    acpi_object_t object = {0};
     uint64_t integer;
     size_t integer_size;
 
@@ -773,7 +773,7 @@ size_t acpins_create_name(void *data)
     uint64_t integer;
     size_t integer_size = acpi_eval_integer(name, &integer);
     size_t pkgsize;
-    acpi_object_t object;
+    acpi_object_t object = {0};
     size_t object_size;
 
     if(integer_size != 0)
@@ -1309,7 +1309,7 @@ acpi_nsnode_t *acpins_get_deviceid(size_t index, acpi_object_t *id)
 
     acpi_nsnode_t *handle;
     char path[ACPI_MAX_NAME];
-    acpi_object_t device_id;
+    acpi_object_t device_id = {0};
 
     handle = acpins_get_device(j);
     while(handle != NULL)

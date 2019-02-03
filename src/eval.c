@@ -131,7 +131,8 @@ size_t acpi_eval_object(acpi_object_t *destination, acpi_state_t *state, void *d
     char name[ACPI_MAX_NAME];
     acpi_object_t *destination_reg;
     acpi_object_t *sizeof_object;
-    acpi_object_t n1, n2;
+    acpi_object_t n1 = {0};
+    acpi_object_t n2 = {0};
 
     // try register
     if(object[0] >= LOCAL0_OP && object[0] <= LOCAL7_OP)
@@ -354,7 +355,8 @@ size_t acpi_eval_object(acpi_object_t *destination, acpi_state_t *state, void *d
 
         size_t index_size;
 
-        acpi_object_t ref, index;
+        acpi_object_t ref = {0};
+        acpi_object_t index = {0};
         index_size = acpi_eval_object(&ref, state, &object[0]);
         return_size += index_size;
         object += index_size;
@@ -626,7 +628,8 @@ size_t acpi_eval_object(acpi_object_t *destination, acpi_state_t *state, void *d
         return_size += integer_size;
         object += integer_size;
 
-        acpi_object_t mod, quo;
+        acpi_object_t mod = {0};
+        acpi_object_t quo = {0};
         mod.type = ACPI_INTEGER;
         quo.type = ACPI_INTEGER;
 
