@@ -177,7 +177,7 @@ void acpi_create_namespace(void *dsdt)
     acpins_load_table(dsdt);
 
     // load all SSDTs
-    /*size_t index = 0;
+    size_t index = 0;
     acpi_aml_t *ssdt = acpi_scan("SSDT", index);
     while(ssdt != NULL)
     {
@@ -195,9 +195,7 @@ void acpi_create_namespace(void *dsdt)
         acpins_load_table(psdt);
         index++;
         psdt = acpi_scan("PSDT", index);
-    }*/
-
-    acpi_debug("starting...\n");
+    }
 
     // create the OS-defined objects first
     acpi_nsnode_t *osi_node = acpins_create_nsnode_or_die();
@@ -217,8 +215,6 @@ void acpi_create_namespace(void *dsdt)
     acpi_strcpy(rev_node->path, "\\._REV");
     rev_node->method_flags = 0x00;
     acpins_install_nsnode(rev_node);
-
-    acpi_debug("created OS-defined objects.\n");
 
     // create the namespace with all the objects
     // most of the functions are recursive

@@ -68,8 +68,7 @@ int acpi_enable(uint32_t mode)
         if(!acpi_exec_method(&state))
             acpi_debug("evaluated \\._SB_._INI\n");
         acpi_finalize_state(&state);
-    }else
-        acpi_debug("\\._SB_.INI does not exist\n");
+    }
 
     /* _STA/_INI for all devices */
     acpi_init_children("\\._SB_");
@@ -85,8 +84,7 @@ int acpi_enable(uint32_t mode)
         if(!acpi_exec_method(&state))
             acpi_debug("evaluated \\._PIC(%d)\n", mode);
         acpi_finalize_state(&state);
-    }else
-        acpi_debug("\\._PIC does not exist\n");
+    }
 
     /* enable ACPI SCI */
     acpi_outb(acpi_fadt->smi_command_port, acpi_fadt->acpi_enable);
