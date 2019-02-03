@@ -67,6 +67,7 @@ int acpi_enable(uint32_t mode)
         acpi_init_call_state(&state, handle);
         if(!acpi_exec_method(&state))
             acpi_debug("evaluated \\._SB_._INI\n");
+        acpi_finalize_state(&state);
     }else
         acpi_debug("\\._SB_.INI does not exist\n");
 
@@ -83,6 +84,7 @@ int acpi_enable(uint32_t mode)
 
         if(!acpi_exec_method(&state))
             acpi_debug("evaluated \\._PIC(%d)\n", mode);
+        acpi_finalize_state(&state);
     }else
         acpi_debug("\\._PIC does not exist\n");
 
@@ -145,6 +147,7 @@ static void acpi_init_children(char *parent)
                     acpi_init_call_state(&state, handle);
                     if(!acpi_exec_method(&state))
                         acpi_debug("evaluated %s\n", state.name);
+                    acpi_finalize_state(&state);
                 }
             }
 

@@ -59,6 +59,7 @@ int acpi_enter_sleep(uint8_t state)
 
         acpi_debug("execute _PTS(%d)\n", state);
         acpi_exec_method(&acpi_state);
+        acpi_finalize_state(&acpi_state);
     }
 
     handle = acpins_resolve("_GTS");
@@ -73,6 +74,7 @@ int acpi_enter_sleep(uint8_t state)
 
         acpi_debug("execute _GTS(%d)\n", state);
         acpi_exec_method(&acpi_state);
+        acpi_finalize_state(&acpi_state);
     }
 
     acpi_eval_package(&package, 0, &slp_typa);

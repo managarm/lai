@@ -41,6 +41,12 @@ void acpi_init_call_state(acpi_state_t *state, acpi_nsnode_t *method) {
     acpi_strcpy(state->name, method->path);
 }
 
+// Finalize the interpreter state. Frees all memory owned by the state.
+
+void acpi_finalize_state(acpi_state_t *state) {
+    // TODO: Free memory occupied by buffers and packages in LocalX, ArgX and the return value.
+}
+
 // acpi_exec_method(): Finds and executes a control method
 // Param:    acpi_state_t *state - method name and arguments
 // Param:    acpi_object_t *method_return - return value of method
@@ -475,6 +481,7 @@ size_t acpi_methodinvoke(void *data, acpi_state_t *old_state, acpi_object_t *met
     // execute
     acpi_exec_method(&state);
     acpi_move_object(method_return, &state.retvalue);
+    acpi_finalize_state(&state);
 
     // restore state
     acpi_strcpy(acpins_path, path_save);

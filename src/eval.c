@@ -684,6 +684,7 @@ int acpi_eval(acpi_object_t *destination, char *path)
         if((ret = acpi_exec_method(&state)))
             return ret;
         acpi_move_object(destination, &state.retvalue);
+        acpi_finalize_state(&state);
     }
 
     return 1;
