@@ -261,7 +261,7 @@ typedef struct acpi_stackitem_ {
 
 typedef struct acpi_state_t
 {
-    char name[ACPI_MAX_NAME];
+    acpi_nsnode_t *handle;
     acpi_object_t retvalue;
     acpi_object_t arg[7];
     acpi_object_t local[8];

@@ -38,7 +38,7 @@ const char *supported_osi_strings[] =
 
 void acpi_init_call_state(acpi_state_t *state, acpi_nsnode_t *method) {
     acpi_memset(state, 0, sizeof(acpi_state_t));
-    acpi_strcpy(state->name, method->path);
+    state->handle = method;
 }
 
 // Finalize the interpreter state. Frees all memory owned by the state.
@@ -63,16 +63,14 @@ void acpi_finalize_state(acpi_state_t *state) {
 
 int acpi_exec_method(acpi_state_t *state)
 {
-    acpi_nsnode_t *method;
     acpi_memset(state->local, 0, sizeof(acpi_object_t) * 8);
-
-    uint32_t osi_return = 0;
 
     // When executing the _OSI() method, we'll have one parameter which contains
     // the name of an OS. We have to pretend to be a modern version of Windows,
     // for AML to let us use its features.
-    if(!acpi_strcmp(state->name, "\\._OSI"))
+    if(!acpi_strcmp(state->handle->path, "\\._OSI"))
     {
+        uint32_t osi_return = 0;
         for(int i = 0; i < (sizeof(supported_osi_strings) / sizeof(uintptr_t)); i++)
         {
             if(!acpi_strcmp(state->arg[0].string, supported_osi_strings[i]))
@@ -93,7 +91,7 @@ int acpi_exec_method(acpi_state_t *state)
     }
 
     // OS family -- pretend to be Windows
-    if(!acpi_strcmp(state->name, "\\._OS_"))
+    if(!acpi_strcmp(state->handle->path, "\\._OS_"))
     {
         state->retvalue.type = ACPI_STRING;
         state->retvalue.string = acpi_malloc(acpi_strlen(acpi_emulated_os));
@@ -105,7 +103,7 @@ int acpi_exec_method(acpi_state_t *state)
 
     // All versions of Windows starting from Windows Vista claim to implement
     // at least ACPI 2.0. Therefore we also need to do the same.
-    if(!acpi_strcmp(state->name, "\\._REV"))
+    if(!acpi_strcmp(state->handle->path, "\\._REV"))
     {
         state->retvalue.type = ACPI_INTEGER;
         state->retvalue.integer = acpi_implemented_version;
@@ -115,15 +113,10 @@ int acpi_exec_method(acpi_state_t *state)
     }
 
     // Okay, by here it's a real method
-    method = acpins_resolve(state->name);
-    if(!method)
-        return -1;
+    //acpi_debug("execute control method %s\n", state->handle->path);
+    int status = acpi_exec(state->handle->pointer, state->handle->size, state, &state->retvalue);
 
-    //acpi_debug("execute control method %s\n", state->name);
-
-    int status = acpi_exec(method->pointer, method->size, state, &state->retvalue);
-
-    /*acpi_debug("%s finished, ", state->name);
+    /*acpi_debug("%s finished, ", state->handle->path);
 
     if(state->retvalue.type == ACPI_INTEGER)
         acpi_debug("return value is integer: %d\n", state->retvalue.integer);
@@ -183,7 +176,7 @@ int acpi_exec(uint8_t *method, size_t size, acpi_state_t *state, acpi_object_t *
         return 0;
     }
 
-    acpi_strcpy(acpins_path, state->name);
+    acpi_strcpy(acpins_path, state->handle->path);
 
     size_t i = 0;
     acpi_object_t invoke_return = {0};
@@ -285,7 +278,8 @@ int acpi_exec(uint8_t *method, size_t size, acpi_state_t *state, acpi_object_t *
                 i += acpi_exec_sleep(&method[i], state);
                 break;
             default:
-                acpi_panic("undefined opcode in control method %s, sequence %02X %02X %02X %02X\n", state->name, method[i], method[i+1], method[i+2], method[i+3]);
+                acpi_panic("undefined opcode in control method %s, sequence %02X %02X %02X %02X\n",
+                        state->handle->path, method[i], method[i+1], method[i+2], method[i+3]);
             }
             break;
 
@@ -432,7 +426,8 @@ int acpi_exec(uint8_t *method, size_t size, acpi_state_t *state, acpi_object_t *
             break;
 
         default:
-            acpi_panic("undefined opcode in control method %s, sequence %02X %02X %02X %02X\n", state->name, method[i], method[i+1], method[i+2], method[i+3]);
+            acpi_panic("undefined opcode in control method %s, sequence %02X %02X %02X %02X\n",
+                    state->handle->path, method[i], method[i+1], method[i+2], method[i+3]);
         }
     }
 

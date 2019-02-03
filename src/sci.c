@@ -144,7 +144,7 @@ static void acpi_init_children(char *parent)
                 {
                     acpi_init_call_state(&state, handle);
                     if(!acpi_exec_method(&state))
-                        acpi_debug("evaluated %s\n", state.name);
+                        acpi_debug("evaluated %s\n", path);
                     acpi_finalize_state(&state);
                 }
             }
