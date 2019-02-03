@@ -47,12 +47,11 @@ int acpi_enter_sleep(uint8_t state)
     // ACPI spec says we should call _PTS() and _GTS() before actually sleeping
     // Who knows, it might do some required firmware-specific stuff
     acpi_state_t acpi_state;
-    acpi_memset(&acpi_state, 0, sizeof(acpi_state_t));
     handle = acpins_resolve("_PTS");
 
     if(handle)
     {
-        acpi_strcpy(acpi_state.name, handle->path);
+        acpi_init_call_state(&acpi_state, handle);
 
         // pass the sleeping type as an argument
         acpi_arg(&acpi_state, 0)->type = ACPI_INTEGER;
@@ -62,12 +61,11 @@ int acpi_enter_sleep(uint8_t state)
         acpi_exec_method(&acpi_state);
     }
 
-    acpi_memset(&acpi_state, 0, sizeof(acpi_state_t));
     handle = acpins_resolve("_GTS");
 
     if(handle)
     {
-        acpi_strcpy(acpi_state.name, handle->path);
+        acpi_init_call_state(&acpi_state, handle);
 
         // pass the sleeping type as an argument
         acpi_arg(&acpi_state, 0)->type = ACPI_INTEGER;

@@ -32,6 +32,15 @@ const char *supported_osi_strings[] =
     "Windows 2015",        /* Windows 10 */
 };
 
+// Prepare the interpreter state for a control method call.
+// Param: acpi_state_t *state - will store method name and arguments
+// Param: acpi_nsnode_t *method - identifies the control method
+
+void acpi_init_call_state(acpi_state_t *state, acpi_nsnode_t *method) {
+    acpi_memset(state, 0, sizeof(acpi_state_t));
+    acpi_strcpy(state->name, method->path);
+}
+
 // acpi_exec_method(): Finds and executes a control method
 // Param:    acpi_state_t *state - method name and arguments
 // Param:    acpi_object_t *method_return - return value of method
@@ -436,18 +445,17 @@ size_t acpi_methodinvoke(void *data, acpi_state_t *old_state, acpi_object_t *met
     size_t return_size = 0;
 
     // determine the name of the method
-    acpi_state_t *state = acpi_malloc(sizeof(acpi_state_t));
-    size_t name_size = acpins_resolve_path(state->name, methodinvokation);
+    char path[ACPI_MAX_NAME];
+    size_t name_size = acpins_resolve_path(path, methodinvokation);
     return_size += name_size;
     methodinvokation += name_size;
 
-    acpi_nsnode_t *method;
-    method = acpi_exec_resolve(state->name);
+    acpi_nsnode_t *method = acpi_exec_resolve(path);
     if(!method)
-    {
-        acpi_panic("undefined MethodInvokation %s\n", state->name);
-    }
+        acpi_panic("undefined MethodInvokation %s\n", path);
 
+    acpi_state_t state;
+    acpi_init_call_state(&state, method);
     uint8_t argc = method->method_flags & METHOD_ARGC_MASK;
     uint8_t current_argc = 0;
     size_t arg_size;
@@ -456,7 +464,7 @@ size_t acpi_methodinvoke(void *data, acpi_state_t *old_state, acpi_object_t *met
         // parse method arguments here
         while(current_argc < argc)
         {
-            arg_size = acpi_eval_object(&state->arg[current_argc], old_state, methodinvokation);
+            arg_size = acpi_eval_object(&state.arg[current_argc], old_state, methodinvokation);
             methodinvokation += arg_size;
             return_size += arg_size;
 
@@ -465,8 +473,8 @@ size_t acpi_methodinvoke(void *data, acpi_state_t *old_state, acpi_object_t *met
     }
 
     // execute
-    acpi_exec_method(state);
-    acpi_move_object(method_return, &state->retvalue);
+    acpi_exec_method(&state);
+    acpi_move_object(method_return, &state.retvalue);
 
     // restore state
     acpi_strcpy(acpins_path, path_save);

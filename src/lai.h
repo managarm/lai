@@ -271,6 +271,8 @@ typedef struct acpi_state_t
     acpi_stackitem_t stack[16];
 } acpi_state_t;
 
+void acpi_init_call_state(acpi_state_t *, acpi_nsnode_t *);
+
 __attribute__((always_inline))
 inline acpi_object_t *acpi_retvalue(acpi_state_t *state) {
     return &state->retvalue;

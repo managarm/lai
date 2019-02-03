@@ -679,8 +679,7 @@ int acpi_eval(acpi_object_t *destination, char *path)
     } else if(handle->type == ACPI_NAMESPACE_METHOD)
     {
         acpi_state_t state;
-        acpi_memset(&state, 0, sizeof(acpi_state_t));
-        acpi_strcpy(state.name, path);
+        acpi_init_call_state(&state, handle);
         int ret;
         if((ret = acpi_exec_method(&state)))
             return ret;
