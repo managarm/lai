@@ -74,8 +74,8 @@ int acpi_enable(uint32_t mode)
     acpi_memset(&state, 0, sizeof(acpi_state_t));
 
     acpi_strcpy(state.name, "\\._PIC");
-    state.arg[0].type = ACPI_INTEGER;
-    state.arg[0].integer = mode;
+    acpi_arg(&state, 0)->type = ACPI_INTEGER;
+    acpi_arg(&state, 0)->integer = mode;
 
     if(!acpi_exec_method(&state))
         acpi_debug("evaluated \\._PIC(%d)\n", mode);

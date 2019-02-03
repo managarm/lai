@@ -271,6 +271,16 @@ typedef struct acpi_state_t
     acpi_stackitem_t stack[16];
 } acpi_state_t;
 
+__attribute__((always_inline))
+inline acpi_object_t *acpi_retvalue(acpi_state_t *state) {
+    return &state->retvalue;
+}
+
+__attribute__((always_inline))
+inline acpi_object_t *acpi_arg(acpi_state_t *state, int n) {
+    return &state->arg[n];
+}
+
 typedef struct acpi_resource_t
 {
     uint8_t type;

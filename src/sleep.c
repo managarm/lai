@@ -55,8 +55,8 @@ int acpi_enter_sleep(uint8_t state)
         acpi_strcpy(acpi_state.name, handle->path);
 
         // pass the sleeping type as an argument
-        acpi_state.arg[0].type = ACPI_INTEGER;
-        acpi_state.arg[0].integer = (uint64_t)state & 0xFF;
+        acpi_arg(&acpi_state, 0)->type = ACPI_INTEGER;
+        acpi_arg(&acpi_state, 0)->integer = (uint64_t)state & 0xFF;
 
         acpi_debug("execute _PTS(%d)\n", state);
         acpi_exec_method(&acpi_state);
@@ -70,8 +70,8 @@ int acpi_enter_sleep(uint8_t state)
         acpi_strcpy(acpi_state.name, handle->path);
 
         // pass the sleeping type as an argument
-        acpi_state.arg[0].type = ACPI_INTEGER;
-        acpi_state.arg[0].integer = (uint64_t)state & 0xFF;
+        acpi_arg(&acpi_state, 0)->type = ACPI_INTEGER;
+        acpi_arg(&acpi_state, 0)->integer = (uint64_t)state & 0xFF;
 
         acpi_debug("execute _GTS(%d)\n", state);
         acpi_exec_method(&acpi_state);
