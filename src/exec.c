@@ -37,7 +37,7 @@ const char *supported_osi_strings[] =
 // Param:    acpi_object_t *method_return - return value of method
 // Return:    int - 0 on success
 
-int acpi_exec_method(acpi_state_t *state, acpi_object_t *method_return)
+int acpi_exec_method(acpi_state_t *state)
 {
     acpi_nsnode_t *method;
     acpi_memset(state->local, 0, sizeof(acpi_object_t) * 8);
@@ -61,8 +61,8 @@ int acpi_exec_method(acpi_state_t *state, acpi_object_t *method_return)
         if(!osi_return && !acpi_strcmp(state->arg[0].string, "Linux"))
             acpi_warn("buggy BIOS requested _OSI('Linux'), ignoring...\n");
 
-        method_return->type = ACPI_INTEGER;
-        method_return->integer = osi_return;
+        state->retvalue.type = ACPI_INTEGER;
+        state->retvalue.integer = osi_return;
 
         acpi_debug("_OSI('%s') returned 0x%X\n", state->arg[0].string, osi_return);
         return 0;
@@ -71,11 +71,11 @@ int acpi_exec_method(acpi_state_t *state, acpi_object_t *method_return)
     // OS family -- pretend to be Windows
     if(!acpi_strcmp(state->name, "\\._OS_"))
     {
-        method_return->type = ACPI_STRING;
-        method_return->string = acpi_malloc(acpi_strlen(acpi_emulated_os));
-        acpi_strcpy(method_return->string, acpi_emulated_os);
+        state->retvalue.type = ACPI_STRING;
+        state->retvalue.string = acpi_malloc(acpi_strlen(acpi_emulated_os));
+        acpi_strcpy(state->retvalue.string, acpi_emulated_os);
 
-        acpi_debug("_OS_ returned '%s'\n", method_return->string);
+        acpi_debug("_OS_ returned '%s'\n", state->retvalue.string);
         return 0;
     }
 
@@ -83,10 +83,10 @@ int acpi_exec_method(acpi_state_t *state, acpi_object_t *method_return)
     // at least ACPI 2.0. Therefore we also need to do the same.
     if(!acpi_strcmp(state->name, "\\._REV"))
     {
-        method_return->type = ACPI_INTEGER;
-        method_return->integer = acpi_implemented_version;
+        state->retvalue.type = ACPI_INTEGER;
+        state->retvalue.integer = acpi_implemented_version;
 
-        acpi_debug("_REV returned %d\n", method_return->integer);
+        acpi_debug("_REV returned %d\n", state->retvalue.integer);
         return 0;
     }
 
@@ -97,17 +97,17 @@ int acpi_exec_method(acpi_state_t *state, acpi_object_t *method_return)
 
     //acpi_debug("execute control method %s\n", state->name);
 
-    int status = acpi_exec(method->pointer, method->size, state, method_return);
+    int status = acpi_exec(method->pointer, method->size, state, &state->retvalue);
 
     /*acpi_debug("%s finished, ", state->name);
 
-    if(method_return->type == ACPI_INTEGER)
-        acpi_debug("return value is integer: %d\n", method_return->integer);
-    else if(method_return->type == ACPI_STRING)
-        acpi_debug("return value is string: '%s'\n", method_return->string);
-    else if(method_return->type == ACPI_PACKAGE)
+    if(state->retvalue.type == ACPI_INTEGER)
+        acpi_debug("return value is integer: %d\n", state->retvalue.integer);
+    else if(state->retvalue.type == ACPI_STRING)
+        acpi_debug("return value is string: '%s'\n", state->retvalue.string);
+    else if(state->retvalue.type == ACPI_PACKAGE)
         acpi_debug("return value is package\n");
-    else if(method_return->type == ACPI_BUFFER)
+    else if(state->retvalue.type == ACPI_BUFFER)
         acpi_debug("return value is buffer\n");*/
 
     return status;
@@ -465,7 +465,8 @@ size_t acpi_methodinvoke(void *data, acpi_state_t *old_state, acpi_object_t *met
     }
 
     // execute
-    acpi_exec_method(state, method_return);
+    acpi_exec_method(state);
+    acpi_move_object(method_return, &state->retvalue);
 
     // restore state
     acpi_strcpy(acpins_path, path_save);

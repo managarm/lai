@@ -61,12 +61,10 @@ int acpi_enable(uint32_t mode)
 
     /* first run \._SB_._INI */
     acpi_state_t state;
-    acpi_object_t method_return;
     acpi_memset(&state, 0, sizeof(acpi_state_t));
-    acpi_memset(&method_return, 0, sizeof(acpi_object_t));
 
     acpi_strcpy(state.name, "\\._SB_._INI");
-    if(!acpi_exec_method(&state, &method_return))
+    if(!acpi_exec_method(&state))
         acpi_debug("evaluated \\._SB_._INI\n");
 
     /* _STA/_INI for all devices */
@@ -74,13 +72,12 @@ int acpi_enable(uint32_t mode)
 
     /* tell the firmware about the IRQ mode */
     acpi_memset(&state, 0, sizeof(acpi_state_t));
-    acpi_memset(&method_return, 0, sizeof(acpi_object_t));
 
     acpi_strcpy(state.name, "\\._PIC");
     state.arg[0].type = ACPI_INTEGER;
     state.arg[0].integer = mode;
 
-    if(!acpi_exec_method(&state, &method_return))
+    if(!acpi_exec_method(&state))
         acpi_debug("evaluated \\._PIC(%d)\n", mode);
 
     /* enable ACPI SCI */
@@ -106,7 +103,7 @@ int acpi_enable(uint32_t mode)
 static void acpi_init_children(char *parent)
 {
     acpi_nsnode_t *node;
-    acpi_object_t object, method_return;
+    acpi_object_t object;
     acpi_state_t state;
     char path[ACPI_MAX_NAME];
     int status;
@@ -136,11 +133,10 @@ static void acpi_init_children(char *parent)
                 acpi_strcpy(path + acpi_strlen(path), "._INI");
 
                 acpi_memset(&state, 0, sizeof(acpi_state_t));
-                acpi_memset(&method_return, 0, sizeof(acpi_object_t));
 
                 acpi_strcpy(state.name, path);
 
-                if(!acpi_exec_method(&state, &method_return))
+                if(!acpi_exec_method(&state))
                     acpi_debug("evaluated %s\n", state.name);
             }
 

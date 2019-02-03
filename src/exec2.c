@@ -54,6 +54,16 @@ resolve_alias:
     return object;
 }
 
+// acpi_move_object(): Moves an object: instead of making a deep copy,
+//                     the pointers are exchanged and the source object is reset to zero.
+// Param & Return: See acpi_copy_object().
+
+void acpi_move_object(acpi_object_t *destination, acpi_object_t *source)
+{
+    acpi_memcpy(destination, source, sizeof(acpi_object_t));
+    acpi_memset(source, 0, sizeof(acpi_object_t));
+}
+
 // acpi_free_package(): Frees a package object and all its children
 // Param:   acpi_object_t *object
 // Return:  Nothing

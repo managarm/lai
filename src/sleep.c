@@ -50,8 +50,6 @@ int acpi_enter_sleep(uint8_t state)
     acpi_memset(&acpi_state, 0, sizeof(acpi_state_t));
     handle = acpins_resolve("_PTS");
 
-    acpi_object_t object;
-
     if(handle)
     {
         acpi_strcpy(acpi_state.name, handle->path);
@@ -61,7 +59,7 @@ int acpi_enter_sleep(uint8_t state)
         acpi_state.arg[0].integer = (uint64_t)state & 0xFF;
 
         acpi_debug("execute _PTS(%d)\n", state);
-        acpi_exec_method(&acpi_state, &object);
+        acpi_exec_method(&acpi_state);
     }
 
     acpi_memset(&acpi_state, 0, sizeof(acpi_state_t));
@@ -76,7 +74,7 @@ int acpi_enter_sleep(uint8_t state)
         acpi_state.arg[0].integer = (uint64_t)state & 0xFF;
 
         acpi_debug("execute _GTS(%d)\n", state);
-        acpi_exec_method(&acpi_state, &object);
+        acpi_exec_method(&acpi_state);
     }
 
     acpi_eval_package(&package, 0, &slp_typa);

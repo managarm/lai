@@ -681,7 +681,10 @@ int acpi_eval(acpi_object_t *destination, char *path)
         acpi_state_t state;
         acpi_memset(&state, 0, sizeof(acpi_state_t));
         acpi_strcpy(state.name, path);
-        return acpi_exec_method(&state, destination);
+        int ret;
+        if((ret = acpi_exec_method(&state)))
+            return ret;
+        acpi_move_object(destination, &state.retvalue);
     }
 
     return 1;
