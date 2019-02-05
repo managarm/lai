@@ -69,10 +69,19 @@ void acpi_free_object(acpi_object_t *object)
 {
     if(object->type == ACPI_BUFFER)
         acpi_free(object->buffer);
+    else if(object->type == ACPI_STRING)
+        acpi_free(object->string);
     else if(object->type == ACPI_PACKAGE)
         acpi_free_package(object);
 
     acpi_memset(object, 0, sizeof(acpi_object_t));
+}
+
+// Helper function for acpi_move_object() and acpi_copy_object().
+void acpi_swap_object(acpi_object_t *first, acpi_object_t *second) {
+    acpi_object_t temp = *first;
+    *first = *second;
+    *second = temp;
 }
 
 // acpi_move_object(): Moves an object: instead of making a deep copy,
@@ -81,17 +90,19 @@ void acpi_free_object(acpi_object_t *object)
 
 void acpi_move_object(acpi_object_t *destination, acpi_object_t *source)
 {
-    acpi_free_object(destination);
-    acpi_memcpy(destination, source, sizeof(acpi_object_t));
-    acpi_memset(source, 0, sizeof(acpi_object_t));
+    // Move-by-swap idiom. This handles move-to-self operations correctly.
+    acpi_object_t temp = {0};
+    acpi_swap_object(&temp, source);
+    acpi_swap_object(&temp, destination);
+    acpi_free_object(&temp);
 }
 
-// acpi_copy_buffer(): Copies a buffer object
+// acpi_clone_buffer(): Clones a buffer object
 // Param:    acpi_object_t *destination - destination
 // Param:    acpi_object_t *source - source
 // Return:   Nothing
 
-static void acpi_copy_buffer(acpi_object_t *destination, acpi_object_t *source)
+static void acpi_clone_buffer(acpi_object_t *destination, acpi_object_t *source)
 {
     destination->type = ACPI_BUFFER;
     destination->buffer_size = source->buffer_size;
@@ -102,12 +113,12 @@ static void acpi_copy_buffer(acpi_object_t *destination, acpi_object_t *source)
     acpi_memcpy(destination->buffer, source->buffer, source->buffer_size);
 }
 
-// acpi_copy_string(): Copies a string object
+// acpi_clone_string(): Clones a string object
 // Param:    acpi_object_t *destination - destination
 // Param:    acpi_object_t *source - source
 // Return:   Nothing
 
-static void acpi_copy_string(acpi_object_t *destination, acpi_object_t *source)
+static void acpi_clone_string(acpi_object_t *destination, acpi_object_t *source)
 {
     destination->type = ACPI_STRING;
     destination->string = acpi_malloc(acpi_strlen(source->string) + 1);
@@ -117,22 +128,21 @@ static void acpi_copy_string(acpi_object_t *destination, acpi_object_t *source)
     acpi_strcpy(destination->string, source->string);
 }
 
-// acpi_copy_package(): Copies a package object
+// acpi_clone_package(): Clones a package object
 // Param:    acpi_object_t *destination - destination
 // Param:    acpi_object_t *source - source
 // Return:   Nothing
 
-static void acpi_copy_package(acpi_object_t *destination, acpi_object_t *source)
+static void acpi_clone_package(acpi_object_t *destination, acpi_object_t *source)
 {
+    if(source->package_size > ACPI_MAX_PACKAGE_ENTRIES)
+        acpi_panic("package too large\n");
+
     destination->type = ACPI_PACKAGE;
     destination->package_size = source->package_size;
     destination->package = acpi_calloc(ACPI_MAX_PACKAGE_ENTRIES, sizeof(acpi_object_t));
-
-    if(!source->package_size)
-    {
-        destination->package_size = ACPI_MAX_PACKAGE_ENTRIES;
-        return;
-    }
+    if(!destination->package)
+        acpi_panic("unable to allocate memory for package object.\n");
 
     for(int i = 0; i < source->package_size; i++)
         acpi_copy_object(&destination->package[i], &source->package[i]);
@@ -145,19 +155,20 @@ static void acpi_copy_package(acpi_object_t *destination, acpi_object_t *source)
 
 void acpi_copy_object(acpi_object_t *destination, acpi_object_t *source)
 {
-    if(destination == source)
-        return;
-
-    acpi_free_object(destination);
-
-    if(source->type == ACPI_PACKAGE)
-        acpi_copy_package(destination, source);
-    else if(source->type == ACPI_STRING)
-        acpi_copy_string(destination, source);
+    // First, clone into a temporary object.
+    acpi_object_t temp;
+    if(source->type == ACPI_STRING)
+        acpi_clone_string(&temp, source);
     else if(source->type == ACPI_BUFFER)
-        acpi_copy_buffer(destination, source);
+        acpi_clone_buffer(&temp, source);
+    else if(source->type == ACPI_PACKAGE)
+        acpi_clone_package(&temp, source);
     else
-        acpi_memcpy(destination, source, sizeof(acpi_object_t));
+        temp = *source;
+
+    // Afterwards, swap to the destination. This handles copy-to-self correctly.
+    acpi_swap_object(destination, &temp);
+    acpi_free_object(&temp);
 }
 
 // acpi_take_reference(): Returns a pointer to an encoded acpi_object_t
