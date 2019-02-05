@@ -179,88 +179,25 @@ void acpi_copy_object(acpi_object_t *destination, acpi_object_t *source)
 
 static size_t acpi_take_reference(void *data, acpi_state_t *state, acpi_object_t **out)
 {
-    uint8_t *dest = (uint8_t*)data;
+    uint8_t *opcode = (uint8_t*)data;
 
-    acpi_object_t *dest_reg;
-
-    // try register
-    if(*dest >= LOCAL0_OP && *dest <= LOCAL7_OP)
+    if(*opcode >= LOCAL0_OP && *opcode <= LOCAL7_OP)
     {
-        switch(*dest)
-        {
-        case LOCAL0_OP:
-            dest_reg = &state->local[0];
-            break;
-        case LOCAL1_OP:
-            dest_reg = &state->local[1];
-            break;
-        case LOCAL2_OP:
-            dest_reg = &state->local[2];
-            break;
-        case LOCAL3_OP:
-            dest_reg = &state->local[3];
-            break;
-        case LOCAL4_OP:
-            dest_reg = &state->local[4];
-            break;
-        case LOCAL5_OP:
-            dest_reg = &state->local[5];
-            break;
-        case LOCAL6_OP:
-            dest_reg = &state->local[6];
-            break;
-        case LOCAL7_OP:
-            dest_reg = &state->local[7];
-            break;
-        }
-
-        *out = dest_reg;
+        int index = *opcode - LOCAL0_OP;
+        *out = &state->local[index];
         return 1;
-    } else if(*dest >= ARG0_OP && *dest <= ARG6_OP)
+    } else if(*opcode >= ARG0_OP && *opcode <= ARG6_OP)
     {
-        switch(*dest)
-        {
-        case ARG0_OP:
-            dest_reg = &state->arg[0];
-            break;
-        case ARG1_OP:
-            dest_reg = &state->arg[1];
-            break;
-        case ARG2_OP:
-            dest_reg = &state->arg[2];
-            break;
-        case ARG3_OP:
-            dest_reg = &state->arg[3];
-            break;
-        case ARG4_OP:
-            dest_reg = &state->arg[4];
-            break;
-        case ARG5_OP:
-            dest_reg = &state->arg[5];
-            break;
-        case ARG6_OP:
-            dest_reg = &state->arg[6];
-            break;
-        }
-
-        *out = dest_reg;
+        int index = *opcode - ARG0_OP;
+        *out = &state->arg[index];
         return 1;
     }
 
-    // try integer
-    // in which case we use va_list to store the destination in its own object
-    uint64_t integer;
-    size_t integer_size = acpi_eval_integer(dest, &integer);
-    if(integer_size)
-        acpi_panic("store to integer\n");
-
-    // try name spec
-    // here, the name may only be an object or a field, it cannot be a MethodInvokation
-    if(acpi_is_name(*dest))
+    if(acpi_is_name(*opcode))
     {
         char name[ACPI_MAX_NAME];
         size_t name_size;
-        name_size = acpins_resolve_path(name, dest);
+        name_size = acpins_resolve_path(name, opcode);
         acpi_nsnode_t *handle = acpi_exec_resolve(name);
         if(!handle)
             acpi_panic("undefined reference %s\n", name);
@@ -271,20 +208,20 @@ static size_t acpi_take_reference(void *data, acpi_state_t *state, acpi_object_t
             acpi_panic("NameSpec destination is not a writeable object.\n");
 
         return name_size;
-    } else if(*dest == INDEX_OP)
+    } else if(*opcode == INDEX_OP)
     {
         size_t return_size = 1;
         size_t object_size;
-        dest++;
+        opcode++;
 
         // the first object should be a package
         acpi_object_t *object;
-        object_size = acpi_take_reference(dest, state, &object);
+        object_size = acpi_take_reference(opcode, state, &object);
         return_size += object_size;
-        dest += object_size;
+        opcode += object_size;
 
         acpi_object_t index = {0};
-        object_size = acpi_eval_object(&index, state, dest);
+        object_size = acpi_eval_object(&index, state, opcode);
         return_size += object_size;
 
         if(object->type == ACPI_PACKAGE)
@@ -299,7 +236,8 @@ static size_t acpi_take_reference(void *data, acpi_state_t *state, acpi_object_t
             acpi_panic("cannot write Index() to non-package object: %d\n", object->type);
     }
 
-    acpi_panic("undefined opcode, sequence %02X %02X %02X %02X\n", dest[0], dest[1], dest[2], dest[3]);
+    acpi_panic("undefined opcode, sequence %02X %02X %02X %02X\n",
+            opcode[0], opcode[1], opcode[2], opcode[3]);
 }
 
 // acpi_write_object(): Writes to an object. Moves out of (i.e. destroys) the source object.
