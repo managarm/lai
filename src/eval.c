@@ -380,6 +380,8 @@ size_t acpi_eval_object(acpi_object_t *destination, acpi_state_t *state, void *d
         {
             acpi_panic("TO-DO: More Index() objects\n");
         }
+        acpi_free_object(&ref);
+        acpi_free_object(&index);
     } else if(object[0] == LNOT_OP)
     {
         return_size = 1;
