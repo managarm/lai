@@ -302,7 +302,7 @@ static size_t acpi_take_reference(void *data, acpi_state_t *state, acpi_object_t
     acpi_panic("undefined opcode, sequence %02X %02X %02X %02X\n", dest[0], dest[1], dest[2], dest[3]);
 }
 
-// acpi_write_object(): Writes to an object
+// acpi_write_object(): Writes to an object. Moves out of (i.e. destroys) the source object.
 // Param:    void *data - destination to be parsed
 // Param:    acpi_object_t *source - source object
 // Param:    acpi_state_t *state - state of the AML VM
@@ -340,7 +340,7 @@ size_t acpi_write_object(void *data, acpi_object_t *source, acpi_state_t *state)
     // Now, handle stores to acpi_object_t objects.
     acpi_object_t *dest;
     size_t size = acpi_take_reference(opcode, state, &dest);
-    acpi_copy_object(dest, source);
+    acpi_move_object(dest, source);
     return size;
 }
 
