@@ -160,23 +160,22 @@ void acpi_copy_object(acpi_object_t *destination, acpi_object_t *source)
         acpi_memcpy(destination, source, sizeof(acpi_object_t));
 }
 
-// acpi_write_object(): Writes to an object
+// acpi_take_reference(): Returns a pointer to an encoded acpi_object_t
 // Param:    void *data - destination to be parsed
-// Param:    acpi_object_t *source - source object
 // Param:    acpi_state_t *state - state of the AML VM
+// Param:    acpi_object_t **out - output pointer
 // Return:    size_t - size in bytes for skipping
 
-size_t acpi_write_object(void *data, acpi_object_t *source, acpi_state_t *state)
+static size_t acpi_take_reference(void *data, acpi_state_t *state, acpi_object_t **out)
 {
     uint8_t *dest = (uint8_t*)data;
-    size_t return_size = 0;
 
     acpi_object_t *dest_reg;
 
     // try register
-    if(dest[0] >= LOCAL0_OP && dest[0] <= LOCAL7_OP)
+    if(*dest >= LOCAL0_OP && *dest <= LOCAL7_OP)
     {
-        switch(dest[0])
+        switch(*dest)
         {
         case LOCAL0_OP:
             dest_reg = &state->local[0];
@@ -204,11 +203,11 @@ size_t acpi_write_object(void *data, acpi_object_t *source, acpi_state_t *state)
             break;
         }
 
-        acpi_copy_object(dest_reg, source);
+        *out = dest_reg;
         return 1;
-    } else if(dest[0] >= ARG0_OP && dest[0] <= ARG6_OP)
+    } else if(*dest >= ARG0_OP && *dest <= ARG6_OP)
     {
-        switch(dest[0])
+        switch(*dest)
         {
         case ARG0_OP:
             dest_reg = &state->arg[0];
@@ -233,7 +232,7 @@ size_t acpi_write_object(void *data, acpi_object_t *source, acpi_state_t *state)
             break;
         }
 
-        acpi_copy_object(dest_reg, source);
+        *out = dest_reg;
         return 1;
     }
 
@@ -241,74 +240,97 @@ size_t acpi_write_object(void *data, acpi_object_t *source, acpi_state_t *state)
     // in which case we use va_list to store the destination in its own object
     uint64_t integer;
     size_t integer_size = acpi_eval_integer(dest, &integer);
-    if(integer_size != 0)
-    {
-        /*va_list params;
-        va_start(params, state);
-
-        acpi_object_t *tmp = va_arg(params, acpi_object_t*);
-        acpi_copy_object(tmp, source);
-
-        va_end(params);*/
-        return integer_size;
-    }
+    if(integer_size)
+        acpi_panic("store to integer\n");
 
     // try name spec
     // here, the name may only be an object or a field, it cannot be a MethodInvokation
-    if(acpi_is_name(dest[0]))
+    if(acpi_is_name(*dest))
     {
         char name[ACPI_MAX_NAME];
         size_t name_size;
         name_size = acpins_resolve_path(name, dest);
         acpi_nsnode_t *handle = acpi_exec_resolve(name);
         if(!handle)
-        {
             acpi_panic("undefined reference %s\n", name);
-        }
 
         if(handle->type == ACPI_NAMESPACE_NAME)
-            acpi_copy_object(&handle->object, source);
-        else if(handle->type == ACPI_NAMESPACE_FIELD || handle->type == ACPI_NAMESPACE_INDEXFIELD)
-            acpi_write_opregion(handle, source);
-        else if(handle->type == ACPI_NAMESPACE_BUFFER_FIELD)
-            acpi_write_buffer(handle, source);
+            *out = &handle->object;
         else
-        {
             acpi_panic("NameSpec destination is not a writeable object.\n");
-        }
 
         return name_size;
-    } else if(dest[0] == INDEX_OP)
+    } else if(*dest == INDEX_OP)
     {
-        return_size = 1;
+        size_t return_size = 1;
+        size_t object_size;
         dest++;
 
         // the first object should be a package
-        acpi_object_t object = {0};
-        acpi_object_t index = {0};
-
-        size_t object_size;
-        object_size = acpi_eval_object(&object, state, &dest[0]);
+        acpi_object_t *object;
+        object_size = acpi_take_reference(dest, state, &object);
         return_size += object_size;
         dest += object_size;
 
-        object_size = acpi_eval_object(&index, state, &dest[0]);
+        acpi_object_t index = {0};
+        object_size = acpi_eval_object(&index, state, dest);
         return_size += object_size;
 
-        if(object.type == ACPI_PACKAGE)
+        if(object->type == ACPI_PACKAGE)
         {
-            if(index.integer >= object.package_size)
-                acpi_panic("attempt to write to index %d of package of length %d\n", index.integer, object.package_size);
+            if(index.integer >= object->package_size)
+                acpi_panic("attempt to write to index %d of package of length %d\n",
+                        index.integer, object->package_size);
 
-            acpi_copy_object(&object.package[index.integer], source);
+            *out = &object->package[index.integer];
             return return_size;
         } else
-        {
-            acpi_panic("cannot write Index() to non-package object: %d\n", object.type);
-        }
+            acpi_panic("cannot write Index() to non-package object: %d\n", object->type);
     }
 
     acpi_panic("undefined opcode, sequence %02X %02X %02X %02X\n", dest[0], dest[1], dest[2], dest[3]);
+}
+
+// acpi_write_object(): Writes to an object
+// Param:    void *data - destination to be parsed
+// Param:    acpi_object_t *source - source object
+// Param:    acpi_state_t *state - state of the AML VM
+// Return:    size_t - size in bytes for skipping
+
+size_t acpi_write_object(void *data, acpi_object_t *source, acpi_state_t *state)
+{
+    uint8_t *opcode = data;
+
+    // First, handle stores that do not target acpi_object_t objects.
+    if(*opcode == ZERO_OP)
+    {
+        // Do not store the object.
+        return 1;
+    }else if(acpi_is_name(*opcode))
+    {
+        char name[ACPI_MAX_NAME];
+        size_t name_size = acpins_resolve_path(name, opcode);
+
+        acpi_nsnode_t *handle = acpi_exec_resolve(name);
+        if(!handle)
+            acpi_panic("undefined reference %s\n", name);
+
+        if(handle->type == ACPI_NAMESPACE_FIELD || handle->type == ACPI_NAMESPACE_INDEXFIELD)
+        {
+            acpi_write_opregion(handle, source);
+            return name_size;
+        }else if(handle->type == ACPI_NAMESPACE_BUFFER_FIELD)
+        {
+            acpi_write_buffer(handle, source);
+            return name_size;
+        }
+    }
+
+    // Now, handle stores to acpi_object_t objects.
+    acpi_object_t *dest;
+    size_t size = acpi_take_reference(opcode, state, &dest);
+    acpi_copy_object(dest, source);
+    return size;
 }
 
 // acpi_write_buffer(): Writes to a Buffer Field
