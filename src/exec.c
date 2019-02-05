@@ -44,7 +44,16 @@ void acpi_init_call_state(acpi_state_t *state, acpi_nsnode_t *method) {
 // Finalize the interpreter state. Frees all memory owned by the state.
 
 void acpi_finalize_state(acpi_state_t *state) {
-    // TODO: Free memory occupied by buffers and packages in LocalX, ArgX and the return value.
+    acpi_free_object(&state->retvalue);
+    for(int i = 0; i < 7; i++)
+    {
+        acpi_free_object(&state->arg[i]);
+    }
+
+    for(int i = 0; i < 8; i++)
+    {
+        acpi_free_object(&state->local[i]);
+    }
 }
 
 // acpi_exec_method(): Finds and executes a control method
