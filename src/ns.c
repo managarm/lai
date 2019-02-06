@@ -614,7 +614,8 @@ size_t acpins_create_field(acpi_nsnode_t *parent, void *data)
         field += name_size;
         byte_count += name_size;
 
-        node->path[acpi_strlen(acpins_path)] = '.';
+        // FIXME: This looks odd. Why do we insert a dot in the middle of the path?
+        node->path[acpi_strlen(parent->path)] = '.';
         acpi_strcpy(node->field_opregion, opregion->path);
         node->field_flags = field_flags;
         node->field_size = field[0];
@@ -964,9 +965,10 @@ size_t acpins_create_indexfield(acpi_nsnode_t *parent, void *data)
         //acpi_debug("indexfield %c%c%c%c: size %d bits, at bit offset %d\n", indexfield[0], indexfield[1], indexfield[2], indexfield[3], indexfield[4], current_offset);
         acpi_nsnode_t *node = acpins_create_nsnode_or_die();
         node->type = ACPI_NAMESPACE_INDEXFIELD;
-        acpi_memcpy(node->path, acpins_path, acpi_strlen(acpins_path));
-        node->path[acpi_strlen(acpins_path)] = '.';
-        acpi_memcpy(node->path + acpi_strlen(acpins_path) + 1, indexfield, 4);
+        // FIXME: This looks odd. Why don't we all acpins_resolve_path()?
+        acpi_memcpy(node->path, parent->path, acpi_strlen(parent->path));
+        node->path[acpi_strlen(parent->path)] = '.';
+        acpi_memcpy(node->path + acpi_strlen(parent->path) + 1, indexfield, 4);
 
         acpi_strcpy(node->indexfield_data, datar);
         acpi_strcpy(node->indexfield_index, indexr);
