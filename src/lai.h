@@ -317,7 +317,6 @@ typedef struct acpi_large_irq_t
 
 acpi_fadt_t *acpi_fadt;
 acpi_aml_t *acpi_dsdt;
-extern char acpins_path[];
 size_t acpi_ns_size;
 volatile uint16_t acpi_last_event;
 
