@@ -347,29 +347,12 @@ void acpi_sleep(uint64_t);
 
 // The remaining of these functions are OS independent!
 // ACPI namespace functions
-size_t acpins_resolve_path(char *, uint8_t *);
+size_t acpins_resolve_path(acpi_nsnode_t *, char *, uint8_t *);
 void acpi_create_namespace(void *);
 int acpi_is_name(char);
 size_t acpi_eval_integer(uint8_t *, uint64_t *);
 size_t acpi_parse_pkgsize(uint8_t *, size_t *);
 int acpi_eval_package(acpi_object_t *, size_t, acpi_object_t *);
-void acpins_register_scope(uint8_t *, size_t);
-size_t acpins_create_scope(void *);
-size_t acpins_create_opregion(void *);
-size_t acpins_create_field(void *);
-size_t acpins_create_method(void *);
-size_t acpins_create_device(void *);
-size_t acpins_create_thermalzone(void *);
-size_t acpins_create_name(void *);
-size_t acpins_create_alias(void *);
-size_t acpins_create_mutex(void *);
-size_t acpins_create_indexfield(void *);
-size_t acpins_create_package(acpi_object_t *, void *);
-size_t acpins_create_processor(void *);
-size_t acpins_create_bytefield(void *);
-size_t acpins_create_wordfield(void *);
-size_t acpins_create_dwordfield(void *);
-size_t acpins_create_qwordfield(void *);
 acpi_nsnode_t *acpins_resolve(char *);
 acpi_nsnode_t *acpins_get_device(size_t);
 acpi_nsnode_t *acpins_get_deviceid(size_t, acpi_object_t *);

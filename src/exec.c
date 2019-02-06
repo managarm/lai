@@ -456,7 +456,7 @@ size_t acpi_methodinvoke(void *data, acpi_state_t *old_state, acpi_object_t *met
 
     // determine the name of the method
     char path[ACPI_MAX_NAME];
-    size_t name_size = acpins_resolve_path(path, methodinvokation);
+    size_t name_size = acpins_resolve_path(old_state->handle, path, methodinvokation);
     return_size += name_size;
     methodinvokation += name_size;
 

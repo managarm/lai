@@ -21,7 +21,7 @@ size_t acpi_exec_name(void *data, acpi_state_t *state)
     name++;            // skip over NAME_OP
 
     char path[ACPI_MAX_NAME];
-    size_t size = acpins_resolve_path(path, name);
+    size_t size = acpins_resolve_path(state->handle, path, name);
 
     acpi_nsnode_t *handle;
     handle = acpins_resolve(path);
@@ -83,7 +83,7 @@ size_t acpi_exec_buffer(acpi_object_t *destination, acpi_state_t *state, void *d
 
 size_t acpi_exec_bytefield(void *data, acpi_state_t *state)
 {
-    return acpins_create_bytefield(data);    // dirty af solution but good enough for now
+    return acpins_create_bytefield(state->handle, data);    // dirty af solution but good enough for now
 }
 
 
@@ -94,7 +94,7 @@ size_t acpi_exec_bytefield(void *data, acpi_state_t *state)
 
 size_t acpi_exec_wordfield(void *data, acpi_state_t *state)
 {
-    return acpins_create_wordfield(data);    // dirty af solution but good enough for now
+    return acpins_create_wordfield(state->handle, data);    // dirty af solution but good enough for now
 }
 
 
@@ -105,7 +105,7 @@ size_t acpi_exec_wordfield(void *data, acpi_state_t *state)
 
 size_t acpi_exec_dwordfield(void *data, acpi_state_t *state)
 {
-    return acpins_create_dwordfield(data);    // dirty af solution but good enough for now
+    return acpins_create_dwordfield(state->handle, data);    // dirty af solution but good enough for now
 }
 
 

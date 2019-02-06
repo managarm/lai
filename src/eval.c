@@ -5,6 +5,7 @@
  */
 
 #include "lai.h"
+#include "ns_impl.h"
 
 // acpi_is_name(): Evaluates a name character
 // Param:    char character - character from name
@@ -217,7 +218,8 @@ size_t acpi_eval_object(acpi_object_t *destination, acpi_state_t *state, void *d
         // package
         destination->type = ACPI_PACKAGE;
         destination->package = acpi_calloc(sizeof(acpi_object_t), ACPI_MAX_PACKAGE_ENTRIES);
-        destination->package_size = acpins_create_package(destination->package, object);
+        destination->package_size = acpins_create_package(state->handle,
+                destination->package, object);
         acpi_parse_pkgsize(&object[1], &return_size);
         return_size++;        // skip PACKAGE_OP
     } else if(object[0] == BUFFER_OP)
@@ -228,7 +230,7 @@ size_t acpi_eval_object(acpi_object_t *destination, acpi_state_t *state, void *d
     {
         // it's a NameSpec
         // resolve the name
-        name_size = acpins_resolve_path(name, &object[0]);
+        name_size = acpins_resolve_path(state->handle, name, &object[0]);
         handle = acpi_exec_resolve(name);
         if(!handle)
         {
@@ -593,7 +595,7 @@ size_t acpi_eval_object(acpi_object_t *destination, acpi_state_t *state, void *d
         return_size = 3;
         object += 2;
 
-        name_size = acpins_resolve_path(name, &object[0]);
+        name_size = acpins_resolve_path(state->handle, name, &object[0]);
         return_size += name_size;
 
         acpi_nsnode_t *handle = acpi_exec_resolve(name);

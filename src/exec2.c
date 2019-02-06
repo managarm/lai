@@ -197,7 +197,8 @@ static size_t acpi_take_reference(void *data, acpi_state_t *state, acpi_object_t
     {
         char name[ACPI_MAX_NAME];
         size_t name_size;
-        name_size = acpins_resolve_path(name, opcode);
+        name_size = acpins_resolve_path(state->handle, name, opcode);
+
         acpi_nsnode_t *handle = acpi_exec_resolve(name);
         if(!handle)
             acpi_panic("undefined reference %s\n", name);
@@ -258,7 +259,7 @@ size_t acpi_write_object(void *data, acpi_object_t *source, acpi_state_t *state)
     }else if(acpi_is_name(*opcode))
     {
         char name[ACPI_MAX_NAME];
-        size_t name_size = acpins_resolve_path(name, opcode);
+        size_t name_size = acpins_resolve_path(state->handle, name, opcode);
 
         acpi_nsnode_t *handle = acpi_exec_resolve(name);
         if(!handle)

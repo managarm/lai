@@ -72,7 +72,7 @@ void acpins_install_nsnode(acpi_nsnode_t *node)
 // Param:    uint8_t *path - path to resolve
 // Return:    size_t - size of path data parsed in AML
 
-size_t acpins_resolve_path(char *fullpath, uint8_t *path)
+size_t acpins_resolve_path(acpi_nsnode_t *context, char *fullpath, uint8_t *path)
 {
     size_t name_size = 0;
     size_t multi_count = 0;
@@ -95,7 +95,13 @@ size_t acpins_resolve_path(char *fullpath, uint8_t *path)
             return name_size;
     }
 
-    acpi_strcpy(fullpath, acpins_path);
+    if(context)
+        acpi_strcpy(fullpath, context->path);
+    else
+        acpi_strcpy(fullpath, "\\");
+    if(acpi_strcmp(fullpath, acpins_path))
+        acpi_panic("context path %s does not match deprecated acpis_path%s\n",
+                fullpath, acpins_path);
     fullpath[acpi_strlen(fullpath)] = '.';
 
 start:
@@ -218,7 +224,7 @@ void acpi_create_namespace(void *dsdt)
 
     // create the namespace with all the objects
     // most of the functions are recursive
-    acpins_register_scope(acpi_acpins_code, acpi_acpins_size);
+    acpins_register_scope(NULL, acpi_acpins_code, acpi_acpins_size);
 
     acpi_debug("ACPI namespace created, total of %d predefined objects.\n", acpi_ns_size);
 }
@@ -250,7 +256,7 @@ void acpins_load_table(void *ptr)
 // Param:    size_t size - size of scope in bytes
 // Return:    Nothing
 
-void acpins_register_scope(uint8_t *data, size_t size)
+void acpins_register_scope(acpi_nsnode_t *scope, uint8_t *data, size_t size)
 {
     size_t count = 0;
     size_t pkgsize;
@@ -283,19 +289,19 @@ void acpins_register_scope(uint8_t *data, size_t size)
             break;
 
         case NAME_OP:
-            count += acpins_create_name(&data[count]);
+            count += acpins_create_name(scope, &data[count]);
             break;
 
         case ALIAS_OP:
-            count += acpins_create_alias(&data[count]);
+            count += acpins_create_alias(scope, &data[count]);
             break;
 
         case SCOPE_OP:
-            count += acpins_create_scope(&data[count]);
+            count += acpins_create_scope(scope, &data[count]);
             break;
 
         case METHOD_OP:
-            count += acpins_create_method(&data[count]);
+            count += acpins_create_method(scope, &data[count]);
             break;
 
         case BUFFER_OP:
@@ -307,41 +313,41 @@ void acpins_register_scope(uint8_t *data, size_t size)
             break;
 
         case BYTEFIELD_OP:
-            count += acpins_create_bytefield(&data[count]);
+            count += acpins_create_bytefield(scope, &data[count]);
             break;
         case WORDFIELD_OP:
-            count += acpins_create_wordfield(&data[count]);
+            count += acpins_create_wordfield(scope, &data[count]);
             break;
         case DWORDFIELD_OP:
-            count += acpins_create_dwordfield(&data[count]);
+            count += acpins_create_dwordfield(scope, &data[count]);
             break;
         case QWORDFIELD_OP:
-            count += acpins_create_qwordfield(&data[count]);
+            count += acpins_create_qwordfield(scope, &data[count]);
             break;
 
         case EXTOP_PREFIX:
             switch(data[count+1])
             {
             case MUTEX:
-                count += acpins_create_mutex(&data[count]);
+                count += acpins_create_mutex(scope, &data[count]);
                 break;
             case OPREGION:
-                count += acpins_create_opregion(&data[count]);
+                count += acpins_create_opregion(scope, &data[count]);
                 break;
             case FIELD:
-                count += acpins_create_field(&data[count]);
+                count += acpins_create_field(scope, &data[count]);
                 break;
             case DEVICE:
-                count += acpins_create_device(&data[count]);
+                count += acpins_create_device(scope, &data[count]);
                 break;
             case THERMALZONE:
-                count += acpins_create_thermalzone(&data[count]);
+                count += acpins_create_thermalzone(scope, &data[count]);
                 break;
             case INDEXFIELD:
-                count += acpins_create_indexfield(&data[count]);
+                count += acpins_create_indexfield(scope, &data[count]);
                 break;
             case PROCESSOR:
-                count += acpins_create_processor(&data[count]);
+                count += acpins_create_processor(scope, &data[count]);
                 break;
 
             default:
@@ -378,7 +384,7 @@ void acpins_register_scope(uint8_t *data, size_t size)
 // Param:    void *data - scope data
 // Return:    size_t - size of scope in bytes
 
-size_t acpins_create_scope(void *data)
+size_t acpins_create_scope(acpi_nsnode_t *parent, void *data)
 {
     uint8_t *scope = (uint8_t*)data;
     size_t size;
@@ -389,7 +395,7 @@ size_t acpins_create_scope(void *data)
     // register the scope
     scope += pkgsize + 1;
     acpi_nsnode_t *node = acpins_create_nsnode_or_die();
-    size_t name_length = acpins_resolve_path(node->path, scope);
+    size_t name_length = acpins_resolve_path(parent, node->path, scope);
 
     //acpi_debug("scope %s, size %d bytes\n", node->path, size);
 
@@ -407,7 +413,8 @@ size_t acpins_create_scope(void *data)
     acpins_install_nsnode(node);
 
     // register the child objects of the scope
-    acpins_register_scope((uint8_t*)data + 1 + pkgsize + name_length, size - pkgsize - name_length);
+    acpins_register_scope(node, (uint8_t*)data + 1 + pkgsize + name_length,
+            size - pkgsize - name_length);
 
     // finally restore the original path
     acpi_strcpy(acpins_path, current_path);
@@ -418,14 +425,14 @@ size_t acpins_create_scope(void *data)
 // Param:    void *data - OpRegion data
 // Return:    size_t - total size of OpRegion in bytes
 
-size_t acpins_create_opregion(void *data)
+size_t acpins_create_opregion(acpi_nsnode_t *parent, void *data)
 {
     uint8_t *opregion = (uint8_t*)data;
     opregion += 2;        // skip EXTOP_PREFIX and OPREGION opcodes
 
     // create a namespace object for the opregion
     acpi_nsnode_t *node = acpins_create_nsnode_or_die();
-    size_t name_length = acpins_resolve_path(node->path, opregion);
+    size_t name_length = acpins_resolve_path(parent, node->path, opregion);
 
     opregion = (uint8_t*)data;
 
@@ -487,7 +494,7 @@ size_t acpins_create_opregion(void *data)
 // Param:    void *data - pointer to field data
 // Return:    size_t - total size of field in bytes
 
-size_t acpins_create_field(void *data)
+size_t acpins_create_field(acpi_nsnode_t *parent, void *data)
 {
     uint8_t *field = (uint8_t*)data;
     field += 2;        // skip opcode
@@ -503,7 +510,7 @@ size_t acpins_create_field(void *data)
     char opregion_name[ACPI_MAX_NAME];
     size_t name_size = 0;
 
-    name_size = acpins_resolve_path(opregion_name, field);
+    name_size = acpins_resolve_path(parent, opregion_name, field);
 
     opregion = acpins_resolve(opregion_name);
     if(!opregion)
@@ -602,9 +609,8 @@ size_t acpins_create_field(void *data)
         //acpi_debug("field %c%c%c%c: size %d bits, at bit offset %d\n", field[0], field[1], field[2], field[3], field[4], current_offset);
         acpi_nsnode_t *node = acpins_create_nsnode_or_die();
         node->type = ACPI_NAMESPACE_FIELD;
-        //acpi_memcpy(node->path, acpins_path, acpi_strlen(acpins_path));
 
-        name_size = acpins_resolve_path(node->path, &field[0]);
+        name_size = acpins_resolve_path(parent, node->path, &field[0]);
         field += name_size;
         byte_count += name_size;
 
@@ -628,7 +634,7 @@ size_t acpins_create_field(void *data)
 // Param:    void *data - pointer to AML code
 // Return:    size_t - total size in bytes for skipping
 
-size_t acpins_create_method(void *data)
+size_t acpins_create_method(acpi_nsnode_t *parent, void *data)
 {
     uint8_t *method = (uint8_t*)data;
     method++;        // skip over METHOD_OP
@@ -639,7 +645,7 @@ size_t acpins_create_method(void *data)
 
     // create a namespace object for the method
     acpi_nsnode_t *node = acpins_create_nsnode_or_die();
-    size_t name_length = acpins_resolve_path(node->path, method);
+    size_t name_length = acpins_resolve_path(parent, node->path, method);
 
     // get the method's flags
     method = (uint8_t*)data;
@@ -667,7 +673,7 @@ size_t acpins_create_method(void *data)
 // Param:    void *data - device scope data
 // Return:    size_t - size of device scope in bytes
 
-size_t acpins_create_device(void *data)
+size_t acpins_create_device(acpi_nsnode_t *parent, void *data)
 {
     uint8_t *device = (uint8_t*)data;
     size_t size;
@@ -679,7 +685,7 @@ size_t acpins_create_device(void *data)
     device += pkgsize + 2;
 
     acpi_nsnode_t *node = acpins_create_nsnode_or_die();
-    size_t name_length = acpins_resolve_path(node->path, device);
+    size_t name_length = acpins_resolve_path(parent, node->path, device);
 
     //acpi_debug("device scope %s, size %d bytes\n", node->path, size);
 
@@ -697,7 +703,8 @@ size_t acpins_create_device(void *data)
     acpins_install_nsnode(node);
 
     // register the child objects of the device scope
-    acpins_register_scope((uint8_t*)data + 2 + pkgsize + name_length, size - pkgsize - name_length);
+    acpins_register_scope(node, (uint8_t*)data + 2 + pkgsize + name_length,
+            size - pkgsize - name_length);
 
     // finally restore the original path
     acpi_strcpy(acpins_path, current_path);
@@ -708,7 +715,7 @@ size_t acpins_create_device(void *data)
 // Param:    void *data - thermal zone scope data
 // Return:    size_t - size of thermal zone scope in bytes
 
-size_t acpins_create_thermalzone(void *data)
+size_t acpins_create_thermalzone(acpi_nsnode_t *parent, void *data)
 {
     uint8_t *thermalzone = (uint8_t*)data;
     size_t size;
@@ -720,7 +727,7 @@ size_t acpins_create_thermalzone(void *data)
     thermalzone += pkgsize + 2;
 
     acpi_nsnode_t *node = acpins_create_nsnode_or_die();
-    size_t name_length = acpins_resolve_path(node->path, thermalzone);
+    size_t name_length = acpins_resolve_path(parent, node->path, thermalzone);
 
     // store the new current path
     char current_path[ACPI_MAX_NAME];
@@ -737,7 +744,8 @@ size_t acpins_create_thermalzone(void *data)
     acpins_install_nsnode(node);
 
     // register the child objects of the thermal zone scope
-    acpins_register_scope((uint8_t*)data + 2 + pkgsize + name_length, size - pkgsize - name_length);
+    acpins_register_scope(node, (uint8_t*)data + 2 + pkgsize + name_length,
+            size - pkgsize - name_length);
 
     // finally restore the original path
     acpi_strcpy(acpins_path, current_path);
@@ -749,14 +757,14 @@ size_t acpins_create_thermalzone(void *data)
 // Param:    void *data - pointer to data
 // Return:    size_t - total size in bytes, for skipping
 
-size_t acpins_create_name(void *data)
+size_t acpins_create_name(acpi_nsnode_t *parent, void *data)
 {
     uint8_t *name = (uint8_t*)data;
     name++;            // skip NAME_OP
 
     // create a namespace object for the name object
     acpi_nsnode_t *node = acpins_create_nsnode_or_die();
-    size_t name_length = acpins_resolve_path(node->path, name);
+    size_t name_length = acpins_resolve_path(parent, node->path, name);
 
     name += name_length;
     node->type = ACPI_NAMESPACE_NAME;
@@ -767,7 +775,8 @@ size_t acpins_create_name(void *data)
     {
         node->object.type = ACPI_PACKAGE;
         node->object.package = acpi_calloc(sizeof(acpi_object_t), ACPI_MAX_PACKAGE_ENTRIES);
-        node->object.package_size = acpins_create_package(node->object.package, &name[0]);
+        node->object.package_size = acpins_create_package(parent,
+                node->object.package, &name[0]);
 
         //acpi_debug("package object %s, entry count %d\n", node->path, node->object.package_size);
         acpins_install_nsnode(node);
@@ -817,7 +826,7 @@ size_t acpins_create_name(void *data)
 // Param:    void *data - pointer to data
 // Return:    size_t - total size in bytes, for skipping
 
-size_t acpins_create_alias(void *data)
+size_t acpins_create_alias(acpi_nsnode_t *parent, void *data)
 {
     size_t return_size = 1;
     uint8_t *alias = (uint8_t*)data;
@@ -827,12 +836,12 @@ size_t acpins_create_alias(void *data)
 
     acpi_nsnode_t *node = acpins_create_nsnode_or_die();
     node->type = ACPI_NAMESPACE_ALIAS;
-    name_size = acpins_resolve_path(node->alias, alias);
+    name_size = acpins_resolve_path(parent, node->alias, alias);
 
     return_size += name_size;
     alias += name_size;
 
-    name_size = acpins_resolve_path(node->path, alias);
+    name_size = acpins_resolve_path(parent, node->path, alias);
 
     //acpi_debug("alias %s for object %s\n", node->path, node->alias);
 
@@ -845,7 +854,7 @@ size_t acpins_create_alias(void *data)
 // Param:    void *data - pointer to data
 // Return:    size_t - total size in bytes, for skipping
 
-size_t acpins_create_mutex(void *data)
+size_t acpins_create_mutex(acpi_nsnode_t *parent, void *data)
 {
     size_t return_size = 2;
     uint8_t *mutex = (uint8_t*)data;
@@ -853,7 +862,7 @@ size_t acpins_create_mutex(void *data)
 
     acpi_nsnode_t *node = acpins_create_nsnode_or_die();
     node->type = ACPI_NAMESPACE_MUTEX;
-    size_t name_size = acpins_resolve_path(node->path, mutex);
+    size_t name_size = acpins_resolve_path(parent, node->path, mutex);
 
     return_size += name_size;
     return_size++;
@@ -868,7 +877,7 @@ size_t acpins_create_mutex(void *data)
 // Param:    void *data - pointer to indexfield data
 // Return:    size_t - total size of indexfield in bytes
 
-size_t acpins_create_indexfield(void *data)
+size_t acpins_create_indexfield(acpi_nsnode_t *parent, void *data)
 {
     uint8_t *indexfield = (uint8_t*)data;
     indexfield += 2;        // skip INDEXFIELD_OP
@@ -883,8 +892,8 @@ size_t acpins_create_indexfield(void *data)
     acpi_memset(indexr, 0, ACPI_MAX_NAME);
     acpi_memset(datar, 0, ACPI_MAX_NAME);
 
-    indexfield += acpins_resolve_path(indexr, indexfield);
-    indexfield += acpins_resolve_path(datar, indexfield);
+    indexfield += acpins_resolve_path(parent, indexr, indexfield);
+    indexfield += acpins_resolve_path(parent, datar, indexfield);
 
     uint8_t flags = indexfield[0];
 
@@ -980,7 +989,7 @@ size_t acpins_create_indexfield(void *data)
 // Param:    void *data - package data
 // Return:    size_t - size in entries
 
-size_t acpins_create_package(acpi_object_t *destination, void *data)
+size_t acpins_create_package(acpi_nsnode_t *context, acpi_object_t *destination, void *data)
 {
     uint8_t *package = (uint8_t*)data;
     package++;        // skip PACKAGE_OP
@@ -1026,7 +1035,7 @@ size_t acpins_create_package(acpi_object_t *destination, void *data)
         } else if(acpi_is_name(package[j]) || package[j] == ROOT_CHAR || package[j] == PARENT_CHAR || package[j] == MULTI_PREFIX || package[j] == DUAL_PREFIX)
         {
             destination[i].type = ACPI_NAME;
-            j += acpins_resolve_path(destination[i].name, &package[j]);
+            j += acpins_resolve_path(context, destination[i].name, &package[j]);
 
             //acpi_debug("  index %d: name %s\n", i, destination[i].name);
             i++;
@@ -1038,7 +1047,8 @@ size_t acpins_create_package(acpi_object_t *destination, void *data)
 
             //acpi_debug("  index %d: package\n", i);
 
-            destination[i].package_size = acpins_create_package(destination[i].package, &package[j]);
+            destination[i].package_size = acpins_create_package(context,
+                    destination[i].package, &package[j]);
 
             j++;
             acpi_parse_pkgsize(&package[j], &size);
@@ -1072,7 +1082,7 @@ size_t acpins_create_package(acpi_object_t *destination, void *data)
 // Param:    void *data - pointer to data
 // Return:    size_t - total size in bytes, for skipping
 
-size_t acpins_create_processor(void *data)
+size_t acpins_create_processor(acpi_nsnode_t *parent, void *data)
 {
     uint8_t *processor = (uint8_t*)data;
     processor += 2;            // skip over PROCESSOR_OP
@@ -1083,7 +1093,7 @@ size_t acpins_create_processor(void *data)
 
     acpi_nsnode_t *node = acpins_create_nsnode_or_die();
     node->type = ACPI_NAMESPACE_PROCESSOR;
-    size_t name_size = acpins_resolve_path(node->path, processor);
+    size_t name_size = acpins_resolve_path(parent, node->path, processor);
     processor += name_size;
 
     node->cpu_id = processor[0];
@@ -1099,7 +1109,7 @@ size_t acpins_create_processor(void *data)
 // Param:    void *data - pointer to data
 // Return:    size_t - total size in bytes, for skipping
 
-size_t acpins_create_bytefield(void *data)
+size_t acpins_create_bytefield(acpi_nsnode_t *parent, void *data)
 {
     uint8_t *bytefield = (uint8_t*)data;
     bytefield++;        // skip BYTEFIELD_OP
@@ -1110,7 +1120,7 @@ size_t acpins_create_bytefield(void *data)
 
     // buffer name
     size_t name_size;
-    name_size = acpins_resolve_path(node->buffer, bytefield);
+    name_size = acpins_resolve_path(parent, node->buffer, bytefield);
 
     return_size += name_size;
     bytefield += name_size;
@@ -1125,7 +1135,7 @@ size_t acpins_create_bytefield(void *data)
     return_size += integer_size;
     bytefield += integer_size;
 
-    name_size = acpins_resolve_path(node->path, bytefield);
+    name_size = acpins_resolve_path(parent, node->path, bytefield);
 
     acpins_install_nsnode(node);
     return_size += name_size;
@@ -1136,7 +1146,7 @@ size_t acpins_create_bytefield(void *data)
 // Param:    void *data - pointer to data
 // Return:    size_t - total size in bytes, for skipping
 
-size_t acpins_create_wordfield(void *data)
+size_t acpins_create_wordfield(acpi_nsnode_t *parent, void *data)
 {
     uint8_t *wordfield = (uint8_t*)data;
     wordfield++;        // skip WORDFIELD_OP
@@ -1147,7 +1157,7 @@ size_t acpins_create_wordfield(void *data)
 
     // buffer name
     size_t name_size;
-    name_size = acpins_resolve_path(node->buffer, wordfield);
+    name_size = acpins_resolve_path(parent, node->buffer, wordfield);
 
     return_size += name_size;
     wordfield += name_size;
@@ -1162,7 +1172,7 @@ size_t acpins_create_wordfield(void *data)
     return_size += integer_size;
     wordfield += integer_size;
 
-    name_size = acpins_resolve_path(node->path, wordfield);
+    name_size = acpins_resolve_path(parent, node->path, wordfield);
 
     //acpi_debug("field %s for buffer %s, offset %d size %d bits\n", node->path, node->buffer, node->buffer_offset, node->buffer_size);
 
@@ -1175,7 +1185,7 @@ size_t acpins_create_wordfield(void *data)
 // Param:    void *data - pointer to data
 // Return:    size_t - total size in bytes, for skipping
 
-size_t acpins_create_dwordfield(void *data)
+size_t acpins_create_dwordfield(acpi_nsnode_t *parent, void *data)
 {
     uint8_t *dwordfield = (uint8_t*)data;
     dwordfield++;        // skip DWORDFIELD_OP
@@ -1186,7 +1196,7 @@ size_t acpins_create_dwordfield(void *data)
 
     // buffer name
     size_t name_size;
-    name_size = acpins_resolve_path(node->buffer, dwordfield);
+    name_size = acpins_resolve_path(parent, node->buffer, dwordfield);
 
     return_size += name_size;
     dwordfield += name_size;
@@ -1201,7 +1211,7 @@ size_t acpins_create_dwordfield(void *data)
     return_size += integer_size;
     dwordfield += integer_size;
 
-    name_size = acpins_resolve_path(node->path, dwordfield);
+    name_size = acpins_resolve_path(parent, node->path, dwordfield);
 
     acpins_install_nsnode(node);
     return_size += name_size;
@@ -1212,7 +1222,7 @@ size_t acpins_create_dwordfield(void *data)
 // Param:    void *data - pointer to data
 // Return:    size_t - total size in bytes, for skipping
 
-size_t acpins_create_qwordfield(void *data)
+size_t acpins_create_qwordfield(acpi_nsnode_t *parent, void *data)
 {
     uint8_t *qwordfield = (uint8_t*)data;
     qwordfield++;        // skip QWORDFIELD_OP
@@ -1223,7 +1233,7 @@ size_t acpins_create_qwordfield(void *data)
 
     // buffer name
     size_t name_size;
-    name_size = acpins_resolve_path(node->buffer, qwordfield);
+    name_size = acpins_resolve_path(parent, node->buffer, qwordfield);
 
     return_size += name_size;
     qwordfield += name_size;
@@ -1238,7 +1248,7 @@ size_t acpins_create_qwordfield(void *data)
     return_size += integer_size;
     qwordfield += integer_size;
 
-    name_size = acpins_resolve_path(node->path, qwordfield);
+    name_size = acpins_resolve_path(parent, node->path, qwordfield);
 
     acpins_install_nsnode(node);
     return_size += name_size;
