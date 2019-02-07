@@ -261,6 +261,7 @@ typedef struct acpi_stackitem_ {
             int op_opcode;
             int op_opstack;
             int op_num_operands;
+            int op_want_result;
         };
     };
 } acpi_stackitem_t;

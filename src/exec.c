@@ -248,30 +248,37 @@ int acpi_exec(uint8_t *method, size_t size, acpi_state_t *state, acpi_object_t *
     }
 
     size_t i = 0;
-    acpi_object_t invoke_return = {0};
     state->stack_ptr = -1;
 
     while(i <= size)
     {
+        // Whether we use the result of an expression or not.
+        // If yes, it will be pushed onto the opstack after the expression is computed.
+        int want_exec_result = 0;
+
         acpi_stackitem_t *item = acpi_exec_peek_stack_back(state);
         if(item)
         {
             if(item->kind == LAI_OP_STACKITEM)
             {
-                if(state->opstack_ptr < item->op_opstack + item->op_num_operands) {
-                    acpi_object_t *operand = acpi_exec_push_opstack_or_die(state);
-                    i += acpi_eval_object(operand, state, method + i);
-                    continue;
-                }else
-                {
+                if(state->opstack_ptr == item->op_opstack + item->op_num_operands) {
                     acpi_object_t result = {0};
                     acpi_object_t *operands = acpi_exec_get_opstack(state, item->op_opstack);
                     acpi_exec_reduce(item->op_opcode, operands, &result);
-                    i += acpi_write_object(method + i, &result, state);
                     acpi_exec_pop_opstack(state, item->op_num_operands);
+
+                    if(item->op_want_result)
+                    {
+                        acpi_object_t *copy = acpi_exec_push_opstack_or_die(state);
+                        acpi_copy_object(copy, &result);
+                    }
+                    i += acpi_write_object(method + i, &result, state);
+
                     acpi_exec_pop_stack_back(state);
                     continue;
                 }
+
+                want_exec_result = 1;
             }else if(item->kind == LAI_LOOP_STACKITEM)
             {
                 if(i == item->loop_pred)
@@ -336,16 +343,6 @@ int acpi_exec(uint8_t *method, size_t size, acpi_state_t *state, acpi_object_t *
         if(i > size) // This would be an interpreter bug.
             acpi_panic("execution escaped out of method body\n");
 
-        /* Method Invokation? */
-        if(acpi_is_name(method[i]))
-            i += acpi_methodinvoke(&method[i], state, &invoke_return);
-
-        if(i >= size)
-            goto return_zero;
-
-        if(acpi_is_name(method[i]))
-            continue;
-
         /* General opcodes */
         int opcode;
         if(method[i] == EXTOP_PREFIX)
@@ -358,14 +355,37 @@ int acpi_exec(uint8_t *method, size_t size, acpi_state_t *state, acpi_object_t *
 
         switch(opcode)
         {
-        case ZERO_OP:
-        case ONE_OP:
-        case ONES_OP:
         case NOP_OP:
             i++;
-            break;
+
+        case ZERO_OP:
+            if(want_exec_result)
             {
+                acpi_object_t *result = acpi_exec_push_opstack_or_die(state);
+                result->type = ACPI_INTEGER;
+                result->integer = 0;
             }
+            i++;
+            break;
+        case ONE_OP:
+            if(want_exec_result)
+            {
+                acpi_object_t *result = acpi_exec_push_opstack_or_die(state);
+                result->type = ACPI_INTEGER;
+                result->integer = 1;
+            }
+            i++;
+            break;
+        case ONES_OP:
+            if(want_exec_result)
+            {
+                acpi_object_t *result = acpi_exec_push_opstack_or_die(state);
+                result->type = ACPI_INTEGER;
+                result->integer = ~((uint64_t)0);
+            }
+            i++;
+            break;
+
         case (EXTOP_PREFIX << 8) | SLEEP_OP:
             i += acpi_exec_sleep(&method[i], state);
             break;
@@ -480,6 +500,7 @@ int acpi_exec(uint8_t *method, size_t size, acpi_state_t *state, acpi_object_t *
             op_item->op_opcode = method[i];
             op_item->op_opstack = state->opstack_ptr;
             op_item->op_num_operands = 1;
+            op_item->op_want_result = want_exec_result;
             i++;
             break;
         }
@@ -497,6 +518,7 @@ int acpi_exec(uint8_t *method, size_t size, acpi_state_t *state, acpi_object_t *
             op_item->op_opcode = method[i];
             op_item->op_opstack = state->opstack_ptr;
             op_item->op_num_operands = 2;
+            op_item->op_want_result = want_exec_result;
             i++;
             break;
         }
@@ -509,14 +531,22 @@ int acpi_exec(uint8_t *method, size_t size, acpi_state_t *state, acpi_object_t *
         case DIVIDE_OP:
             i += acpi_exec_divide(&method[i], state);
             break;
-
         default:
-            acpi_panic("undefined opcode in control method %s, sequence %02X %02X %02X %02X\n",
-                    state->handle->path, method[i], method[i+1], method[i+2], method[i+3]);
+            // Opcodes that we do not natively handle here still need to be passed
+            // to acpi_eval_object(). TODO: Get rid of this call.
+            //acpi_debug("opcode 0x%02X is handled by acpi_eval_object()\n", opcode);
+            if(want_exec_result)
+            {
+                acpi_object_t *operand = acpi_exec_push_opstack_or_die(state);
+                i += acpi_eval_object(operand, state, method + i);
+            }else{
+                acpi_object_t discarded = {0};
+                i += acpi_eval_object(&discarded, state, method + i);
+                acpi_free_object(&discarded);
+            }
         }
     }
 
-return_zero:
     // when it returns nothing, assume Return (0)
     method_return->type = ACPI_INTEGER;
     method_return->integer = 0;
