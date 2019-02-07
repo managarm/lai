@@ -69,8 +69,6 @@ void acpi_free_object(acpi_object_t *object)
 {
     if(object->type == ACPI_BUFFER)
         acpi_free(object->buffer);
-    else if(object->type == ACPI_STRING)
-        acpi_free(object->string);
     else if(object->type == ACPI_PACKAGE)
         acpi_free_package(object);
 
