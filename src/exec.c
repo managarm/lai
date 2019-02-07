@@ -130,6 +130,30 @@ int acpi_exec_method(acpi_state_t *state)
     return status;
 }
 
+// Pushes a new item to the opstack and returns it.
+static acpi_object_t *acpi_exec_push_opstack_or_die(acpi_state_t *state) {
+    if(state->opstack_ptr == 16)
+        acpi_panic("operand stack overflow\n");
+    acpi_object_t *object = &state->opstack[state->opstack_ptr];
+    acpi_memset(object, 0, sizeof(acpi_object_t));
+    state->opstack_ptr++;
+    return object;
+}
+
+// Returns the n-th item from the opstack.
+static acpi_object_t *acpi_exec_get_opstack(acpi_state_t *state, int n) {
+    if(n >= state->opstack_ptr)
+        acpi_panic("opstack access out of bounds"); // This is an internal execution error.
+    return &state->opstack[n];
+}
+
+// Removes n items from the opstack.
+static void acpi_exec_pop_opstack(acpi_state_t *state, int n) {
+    for(int k = 0; k < n; k++)
+        acpi_free_object(&state->opstack[state->opstack_ptr - k - 1]);
+    state->opstack_ptr -= n;
+}
+
 // Pushes a new item to the execution stack and returns it.
 static acpi_stackitem_t *acpi_exec_push_stack_or_die(acpi_state_t *state) {
     state->stack_ptr++;
@@ -160,6 +184,53 @@ static void acpi_exec_pop_stack_back(acpi_state_t *state) {
     acpi_exec_pop_stack(state, 1);
 }
 
+static void acpi_exec_reduce(int opcode, acpi_object_t *operands, acpi_object_t *result) {
+    //acpi_debug("acpi_exec_reduce: opcode 0x%02X\n", opcode);
+    switch(opcode) {
+    case STORE_OP:
+        acpi_move_object(result, operands);
+        break;
+    case NOT_OP:
+        result->type = ACPI_INTEGER;
+        result->integer = ~operands[0].integer;
+        break;
+    case ADD_OP:
+        result->type = ACPI_INTEGER;
+        result->integer = operands[0].integer + operands[1].integer;
+        break;
+    case SUBTRACT_OP:
+        result->type = ACPI_INTEGER;
+        result->integer = operands[0].integer - operands[1].integer;
+        break;
+    case MULTIPLY_OP:
+        result->type = ACPI_INTEGER;
+        result->integer = operands[0].integer * operands[1].integer;
+        break;
+    case AND_OP:
+        result->type = ACPI_INTEGER;
+        result->integer = operands[0].integer & operands[1].integer;
+        break;
+    case OR_OP:
+        result->type = ACPI_INTEGER;
+        result->integer = operands[0].integer | operands[1].integer;
+        break;
+    case XOR_OP:
+        result->type = ACPI_INTEGER;
+        result->integer = operands[0].integer ^ operands[1].integer;
+        break;
+    case SHL_OP:
+        result->type = ACPI_INTEGER;
+        result->integer = operands[0].integer << operands[1].integer;
+        break;
+    case SHR_OP:
+        result->type = ACPI_INTEGER;
+        result->integer = operands[0].integer >> operands[1].integer;
+        break;
+    default:
+        acpi_panic("undefined opcode in acpi_exec_reduce: %02X\n", opcode);
+    }
+}
+
 // acpi_exec(): Internal function, executes actual AML opcodes
 // Param:    uint8_t *method - pointer to method opcodes
 // Param:    size_t size - size of method of bytes
@@ -185,7 +256,23 @@ int acpi_exec(uint8_t *method, size_t size, acpi_state_t *state, acpi_object_t *
         acpi_stackitem_t *item = acpi_exec_peek_stack_back(state);
         if(item)
         {
-            if(item->kind == LAI_LOOP_STACKITEM)
+            if(item->kind == LAI_OP_STACKITEM)
+            {
+                if(state->opstack_ptr < item->op_opstack + item->op_num_operands) {
+                    acpi_object_t *operand = acpi_exec_push_opstack_or_die(state);
+                    i += acpi_eval_object(operand, state, method + i);
+                    continue;
+                }else
+                {
+                    acpi_object_t result = {0};
+                    acpi_object_t *operands = acpi_exec_get_opstack(state, item->op_opstack);
+                    acpi_exec_reduce(item->op_opcode, operands, &result);
+                    i += acpi_write_object(method + i, &result, state);
+                    acpi_exec_pop_opstack(state, item->op_num_operands);
+                    acpi_exec_pop_stack_back(state);
+                    continue;
+                }
+            }else if(item->kind == LAI_LOOP_STACKITEM)
             {
                 if(i == item->loop_pred)
                 {
@@ -384,40 +471,38 @@ int acpi_exec(uint8_t *method, size_t size, acpi_state_t *state, acpi_object_t *
             i += acpi_exec_dwordfield(&method[i], state);
             break;
         case STORE_OP:
-            i += acpi_exec_store(&method[i], state);
+        case NOT_OP:
+        {
+            acpi_stackitem_t *op_item = acpi_exec_push_stack_or_die(state);
+            op_item->kind = LAI_OP_STACKITEM;
+            op_item->op_opcode = method[i];
+            op_item->op_opstack = state->opstack_ptr;
+            op_item->op_num_operands = 1;
+            i++;
             break;
+        }
         case ADD_OP:
-            i += acpi_exec_add(&method[i], state);
-            break;
         case SUBTRACT_OP:
-            i += acpi_exec_subtract(&method[i], state);
+        case MULTIPLY_OP:
+        case AND_OP:
+        case OR_OP:
+        case XOR_OP:
+        case SHR_OP:
+        case SHL_OP:
+        {
+            acpi_stackitem_t *op_item = acpi_exec_push_stack_or_die(state);
+            op_item->kind = LAI_OP_STACKITEM;
+            op_item->op_opcode = method[i];
+            op_item->op_opstack = state->opstack_ptr;
+            op_item->op_num_operands = 2;
+            i++;
             break;
+        }
         case INCREMENT_OP:
             i += acpi_exec_increment(&method[i], state);
             break;
         case DECREMENT_OP:
             i += acpi_exec_decrement(&method[i], state);
-            break;
-        case AND_OP:
-            i += acpi_exec_and(&method[i], state);
-            break;
-        case OR_OP:
-            i += acpi_exec_or(&method[i], state);
-            break;
-        case NOT_OP:
-            i += acpi_exec_not(&method[i], state);
-            break;
-        case XOR_OP:
-            i += acpi_exec_xor(&method[i], state);
-            break;
-        case SHR_OP:
-            i += acpi_exec_shr(&method[i], state);
-            break;
-        case SHL_OP:
-            i += acpi_exec_shl(&method[i], state);
-            break;
-        case MULTIPLY_OP:
-            i += acpi_exec_multiply(&method[i], state);
             break;
         case DIVIDE_OP:
             i += acpi_exec_divide(&method[i], state);

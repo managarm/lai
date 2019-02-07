@@ -244,6 +244,7 @@ typedef struct acpi_condition_t
 
 #define LAI_LOOP_STACKITEM 1
 #define LAI_COND_STACKITEM 2
+#define LAI_OP_STACKITEM 3
 
 typedef struct acpi_stackitem_ {
     int kind;
@@ -255,6 +256,11 @@ typedef struct acpi_stackitem_ {
         struct {
             int cond_taken; // Whether the conditional was true or not.
             size_t cond_end; // End of conditional PC.
+        };
+        struct {
+            int op_opcode;
+            int op_opstack;
+            int op_num_operands;
         };
     };
 } acpi_stackitem_t;
@@ -268,7 +274,9 @@ typedef struct acpi_state_t
 
     // Stack to track the current execution state.
     int stack_ptr;
+    int opstack_ptr;
     acpi_stackitem_t stack[16];
+    acpi_object_t opstack[16];
 } acpi_state_t;
 
 void acpi_init_call_state(acpi_state_t *, acpi_nsnode_t *);
@@ -371,19 +379,10 @@ int acpi_exec_method(acpi_state_t *);
 size_t acpi_methodinvoke(void *, acpi_state_t *, acpi_object_t *);
 void acpi_read_opregion(acpi_object_t *, acpi_nsnode_t *);
 void acpi_write_opregion(acpi_nsnode_t *, acpi_object_t *);
-size_t acpi_exec_store(void *, acpi_state_t *);
-size_t acpi_exec_add(void *, acpi_state_t *);
 size_t acpi_exec_name(void *, acpi_state_t *);
 size_t acpi_exec_buffer(acpi_object_t *, acpi_state_t *, void *);
 size_t acpi_exec_increment(void *, acpi_state_t *);
 size_t acpi_exec_decrement(void *, acpi_state_t *);
-size_t acpi_exec_and(void *, acpi_state_t *);
-size_t acpi_exec_or(void *, acpi_state_t *);
-size_t acpi_exec_subtract(void *, acpi_state_t *);
-size_t acpi_exec_not(void *, acpi_state_t *);
-size_t acpi_exec_xor(void *, acpi_state_t *);
-size_t acpi_exec_shl(void *, acpi_state_t *);
-size_t acpi_exec_shr(void *, acpi_state_t *);
 size_t acpi_exec_sleep(void *, acpi_state_t *);
 uint16_t acpi_bswap16(uint16_t);
 uint32_t acpi_bswap32(uint32_t);
