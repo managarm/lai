@@ -347,7 +347,16 @@ int acpi_exec(uint8_t *method, size_t size, acpi_state_t *state, acpi_object_t *
             continue;
 
         /* General opcodes */
-        switch(method[i])
+        int opcode;
+        if(method[i] == EXTOP_PREFIX)
+        {
+            if(i + 1 == size)
+                acpi_panic("two-byte opcode on method boundary");
+            opcode = (EXTOP_PREFIX << 8) | method[i + 1];
+        }else
+            opcode = method[i];
+
+        switch(opcode)
         {
         case ZERO_OP:
         case ONE_OP:
@@ -355,17 +364,10 @@ int acpi_exec(uint8_t *method, size_t size, acpi_state_t *state, acpi_object_t *
         case NOP_OP:
             i++;
             break;
-
-        case EXTOP_PREFIX:
-            switch(method[i+1])
             {
-            case SLEEP_OP:
-                i += acpi_exec_sleep(&method[i], state);
-                break;
-            default:
-                acpi_panic("undefined opcode in control method %s, sequence %02X %02X %02X %02X\n",
-                        state->handle->path, method[i], method[i+1], method[i+2], method[i+3]);
             }
+        case (EXTOP_PREFIX << 8) | SLEEP_OP:
+            i += acpi_exec_sleep(&method[i], state);
             break;
 
         /* A control method can return literally any object */
