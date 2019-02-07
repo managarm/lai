@@ -176,8 +176,6 @@ int acpi_exec(uint8_t *method, size_t size, acpi_state_t *state, acpi_object_t *
         return 0;
     }
 
-    acpi_strcpy(acpins_path, state->handle->path);
-
     size_t i = 0;
     acpi_object_t invoke_return = {0};
     state->stack_ptr = -1;
@@ -448,10 +446,6 @@ size_t acpi_methodinvoke(void *data, acpi_state_t *old_state, acpi_object_t *met
 {
     uint8_t *methodinvokation = (uint8_t*)data;
 
-    // save the state of the currently executing method
-    char path_save[ACPI_MAX_NAME];
-    acpi_strcpy(path_save, acpins_path);
-
     size_t return_size = 0;
 
     // determine the name of the method
@@ -487,8 +481,6 @@ size_t acpi_methodinvoke(void *data, acpi_state_t *old_state, acpi_object_t *met
     acpi_move_object(method_return, &state.retvalue);
     acpi_finalize_state(&state);
 
-    // restore state
-    acpi_strcpy(acpins_path, path_save);
     return return_size;
 }
 

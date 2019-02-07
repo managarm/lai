@@ -17,7 +17,6 @@ size_t acpi_acpins_allocation = 0;
 size_t acpi_acpins_size = 0;
 size_t acpi_acpins_count = 0;
 extern char aml_test[];
-char acpins_path[ACPI_MAX_NAME];
 
 acpi_nsnode_t **acpi_namespace;
 size_t acpi_ns_size = 0;
@@ -99,9 +98,6 @@ size_t acpins_resolve_path(acpi_nsnode_t *context, char *fullpath, uint8_t *path
         acpi_strcpy(fullpath, context->path);
     else
         acpi_strcpy(fullpath, "\\");
-    if(acpi_strcmp(fullpath, acpins_path))
-        acpi_panic("context path %s does not match deprecated acpis_path%s\n",
-                fullpath, acpins_path);
     fullpath[acpi_strlen(fullpath)] = '.';
 
 start:
@@ -163,9 +159,6 @@ void acpi_create_namespace(void *dsdt)
     acpi_namespace = acpi_calloc(sizeof(acpi_nsnode_t *), acpi_ns_capacity);
     if(!acpi_namespace)
         acpi_panic("unable to allocate memory.\n");
-
-    acpi_memset(acpins_path, 0, ACPI_MAX_NAME);
-    acpins_path[0] = ROOT_CHAR;
 
     acpi_acpins_code = acpi_malloc(CODE_WINDOW);
     acpi_acpins_allocation = CODE_WINDOW;
@@ -399,13 +392,6 @@ size_t acpins_create_scope(acpi_nsnode_t *parent, void *data)
 
     //acpi_debug("scope %s, size %d bytes\n", node->path, size);
 
-    // store the new current path
-    char current_path[ACPI_MAX_NAME];
-    acpi_strcpy(current_path, acpins_path);
-
-    // and update the path
-    acpi_strcpy(acpins_path, node->path);
-
     // put the scope in the namespace
     node->type = ACPI_NAMESPACE_SCOPE;
     node->size = size - pkgsize - name_length;
@@ -416,8 +402,6 @@ size_t acpins_create_scope(acpi_nsnode_t *parent, void *data)
     acpins_register_scope(node, (uint8_t*)data + 1 + pkgsize + name_length,
             size - pkgsize - name_length);
 
-    // finally restore the original path
-    acpi_strcpy(acpins_path, current_path);
     return size + 1;
 }
 
@@ -614,7 +598,8 @@ size_t acpins_create_field(acpi_nsnode_t *parent, void *data)
         field += name_size;
         byte_count += name_size;
 
-        node->path[acpi_strlen(acpins_path)] = '.';
+        // FIXME: This looks odd. Why do we insert a dot in the middle of the path?
+        node->path[acpi_strlen(parent->path)] = '.';
         acpi_strcpy(node->field_opregion, opregion->path);
         node->field_flags = field_flags;
         node->field_size = field[0];
@@ -689,13 +674,6 @@ size_t acpins_create_device(acpi_nsnode_t *parent, void *data)
 
     //acpi_debug("device scope %s, size %d bytes\n", node->path, size);
 
-    // store the new current path
-    char current_path[ACPI_MAX_NAME];
-    acpi_strcpy(current_path, acpins_path);
-
-    // and update the path
-    acpi_strcpy(acpins_path, node->path);
-
     // put the device scope in the namespace
     node->type = ACPI_NAMESPACE_DEVICE;
     node->size = size - pkgsize - name_length;
@@ -706,8 +684,6 @@ size_t acpins_create_device(acpi_nsnode_t *parent, void *data)
     acpins_register_scope(node, (uint8_t*)data + 2 + pkgsize + name_length,
             size - pkgsize - name_length);
 
-    // finally restore the original path
-    acpi_strcpy(acpins_path, current_path);
     return size + 2;
 }
 
@@ -729,13 +705,6 @@ size_t acpins_create_thermalzone(acpi_nsnode_t *parent, void *data)
     acpi_nsnode_t *node = acpins_create_nsnode_or_die();
     size_t name_length = acpins_resolve_path(parent, node->path, thermalzone);
 
-    // store the new current path
-    char current_path[ACPI_MAX_NAME];
-    acpi_strcpy(current_path, acpins_path);
-
-    // and update the path
-    acpi_strcpy(acpins_path, node->path);
-
     // put the device scope in the namespace
     node->type = ACPI_NAMESPACE_THERMALZONE;
     node->size = size - pkgsize - name_length;
@@ -747,8 +716,6 @@ size_t acpins_create_thermalzone(acpi_nsnode_t *parent, void *data)
     acpins_register_scope(node, (uint8_t*)data + 2 + pkgsize + name_length,
             size - pkgsize - name_length);
 
-    // finally restore the original path
-    acpi_strcpy(acpins_path, current_path);
     return size + 2;
 }
 
@@ -964,9 +931,10 @@ size_t acpins_create_indexfield(acpi_nsnode_t *parent, void *data)
         //acpi_debug("indexfield %c%c%c%c: size %d bits, at bit offset %d\n", indexfield[0], indexfield[1], indexfield[2], indexfield[3], indexfield[4], current_offset);
         acpi_nsnode_t *node = acpins_create_nsnode_or_die();
         node->type = ACPI_NAMESPACE_INDEXFIELD;
-        acpi_memcpy(node->path, acpins_path, acpi_strlen(acpins_path));
-        node->path[acpi_strlen(acpins_path)] = '.';
-        acpi_memcpy(node->path + acpi_strlen(acpins_path) + 1, indexfield, 4);
+        // FIXME: This looks odd. Why don't we all acpins_resolve_path()?
+        acpi_memcpy(node->path, parent->path, acpi_strlen(parent->path));
+        node->path[acpi_strlen(parent->path)] = '.';
+        acpi_memcpy(node->path + acpi_strlen(parent->path) + 1, indexfield, 4);
 
         acpi_strcpy(node->indexfield_data, datar);
         acpi_strcpy(node->indexfield_index, indexr);
