@@ -5,6 +5,7 @@
  */
 
 #include "lai.h"
+#include "ns_impl.h"
 
 /* ACPI Control Method Execution */
 /* Type1Opcode := DefBreak | DefBreakPoint | DefContinue | DefFatal | DefIfElse |
@@ -16,7 +17,7 @@ int acpi_exec(uint8_t *, size_t, acpi_state_t *, acpi_object_t *);
 const char *acpi_emulated_os = "Microsoft Windows NT";        // OS family
 uint64_t acpi_implemented_version = 2;                // ACPI 2.0
 
-const char *supported_osi_strings[] = 
+const char *supported_osi_strings[] =
 {
     "Windows 2000",        /* Windows 2000 */
     "Windows 2001",        /* Windows XP */
@@ -269,8 +270,8 @@ int acpi_exec(uint8_t *method, size_t size, acpi_state_t *state, acpi_object_t *
 
                     if(item->op_want_result)
                     {
-                        acpi_object_t *copy = acpi_exec_push_opstack_or_die(state);
-                        acpi_copy_object(copy, &result);
+                        acpi_object_t *opstack_res = acpi_exec_push_opstack_or_die(state);
+                        acpi_copy_object(opstack_res, &result);
                     }
                     i += acpi_write_object(method + i, &result, state);
 
@@ -343,16 +344,51 @@ int acpi_exec(uint8_t *method, size_t size, acpi_state_t *state, acpi_object_t *
         if(i > size) // This would be an interpreter bug.
             acpi_panic("execution escaped out of method body\n");
 
+        // Process names.
+        if(acpi_is_name(method[i])) {
+            char name[ACPI_MAX_NAME];
+            size_t name_size = acpins_resolve_path(state->handle, name, method + i);
+            acpi_nsnode_t *handle = acpi_exec_resolve(name);
+            if(!handle)
+                acpi_panic("undefined reference %s\n", name);
+
+            acpi_object_t result = {0};
+            if(handle->type == ACPI_NAMESPACE_NAME)
+            {
+                acpi_copy_object(&result, &handle->object);
+                i += name_size;
+            }else if(handle->type == ACPI_NAMESPACE_METHOD)
+            {
+                i += acpi_methodinvoke(method + i, state, &result);
+            }else if(handle->type == ACPI_NAMESPACE_FIELD
+                    || handle->type == ACPI_NAMESPACE_INDEXFIELD)
+            {
+                // It's an Operation Region field; perform IO in that region.
+                acpi_read_opregion(&result, handle);
+                i += name_size;
+            }else
+                acpi_panic("unexpected type of named object\n");
+
+            if(want_exec_result)
+            {
+                acpi_object_t *opstack_res = acpi_exec_push_opstack_or_die(state);
+                acpi_move_object(opstack_res, &result);
+            }
+            acpi_free_object(&result);
+            continue;
+        }
+
         /* General opcodes */
         int opcode;
         if(method[i] == EXTOP_PREFIX)
         {
             if(i + 1 == size)
-                acpi_panic("two-byte opcode on method boundary");
+                acpi_panic("two-byte opcode on method boundary\n");
             opcode = (EXTOP_PREFIX << 8) | method[i + 1];
         }else
             opcode = method[i];
 
+        // This switch handles the majority of all opcodes.
         switch(opcode)
         {
         case NOP_OP:
@@ -385,6 +421,41 @@ int acpi_exec(uint8_t *method, size_t size, acpi_state_t *state, acpi_object_t *
             }
             i++;
             break;
+
+        case BYTEPREFIX:
+        case WORDPREFIX:
+        case DWORDPREFIX:
+        case QWORDPREFIX:
+        {
+            uint64_t integer;
+            size_t integer_size = acpi_eval_integer(method + i, &integer);
+            if(!integer_size)
+                acpi_panic("failed to parse integer opcode\n");
+            if(want_exec_result)
+            {
+                acpi_object_t *result = acpi_exec_push_opstack_or_die(state);
+                result->type = ACPI_INTEGER;
+                result->integer = integer;
+            }
+            i += integer_size;
+            continue;
+        }
+        case PACKAGE_OP:
+        {
+            size_t encoded_size;
+            acpi_parse_pkgsize(method + i + 1, &encoded_size);
+
+            if(want_exec_result)
+            {
+                acpi_object_t *result = acpi_exec_push_opstack_or_die(state);
+                result->type = ACPI_PACKAGE;
+                result->package = acpi_calloc(sizeof(acpi_object_t), ACPI_MAX_PACKAGE_ENTRIES);
+                result->package_size = acpins_create_package(state->handle,
+                        result->package, method + i);
+            }
+            i += encoded_size + 1;
+            break;
+        }
 
         case (EXTOP_PREFIX << 8) | SLEEP_OP:
             i += acpi_exec_sleep(&method[i], state);
@@ -492,6 +563,42 @@ int acpi_exec(uint8_t *method, size_t size, acpi_state_t *state, acpi_object_t *
         case DWORDFIELD_OP:
             i += acpi_exec_dwordfield(&method[i], state);
             break;
+
+        case ARG0_OP:
+        case ARG1_OP:
+        case ARG2_OP:
+        case ARG3_OP:
+        case ARG4_OP:
+        case ARG5_OP:
+        case ARG6_OP:
+        {
+            if(want_exec_result)
+            {
+                acpi_object_t *result = acpi_exec_push_opstack_or_die(state);
+                acpi_copy_object(result, &state->arg[opcode - ARG0_OP]);
+            }
+            i++;
+            break;
+        }
+
+        case LOCAL0_OP:
+        case LOCAL1_OP:
+        case LOCAL2_OP:
+        case LOCAL3_OP:
+        case LOCAL4_OP:
+        case LOCAL5_OP:
+        case LOCAL6_OP:
+        case LOCAL7_OP:
+        {
+            if(want_exec_result)
+            {
+                acpi_object_t *result = acpi_exec_push_opstack_or_die(state);
+                acpi_copy_object(result, &state->local[opcode - LOCAL0_OP]);
+            }
+            i++;
+            break;
+        }
+
         case STORE_OP:
         case NOT_OP:
         {
@@ -534,7 +641,7 @@ int acpi_exec(uint8_t *method, size_t size, acpi_state_t *state, acpi_object_t *
         default:
             // Opcodes that we do not natively handle here still need to be passed
             // to acpi_eval_object(). TODO: Get rid of this call.
-            //acpi_debug("opcode 0x%02X is handled by acpi_eval_object()\n", opcode);
+            acpi_debug("opcode 0x%02X is handled by acpi_eval_object()\n", opcode);
             if(want_exec_result)
             {
                 acpi_object_t *operand = acpi_exec_push_opstack_or_die(state);
