@@ -12,8 +12,6 @@
    DefLoad | DefNoop | DefNotify | DefRelease | DefReset | DefReturn |
    DefSignal | DefSleep | DefStall | DefUnload | DefWhile */
 
-static int acpi_exec_run(uint8_t *, size_t, acpi_state_t *);
-
 const char *acpi_emulated_os = "Microsoft Windows NT";        // OS family
 uint64_t acpi_implemented_version = 2;                // ACPI 2.0
 
@@ -176,100 +174,97 @@ static int acpi_exec_run(uint8_t *method, size_t size, acpi_state_t *state)
         // If yes, it will be pushed onto the opstack after the expression is computed.
         int want_exec_result = 0;
 
-        if(item)
+        if(item->kind == LAI_METHOD_CONTEXT_STACKITEM)
         {
-            if(item->kind == LAI_METHOD_CONTEXT_STACKITEM)
+			// ACPI does an implicit Return(0) at the end of a control method.
+			if(i == size)
+			{
+				if(state->opstack_ptr) // This is an internal error.
+					acpi_panic("opstack is not empty before return\n");
+				acpi_object_t *result = acpi_exec_push_opstack_or_die(state);
+				result->type = ACPI_INTEGER;
+				result->integer = 0;
+
+				acpi_exec_pop_stack_back(state);
+				continue;
+			}
+        }else if(item->kind == LAI_OP_STACKITEM)
+        {
+            if(state->opstack_ptr == item->op_opstack + item->op_num_operands) {
+                acpi_object_t result = {0};
+                acpi_object_t *operands = acpi_exec_get_opstack(state, item->op_opstack);
+                acpi_exec_reduce(item->op_opcode, operands, &result);
+                acpi_exec_pop_opstack(state, item->op_num_operands);
+
+                if(item->op_want_result)
+                {
+                    acpi_object_t *opstack_res = acpi_exec_push_opstack_or_die(state);
+                    acpi_copy_object(opstack_res, &result);
+                }
+                i += acpi_write_object(method + i, &result, state);
+
+                acpi_exec_pop_stack_back(state);
+                continue;
+            }
+
+            want_exec_result = 1;
+        }else if(item->kind == LAI_LOOP_STACKITEM)
+        {
+            if(i == item->loop_pred)
             {
-                // ACPI does an implicit Return(0) at the end of a control method.
-                if(i == size)
+                // We are at the beginning of a loop. We check the predicate; if it is false,
+                // we jump to the end of the loop and remove the stack item.
+                acpi_object_t predicate = {0};
+                i += acpi_eval_object(&predicate, state, method + i);
+                if(!predicate.integer)
                 {
-                    if(state->opstack_ptr) // This is an internal error.
-                        acpi_panic("opstack is not empty before return\n");
-                    acpi_object_t *result = acpi_exec_push_opstack_or_die(state);
-                    result->type = ACPI_INTEGER;
-                    result->integer = 0;
-
+                    i = item->loop_end;
                     acpi_exec_pop_stack_back(state);
-                    continue;
                 }
-            }else if(item->kind == LAI_OP_STACKITEM)
+                continue;
+            }else if(i == item->loop_end)
             {
-                if(state->opstack_ptr == item->op_opstack + item->op_num_operands) {
-                    acpi_object_t result = {0};
-                    acpi_object_t *operands = acpi_exec_get_opstack(state, item->op_opstack);
-                    acpi_exec_reduce(item->op_opcode, operands, &result);
-                    acpi_exec_pop_opstack(state, item->op_num_operands);
+                // Unconditionally jump to the loop's predicate.
+                i = item->loop_pred;
+                continue;
+            }
 
-                    if(item->op_want_result)
-                    {
-                        acpi_object_t *opstack_res = acpi_exec_push_opstack_or_die(state);
-                        acpi_copy_object(opstack_res, &result);
-                    }
-                    i += acpi_write_object(method + i, &result, state);
-
-                    acpi_exec_pop_stack_back(state);
-                    continue;
-                }
-
-                want_exec_result = 1;
-            }else if(item->kind == LAI_LOOP_STACKITEM)
+            if (i > item->loop_end) // This would be an interpreter bug.
+                acpi_panic("execution escaped out of While() body\n");
+        }else if(item->kind == LAI_COND_STACKITEM)
+        {
+            // If the condition wasn't taken, execute the Else() block if it exists
+            if(!item->cond_taken)
             {
-                if(i == item->loop_pred)
+                if(method[i] == ELSE_OP)
                 {
-                    // We are at the beginning of a loop. We check the predicate; if it is false,
-                    // we jump to the end of the loop and remove the stack item.
-                    acpi_object_t predicate = {0};
-                    i += acpi_eval_object(&predicate, state, method + i);
-                    if(!predicate.integer)
-                    {
-                        i = item->loop_end;
-                        acpi_exec_pop_stack_back(state);
-                    }
-                    continue;
-                }else if(i == item->loop_end)
-                {
-                    // Unconditionally jump to the loop's predicate.
-                    i = item->loop_pred;
-                    continue;
+                    size_t else_size;
+                    i++;
+                    i += acpi_parse_pkgsize(method + i, &else_size);
                 }
 
-                if (i > item->loop_end) // This would be an interpreter bug.
-                    acpi_panic("execution escaped out of While() body\n");
-            }else if(item->kind == LAI_COND_STACKITEM)
+                acpi_exec_pop_stack_back(state);
+                continue;
+            }
+
+            // Clean up the execution stack at the end of If().
+            if(i == item->cond_end)
             {
-                // If the condition wasn't taken, execute the Else() block if it exists
-                if(!item->cond_taken)
-                {
-                    if(method[i] == ELSE_OP)
-                    {
-                        size_t else_size;
-                        i++;
-                        i += acpi_parse_pkgsize(method + i, &else_size);
-                    }
+                // Consume a follow-up Else() opcode.
+                if(i < size && method[i] == ELSE_OP) {
+                    size_t else_size;
+                    i++;
+                    size_t j = i;
+                    i += acpi_parse_pkgsize(method + i, &else_size);
 
-                    acpi_exec_pop_stack_back(state);
-                    continue;
+                    i = j + else_size;
                 }
 
-                // Clean up the execution stack at the end of If().
-                if(i == item->cond_end)
-                {
-                    // Consume a follow-up Else() opcode.
-                    if(i < size && method[i] == ELSE_OP) {
-                        size_t else_size;
-                        i++;
-                        size_t j = i;
-                        i += acpi_parse_pkgsize(method + i, &else_size);
-
-                        i = j + else_size;
-                    }
-
-                    acpi_exec_pop_stack_back(state);
-                    continue;
-                }
-            }else
-                acpi_panic("unexpected acpi_stackitem_t\n");
-        }
+                acpi_exec_pop_stack_back(state);
+                continue;
+            }
+        }else
+            acpi_panic("unexpected acpi_stackitem_t\n");
 
         if(i > size) // This would be an interpreter bug.
             acpi_panic("execution escaped out of code range\n");
