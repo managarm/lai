@@ -190,7 +190,7 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
                     acpi_object_t *opstack_res = acpi_exec_push_opstack_or_die(state);
                     acpi_copy_object(opstack_res, &result);
                 }
-                state->pc += acpi_write_object(method + state->pc, &result, state);
+                acpi_write_object(method, &result, state);
 
                 acpi_exec_pop_stack_back(state);
                 continue;
@@ -567,13 +567,13 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
             break;
         }
         case INCREMENT_OP:
-            state->pc += acpi_exec_increment(&method[state->pc], state);
+            acpi_exec_increment(method, state);
             break;
         case DECREMENT_OP:
-            state->pc += acpi_exec_decrement(&method[state->pc], state);
+            acpi_exec_decrement(method, state);
             break;
         case DIVIDE_OP:
-            state->pc += acpi_exec_divide(&method[state->pc], state);
+            acpi_exec_divide(method, state);
             break;
         default:
             // Opcodes that we do not natively handle here still need to be passed

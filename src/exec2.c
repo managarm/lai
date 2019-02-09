@@ -175,27 +175,24 @@ void acpi_copy_object(acpi_object_t *destination, acpi_object_t *source)
 // Param:    acpi_object_t **out - output pointer
 // Return:    size_t - size in bytes for skipping
 
-static size_t acpi_take_reference(void *data, acpi_state_t *state, acpi_object_t **out)
+static void acpi_take_reference(void *data, acpi_state_t *state, acpi_object_t **out)
 {
-    uint8_t *opcode = (uint8_t*)data;
+    uint8_t *code = (uint8_t*)data;
 
-    if(*opcode >= LOCAL0_OP && *opcode <= LOCAL7_OP)
+    if(code[state->pc] >= LOCAL0_OP && code[state->pc] <= LOCAL7_OP)
     {
-        int index = *opcode - LOCAL0_OP;
+        int index = code[state->pc] - LOCAL0_OP;
+        state->pc++;
         *out = &state->local[index];
-        return 1;
-    } else if(*opcode >= ARG0_OP && *opcode <= ARG6_OP)
+    } else if(code[state->pc] >= ARG0_OP && code[state->pc] <= ARG6_OP)
     {
-        int index = *opcode - ARG0_OP;
+        int index = code[state->pc] - ARG0_OP;
+        state->pc++;
         *out = &state->arg[index];
-        return 1;
-    }
-
-    if(acpi_is_name(*opcode))
+    } else if(acpi_is_name(code[state->pc]))
     {
         char name[ACPI_MAX_NAME];
-        size_t name_size;
-        name_size = acpins_resolve_path(state->handle, name, opcode);
+        state->pc += acpins_resolve_path(state->handle, name, code + state->pc);
 
         acpi_nsnode_t *handle = acpi_exec_resolve(name);
         if(!handle)
@@ -205,23 +202,16 @@ static size_t acpi_take_reference(void *data, acpi_state_t *state, acpi_object_t
             *out = &handle->object;
         else
             acpi_panic("NameSpec destination is not a writeable object.\n");
-
-        return name_size;
-    } else if(*opcode == INDEX_OP)
+    } else if(code[state->pc] == INDEX_OP)
     {
-        size_t return_size = 1;
-        size_t object_size;
-        opcode++;
+        state->pc++;
 
         // the first object should be a package
         acpi_object_t *object;
-        object_size = acpi_take_reference(opcode, state, &object);
-        return_size += object_size;
-        opcode += object_size;
+        acpi_take_reference(code, state, &object);
 
         acpi_object_t index = {0};
-        object_size = acpi_eval_object(&index, state, opcode);
-        return_size += object_size;
+        acpi_eval_operand(&index, state, code);
 
         if(object->type == ACPI_PACKAGE)
         {
@@ -230,34 +220,33 @@ static size_t acpi_take_reference(void *data, acpi_state_t *state, acpi_object_t
                         index.integer, object->package_size);
 
             *out = &object->package[index.integer];
-            return return_size;
         } else
             acpi_panic("cannot write Index() to non-package object: %d\n", object->type);
-    }
-
-    acpi_panic("undefined opcode, sequence %02X %02X %02X %02X\n",
-            opcode[0], opcode[1], opcode[2], opcode[3]);
+    } else
+        acpi_panic("undefined opcode in acpi_take_reference(), sequence %02X %02X %02X %02X\n",
+                code[state->pc + 0], code[state->pc + 1],
+                code[state->pc + 2], code[state->pc + 3]);
 }
 
 // acpi_write_object(): Writes to an object. Moves out of (i.e. destroys) the source object.
 // Param:    void *data - destination to be parsed
 // Param:    acpi_object_t *source - source object
 // Param:    acpi_state_t *state - state of the AML VM
-// Return:    size_t - size in bytes for skipping
 
-size_t acpi_write_object(void *data, acpi_object_t *source, acpi_state_t *state)
+void acpi_write_object(void *data, acpi_object_t *source, acpi_state_t *state)
 {
     uint8_t *opcode = data;
 
     // First, handle stores that do not target acpi_object_t objects.
-    if(*opcode == ZERO_OP)
+    if(opcode[state->pc] == ZERO_OP)
     {
         // Do not store the object.
-        return 1;
-    }else if(acpi_is_name(*opcode))
+        state->pc++;
+        return;
+    }else if(acpi_is_name(opcode[state->pc]))
     {
         char name[ACPI_MAX_NAME];
-        size_t name_size = acpins_resolve_path(state->handle, name, opcode);
+        size_t name_size = acpins_resolve_path(state->handle, name, opcode + state->pc);
 
         acpi_nsnode_t *handle = acpi_exec_resolve(name);
         if(!handle)
@@ -265,20 +254,21 @@ size_t acpi_write_object(void *data, acpi_object_t *source, acpi_state_t *state)
 
         if(handle->type == ACPI_NAMESPACE_FIELD || handle->type == ACPI_NAMESPACE_INDEXFIELD)
         {
+            state->pc += name_size;
             acpi_write_opregion(handle, source);
-            return name_size;
+            return;
         }else if(handle->type == ACPI_NAMESPACE_BUFFER_FIELD)
         {
+            state->pc += name_size;
             acpi_write_buffer(handle, source);
-            return name_size;
+            return;
         }
     }
 
     // Now, handle stores to acpi_object_t objects.
     acpi_object_t *dest;
-    size_t size = acpi_take_reference(opcode, state, &dest);
+    acpi_take_reference(opcode, state, &dest);
     acpi_move_object(dest, source);
-    return size;
 }
 
 // acpi_write_buffer(): Writes to a Buffer Field
@@ -331,88 +321,63 @@ void acpi_write_buffer(acpi_nsnode_t *handle, acpi_object_t *source)
 }
 
 // acpi_exec_increment(): Executes Increment() instruction
-// Param:    void *data - pointer to opcode
+// Param:    void *code - pointer to opcode
 // Param:    acpi_state_t *state - ACPI AML state
 // Return:    size_t - size in bytes for skipping
 
-size_t acpi_exec_increment(void *data, acpi_state_t *state)
+void acpi_exec_increment(void *code, acpi_state_t *state)
 {
-    size_t return_size = 1;
-    uint8_t *opcode = (uint8_t*)data;
-    opcode++;
+    state->pc++;
 
     acpi_object_t n = {0};
-    size_t size;
-
-    size = acpi_eval_object(&n, state, &opcode[0]);
+    size_t offset = state->pc;
+    acpi_eval_operand(&n, state, code);
     n.integer++;
-    acpi_write_object(&opcode[0], &n, state);
-
-    return_size += size;
-    return return_size;
+    state->pc = offset; // Reset the PC.
+    acpi_write_object(code, &n, state);
 }
 
 // acpi_exec_decrement(): Executes Decrement() instruction
-// Param:    void *data - pointer to opcode
+// Param:    void *code - pointer to opcode
 // Param:    acpi_state_t *state - ACPI AML state
 // Return:    size_t - size in bytes for skipping
 
-size_t acpi_exec_decrement(void *data, acpi_state_t *state)
+void acpi_exec_decrement(void *code, acpi_state_t *state)
 {
-    size_t return_size = 1;
-    uint8_t *opcode = (uint8_t*)data;
-    opcode++;
+    state->pc++;
 
     acpi_object_t n = {0};
-    size_t size;
-
-    size = acpi_eval_object(&n, state, &opcode[0]);
+    size_t offset = state->pc;
+    acpi_eval_operand(&n, state, code);
     n.integer--;
-    acpi_write_object(&opcode[0], &n, state);
-
-    return_size += size;
-    return return_size;
+    state->pc = offset; // Reset the PC.
+    acpi_write_object(code + offset, &n, state);
 }
 
 // acpi_exec_divide(): Executes a Divide() opcode
-// Param:    void *data - pointer to opcode
+// Param:    void *code - pointer to opcode
 // Param:    acpi_state_t *state - ACPI AML state
 // Return:    size_t - size in bytes for skipping
 
-size_t acpi_exec_divide(void *data, acpi_state_t *state)
+void acpi_exec_divide(void *code, acpi_state_t *state)
 {
-    size_t return_size = 1;
-    uint8_t *opcode = (uint8_t*)data;
-    opcode++;
+    state->pc++;
 
     acpi_object_t n1 = {0};
     acpi_object_t n2 = {0};
     acpi_object_t mod = {0};
     acpi_object_t quo = {0};
-    size_t size;
 
-    size = acpi_eval_object(&n1, state, &opcode[0]);
-    opcode += size;
-    return_size += size;
-
-    size = acpi_eval_object(&n2, state, &opcode[0]);
-    opcode += size;
-    return_size += size;
+    acpi_eval_operand(&n1, state, code);
+    acpi_eval_operand(&n2, state, code);
 
     mod.type = ACPI_INTEGER;
     quo.type = ACPI_INTEGER;
-
     mod.integer = n1.integer % n2.integer;
     quo.integer = n1.integer / n2.integer;
 
-    size = acpi_write_object(&opcode[0], &mod, state);
-    return_size += size;
-    opcode += size;
-
-    size = acpi_write_object(&opcode[0], &quo, state);
-    return_size += size;
-
-    return return_size;
+    acpi_write_object(code, &mod, state);
+    acpi_write_object(code, &quo, state);
 }
 
 

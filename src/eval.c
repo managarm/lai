@@ -619,36 +619,6 @@ size_t acpi_eval_object(acpi_object_t *destination, acpi_state_t *state, void *d
 
         destination->type = ACPI_INTEGER;
         destination->integer = n1.integer * n2.integer;
-    } else if(object[0] == DIVIDE_OP)
-    {
-        return_size = 3;
-        object++;
-
-        integer_size = acpi_eval_object(&n1, state, &object[0]);
-        return_size += integer_size;
-        object += integer_size;
-
-        integer_size = acpi_eval_object(&n2, state, &object[0]);
-        return_size += integer_size;
-        object += integer_size;
-
-        acpi_object_t mod = {0};
-        acpi_object_t quo = {0};
-        mod.type = ACPI_INTEGER;
-        quo.type = ACPI_INTEGER;
-
-        mod.integer = n1.integer % n2.integer;
-        quo.integer = n1.integer / n2.integer;
-
-        integer_size = acpi_write_object(&object[0], &mod, state);
-        return_size += integer_size;
-        object += integer_size;
-
-        integer_size = acpi_write_object(&object[0], &quo, state);
-        return_size += integer_size;
-
-        destination->type = ACPI_INTEGER;
-        destination->integer = n1.integer / n2.integer;
     } else
     {
         acpi_panic("undefined opcode, sequence: %02X %02X %02X %02X\n", object[0], object[1], object[2], object[3]);
