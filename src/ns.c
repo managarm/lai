@@ -256,8 +256,8 @@ void acpins_load_table(void *ptr)
 void acpins_register_scope(acpi_nsnode_t *scope, uint8_t *data, size_t size)
 {
     acpi_state_t state;
-    acpi_init_call_state(&state, scope);
-    acpi_populate(data, size, &state);
+    acpi_init_state(&state);
+    acpi_populate(scope, data, size, &state);
     acpi_finalize_state(&state);
 }
 

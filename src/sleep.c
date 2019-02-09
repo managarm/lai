@@ -53,14 +53,14 @@ int acpi_enter_sleep(uint8_t state)
 
     if(handle)
     {
-        acpi_init_call_state(&acpi_state, handle);
+        acpi_init_state(&acpi_state);
 
         // pass the sleeping type as an argument
         acpi_arg(&acpi_state, 0)->type = ACPI_INTEGER;
         acpi_arg(&acpi_state, 0)->integer = (uint64_t)state & 0xFF;
 
         acpi_debug("execute _PTS(%d)\n", state);
-        acpi_exec_method(&acpi_state);
+        acpi_exec_method(handle, &acpi_state);
         acpi_finalize_state(&acpi_state);
     }
 
@@ -68,14 +68,14 @@ int acpi_enter_sleep(uint8_t state)
 
     if(handle)
     {
-        acpi_init_call_state(&acpi_state, handle);
+        acpi_init_state(&acpi_state);
 
         // pass the sleeping type as an argument
         acpi_arg(&acpi_state, 0)->type = ACPI_INTEGER;
         acpi_arg(&acpi_state, 0)->integer = (uint64_t)state & 0xFF;
 
         acpi_debug("execute _GTS(%d)\n", state);
-        acpi_exec_method(&acpi_state);
+        acpi_exec_method(handle, &acpi_state);
         acpi_finalize_state(&acpi_state);
     }
 

@@ -192,7 +192,10 @@ static void acpi_take_reference(void *data, acpi_state_t *state, acpi_object_t *
     } else if(acpi_is_name(code[state->pc]))
     {
         char name[ACPI_MAX_NAME];
-        state->pc += acpins_resolve_path(state->handle, name, code + state->pc);
+        // TODO: It's ugly to rely on acpi_state_t internals here. Clean this up.
+        acpi_stackitem_t *ctx_item = &state->stack[state->context_ptr];
+        acpi_nsnode_t *ctx_handle = ctx_item->ctx_handle;
+        state->pc += acpins_resolve_path(ctx_handle, name, code + state->pc);
 
         acpi_nsnode_t *handle = acpi_exec_resolve(name);
         if(!handle)
@@ -246,7 +249,10 @@ void acpi_write_object(void *data, acpi_object_t *source, acpi_state_t *state)
     }else if(acpi_is_name(opcode[state->pc]))
     {
         char name[ACPI_MAX_NAME];
-        size_t name_size = acpins_resolve_path(state->handle, name, opcode + state->pc);
+        // TODO: It's ugly to rely on acpi_state_t internals here. Clean this up.
+        acpi_stackitem_t *ctx_item = &state->stack[state->context_ptr];
+        acpi_nsnode_t *ctx_handle = ctx_item->ctx_handle;
+        size_t name_size = acpins_resolve_path(ctx_handle, name, opcode + state->pc);
 
         acpi_nsnode_t *handle = acpi_exec_resolve(name);
         if(!handle)

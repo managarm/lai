@@ -256,7 +256,11 @@ typedef struct acpi_condition_t
 
 typedef struct acpi_stackitem_ {
     int kind;
+    int opstack_frame;
     union {
+        struct {
+            acpi_nsnode_t *ctx_handle;
+        };
         struct {
             int loop_pred; // Loop predicate PC.
             int loop_end; // End of loop PC.
@@ -267,7 +271,6 @@ typedef struct acpi_stackitem_ {
         };
         struct {
             int op_opcode;
-            int op_opstack;
             int op_num_operands;
             int op_want_result;
         };
@@ -276,7 +279,6 @@ typedef struct acpi_stackitem_ {
 
 typedef struct acpi_state_t
 {
-    acpi_nsnode_t *handle;
     int pc;
     int limit;
     acpi_object_t retvalue;
@@ -288,9 +290,10 @@ typedef struct acpi_state_t
     int opstack_ptr;
     acpi_stackitem_t stack[16];
     acpi_object_t opstack[16];
+    int context_ptr; // Index of the last CONTEXT_STACKITEM.
 } acpi_state_t;
 
-void acpi_init_call_state(acpi_state_t *, acpi_nsnode_t *);
+void acpi_init_state(acpi_state_t *);
 void acpi_finalize_state(acpi_state_t *);
 
 __attribute__((always_inline))
@@ -387,11 +390,11 @@ void acpi_move_object(acpi_object_t *, acpi_object_t *);
 void acpi_copy_object(acpi_object_t *, acpi_object_t *);
 void acpi_write_object(void *, acpi_object_t *, acpi_state_t *);
 acpi_nsnode_t *acpi_exec_resolve(char *);
-int acpi_populate(void *, size_t, acpi_state_t *);
-int acpi_exec_method(acpi_state_t *);
+int acpi_populate(acpi_nsnode_t *, void *, size_t, acpi_state_t *);
+int acpi_exec_method(acpi_nsnode_t *, acpi_state_t *);
 void acpi_read_opregion(acpi_object_t *, acpi_nsnode_t *);
 void acpi_write_opregion(acpi_nsnode_t *, acpi_object_t *);
-void acpi_exec_name(void *, acpi_state_t *);
+void acpi_exec_name(void *, acpi_nsnode_t *, acpi_state_t *);
 void acpi_exec_increment(void *, acpi_state_t *);
 void acpi_exec_decrement(void *, acpi_state_t *);
 void acpi_exec_sleep(void *, acpi_state_t *);
@@ -401,9 +404,9 @@ uint8_t acpi_char_to_hex(char);
 size_t acpi_exec_multiply(void *, acpi_state_t *);
 void acpi_exec_divide(void *, acpi_state_t *);
 void acpi_write_buffer(acpi_nsnode_t *, acpi_object_t *);
-void acpi_exec_bytefield(void *, acpi_state_t *);
-void acpi_exec_wordfield(void *, acpi_state_t *);
-void acpi_exec_dwordfield(void *, acpi_state_t *);
+void acpi_exec_bytefield(void *, acpi_nsnode_t *, acpi_state_t *);
+void acpi_exec_wordfield(void *, acpi_nsnode_t *, acpi_state_t *);
+void acpi_exec_dwordfield(void *, acpi_nsnode_t *, acpi_state_t *);
 
 // Generic Functions
 int acpi_enable(uint32_t);

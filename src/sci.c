@@ -64,8 +64,8 @@ int acpi_enable(uint32_t mode)
     /* first run \._SB_._INI */
     handle = acpins_resolve("\\._SB_._INI");
     if(handle) {
-        acpi_init_call_state(&state, handle);
-        if(!acpi_exec_method(&state))
+        acpi_init_state(&state);
+        if(!acpi_exec_method(handle, &state))
             acpi_debug("evaluated \\._SB_._INI\n");
         acpi_finalize_state(&state);
     }
@@ -77,11 +77,11 @@ int acpi_enable(uint32_t mode)
     handle = acpins_resolve("\\._PIC");
     if(handle)
     {
-        acpi_init_call_state(&state, handle);
+        acpi_init_state(&state);
         acpi_arg(&state, 0)->type = ACPI_INTEGER;
         acpi_arg(&state, 0)->integer = mode;
 
-        if(!acpi_exec_method(&state))
+        if(!acpi_exec_method(handle, &state))
             acpi_debug("evaluated \\._PIC(%d)\n", mode);
         acpi_finalize_state(&state);
     }
@@ -142,8 +142,8 @@ static void acpi_init_children(char *parent)
 
                 if(handle)
                 {
-                    acpi_init_call_state(&state, handle);
-                    if(!acpi_exec_method(&state))
+                    acpi_init_state(&state);
+                    if(!acpi_exec_method(handle, &state))
                         acpi_debug("evaluated %s\n", path);
                     acpi_finalize_state(&state);
                 }

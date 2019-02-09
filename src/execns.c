@@ -14,13 +14,13 @@
 // Param:    acpi_state_t *state - AML VM state
 // Return:    size_t - size in bytes for skipping
 
-void acpi_exec_name(void *data, acpi_state_t *state)
+void acpi_exec_name(void *data, acpi_nsnode_t *parent, acpi_state_t *state)
 {
     state->pc++; // Skip over NAME_OP.
     uint8_t *code = data;
 
     char path[ACPI_MAX_NAME];
-    state->pc += acpins_resolve_path(state->handle, path, code + state->pc);
+    state->pc += acpins_resolve_path(parent, path, code + state->pc);
 
     acpi_nsnode_t *handle;
     handle = acpins_resolve(path);
@@ -40,10 +40,10 @@ void acpi_exec_name(void *data, acpi_state_t *state)
 // Param:    void *data - data
 // Param:    acpi_state_t *state - AML VM state
 
-void acpi_exec_bytefield(void *data, acpi_state_t *state)
+void acpi_exec_bytefield(void *data, acpi_nsnode_t *parent, acpi_state_t *state)
 {
     uint8_t *code = data;
-    state->pc += acpins_create_bytefield(state->handle, code + state->pc);    // dirty af solution but good enough for now
+    state->pc += acpins_create_bytefield(parent, code + state->pc);    // dirty af solution but good enough for now
 }
 
 
@@ -51,10 +51,10 @@ void acpi_exec_bytefield(void *data, acpi_state_t *state)
 // Param:    void *data - data
 // Param:    acpi_state_t *state - AML VM state
 
-void acpi_exec_wordfield(void *data, acpi_state_t *state)
+void acpi_exec_wordfield(void *data, acpi_nsnode_t *parent, acpi_state_t *state)
 {
     uint8_t *code = data;
-    state->pc += acpins_create_wordfield(state->handle, code + state->pc);    // dirty af solution but good enough for now
+    state->pc += acpins_create_wordfield(parent, code + state->pc);    // dirty af solution but good enough for now
 }
 
 
@@ -62,9 +62,9 @@ void acpi_exec_wordfield(void *data, acpi_state_t *state)
 // Param:    void *data - data
 // Param:    acpi_state_t *state - AML VM state
 
-void acpi_exec_dwordfield(void *data, acpi_state_t *state)
+void acpi_exec_dwordfield(void *data, acpi_nsnode_t *parent, acpi_state_t *state)
 {
     uint8_t *code = data;
-    state->pc += acpins_create_dwordfield(state->handle, code + state->pc);    // dirty af solution but good enough for now
+    state->pc += acpins_create_dwordfield(parent, code + state->pc);    // dirty af solution but good enough for now
 }
 

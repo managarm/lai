@@ -143,9 +143,9 @@ int acpi_eval(acpi_object_t *destination, char *path)
     } else if(handle->type == ACPI_NAMESPACE_METHOD)
     {
         acpi_state_t state;
-        acpi_init_call_state(&state, handle);
+        acpi_init_state(&state);
         int ret;
-        if((ret = acpi_exec_method(&state)))
+        if((ret = acpi_exec_method(handle, &state)))
             return ret;
         acpi_move_object(destination, &state.retvalue);
         acpi_finalize_state(&state);

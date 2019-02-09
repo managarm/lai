@@ -18,10 +18,10 @@ void acpi_eval_operand(acpi_object_t *destination, acpi_state_t *state, uint8_t 
 // Param: acpi_state_t *state - will store method name and arguments
 // Param: acpi_nsnode_t *method - identifies the control method
 
-void acpi_init_call_state(acpi_state_t *state, acpi_nsnode_t *method) {
+void acpi_init_state(acpi_state_t *state) {
     acpi_memset(state, 0, sizeof(acpi_state_t));
-    state->handle = method;
     state->stack_ptr = -1;
+    state->context_ptr = -1;
 }
 
 // Finalize the interpreter state. Frees all memory owned by the state.
@@ -91,6 +91,29 @@ static void acpi_exec_pop_stack(acpi_state_t *state, int n) {
 // Removes the last item from the stack.
 static void acpi_exec_pop_stack_back(acpi_state_t *state) {
     acpi_exec_pop_stack(state, 1);
+}
+
+// Returns the acpi_stackitem_t pointed to by the state's context_ptr.
+static acpi_stackitem_t *acpi_exec_context(acpi_state_t *state) {
+    return &state->stack[state->context_ptr];
+}
+
+// Updates the state's context_ptr to point to the innermost context item.
+static void acpi_exec_update_context(acpi_state_t *state) {
+    int j = 0;
+    acpi_stackitem_t *ctx_item;
+    while(1) {
+        ctx_item = acpi_exec_peek_stack(state, j);
+        if(!ctx_item)
+            break;
+        if(ctx_item->kind == LAI_POPULATE_CONTEXT_STACKITEM
+                || ctx_item->kind == LAI_METHOD_CONTEXT_STACKITEM
+                || ctx_item->kind == LAI_EVALOBJECT_CONTEXT_STACKITEM)
+            break;
+        j++;
+    }
+
+    state->context_ptr = state->stack_ptr - j;
 }
 
 static int acpi_compare(acpi_object_t *lhs, acpi_object_t *rhs) {
@@ -187,6 +210,7 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
 			if(state->pc == state->limit)
             {
 				acpi_exec_pop_stack_back(state);
+                acpi_exec_update_context(state);
 				continue;
 			}
         }else if(item->kind == LAI_METHOD_CONTEXT_STACKITEM)
@@ -201,22 +225,24 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
 				result->integer = 0;
 
 				acpi_exec_pop_stack_back(state);
+                acpi_exec_update_context(state);
 				continue;
 			}
         }else if(item->kind == LAI_EVALOBJECT_CONTEXT_STACKITEM)
         {
-            if(state->opstack_ptr == item->op_opstack + 1)
+            if(state->opstack_ptr == item->opstack_frame + 1)
             {
                 acpi_exec_pop_stack_back(state);
+                acpi_exec_update_context(state);
                 return 0;
             }
 
             want_exec_result = 1;
         }else if(item->kind == LAI_OP_STACKITEM)
         {
-            if(state->opstack_ptr == item->op_opstack + item->op_num_operands) {
+            if(state->opstack_ptr == item->opstack_frame + item->op_num_operands) {
                 acpi_object_t result = {0};
-                acpi_object_t *operands = acpi_exec_get_opstack(state, item->op_opstack);
+                acpi_object_t *operands = acpi_exec_get_opstack(state, item->opstack_frame);
                 acpi_exec_reduce(item->op_opcode, operands, &result);
                 acpi_exec_pop_opstack(state, item->op_num_operands);
 
@@ -234,9 +260,9 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
             want_exec_result = 1;
         }else if(item->kind == LAI_NOWRITE_OP_STACKITEM)
         {
-            if(state->opstack_ptr == item->op_opstack + item->op_num_operands) {
+            if(state->opstack_ptr == item->opstack_frame + item->op_num_operands) {
                 acpi_object_t result = {0};
-                acpi_object_t *operands = acpi_exec_get_opstack(state, item->op_opstack);
+                acpi_object_t *operands = acpi_exec_get_opstack(state, item->opstack_frame);
                 acpi_exec_reduce(item->op_opcode, operands, &result);
                 acpi_exec_pop_opstack(state, item->op_num_operands);
 
@@ -314,10 +340,13 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
             acpi_panic("execution escaped out of code range (PC is 0x%x with limit 0x%x)\n",
                     state->pc, state->limit);
 
+        acpi_stackitem_t *ctx_item = acpi_exec_context(state);
+        acpi_nsnode_t *ctx_handle = ctx_item->ctx_handle;
+
         // Process names.
         if(acpi_is_name(method[state->pc])) {
             char name[ACPI_MAX_NAME];
-            size_t name_size = acpins_resolve_path(state->handle, name, method + state->pc);
+            size_t name_size = acpins_resolve_path(ctx_handle, name, method + state->pc);
             acpi_nsnode_t *handle = acpi_exec_resolve(name);
             if(!handle)
                 acpi_panic("undefined reference %s\n", name);
@@ -331,19 +360,19 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
             }else if(handle->type == ACPI_NAMESPACE_METHOD)
             {
                 char path[ACPI_MAX_NAME];
-                state->pc += acpins_resolve_path(state->handle, path, method + state->pc);
+                state->pc += acpins_resolve_path(ctx_handle, path, method + state->pc);
 
                 acpi_nsnode_t *handle = acpi_exec_resolve(path);
                 if(!handle)
                     acpi_panic("undefined MethodInvokation %s\n", path);
 
                 acpi_state_t nested_state;
-                acpi_init_call_state(&nested_state, handle);
+                acpi_init_state(&nested_state);
                 int argc = handle->method_flags & METHOD_ARGC_MASK;
                 for(int i = 0; i < argc; i++)
                     acpi_eval_operand(&nested_state.arg[i], state, method);
 
-                acpi_exec_method(&nested_state);
+                acpi_exec_method(handle, &nested_state);
                 acpi_move_object(&result, &nested_state.retvalue);
                 acpi_finalize_state(&nested_state);
             }else if(handle->type == ACPI_NAMESPACE_FIELD
@@ -559,6 +588,7 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
             acpi_move_object(opstack_res, &result);
 
             acpi_exec_pop_stack(state, j + 1);
+            acpi_exec_update_context(state);
             break;
         }
         /* While Loops */
@@ -645,64 +675,64 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
 
         // "Simple" objects in the ACPI namespace.
         case NAME_OP:
-            acpi_exec_name(method, state);
+            acpi_exec_name(method, ctx_handle, state);
             break;
         case BYTEFIELD_OP:
-            acpi_exec_bytefield(method, state);
+            acpi_exec_bytefield(method, ctx_handle, state);
             break;
         case WORDFIELD_OP:
-            acpi_exec_wordfield(method, state);
+            acpi_exec_wordfield(method, ctx_handle, state);
             break;
         case DWORDFIELD_OP:
-            acpi_exec_dwordfield(method, state);
+            acpi_exec_dwordfield(method, ctx_handle, state);
             break;
 
         // Scope-like objects in the ACPI namespace.
         case SCOPE_OP:
         {
-            state->pc += acpins_create_scope(state->handle, method + state->pc);
+            state->pc += acpins_create_scope(ctx_handle, method + state->pc);
             break;
         }
         case (EXTOP_PREFIX << 8) | DEVICE:
         {
-            state->pc += acpins_create_device(state->handle, method + state->pc);
+            state->pc += acpins_create_device(ctx_handle, method + state->pc);
             break;
         }
         case (EXTOP_PREFIX << 8) | PROCESSOR:
         {
-            state->pc += acpins_create_processor(state->handle, method + state->pc);
+            state->pc += acpins_create_processor(ctx_handle, method + state->pc);
             break;
         }
         case (EXTOP_PREFIX << 8) | THERMALZONE:
         {
-            state->pc += acpins_create_thermalzone(state->handle, method + state->pc);
+            state->pc += acpins_create_thermalzone(ctx_handle, method + state->pc);
             break;
         }
         case (EXTOP_PREFIX << 8) | OPREGION:
         {
-            state->pc += acpins_create_opregion(state->handle, method + state->pc);
+            state->pc += acpins_create_opregion(ctx_handle, method + state->pc);
             break;
         }
 
         // Leafs in the ACPI namespace.
         case METHOD_OP:
         {
-            state->pc += acpins_create_method(state->handle, method + state->pc);
+            state->pc += acpins_create_method(ctx_handle, method + state->pc);
             break;
         }
         case (EXTOP_PREFIX << 8) | MUTEX:
         {
-            state->pc += acpins_create_mutex(state->handle, method + state->pc);
+            state->pc += acpins_create_mutex(ctx_handle, method + state->pc);
             break;
         }
         case (EXTOP_PREFIX << 8) | FIELD:
         {
-            state->pc += acpins_create_field(state->handle, method + state->pc);
+            state->pc += acpins_create_field(ctx_handle, method + state->pc);
             break;
         }
         case (EXTOP_PREFIX << 8) | INDEXFIELD:
         {
-            state->pc += acpins_create_indexfield(state->handle, method + state->pc);
+            state->pc += acpins_create_indexfield(ctx_handle, method + state->pc);
             break;
         }
 
@@ -747,7 +777,7 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
             acpi_stackitem_t *op_item = acpi_exec_push_stack_or_die(state);
             op_item->kind = LAI_OP_STACKITEM;
             op_item->op_opcode = method[state->pc];
-            op_item->op_opstack = state->opstack_ptr;
+            op_item->opstack_frame = state->opstack_ptr;
             op_item->op_num_operands = 1;
             op_item->op_want_result = want_exec_result;
             state->pc++;
@@ -765,7 +795,7 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
             acpi_stackitem_t *op_item = acpi_exec_push_stack_or_die(state);
             op_item->kind = LAI_OP_STACKITEM;
             op_item->op_opcode = method[state->pc];
-            op_item->op_opstack = state->opstack_ptr;
+            op_item->opstack_frame = state->opstack_ptr;
             op_item->op_num_operands = 2;
             op_item->op_want_result = want_exec_result;
             state->pc++;
@@ -791,7 +821,7 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
             acpi_stackitem_t *op_item = acpi_exec_push_stack_or_die(state);
             op_item->kind = LAI_NOWRITE_OP_STACKITEM;
             op_item->op_opcode = method[state->pc];
-            op_item->op_opstack = state->opstack_ptr;
+            op_item->opstack_frame = state->opstack_ptr;
             op_item->op_num_operands = 2;
             op_item->op_want_result = want_exec_result;
             state->pc++;
@@ -808,9 +838,11 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
     return 0;
 }
 
-int acpi_populate(void *data, size_t size, acpi_state_t *state) {
+int acpi_populate(acpi_nsnode_t *parent, void *data, size_t size, acpi_state_t *state) {
     acpi_stackitem_t *item = acpi_exec_push_stack_or_die(state);
     item->kind = LAI_POPULATE_CONTEXT_STACKITEM;
+    item->ctx_handle = parent;
+    acpi_exec_update_context(state);
 
     state->pc = 0;
     state->limit = size;
@@ -821,28 +853,30 @@ int acpi_populate(void *data, size_t size, acpi_state_t *state) {
 }
 
 // acpi_exec_method(): Finds and executes a control method
-// Param:    acpi_state_t *state - method name and arguments
-// Param:    acpi_object_t *method_return - return value of method
+// Param:    acpi_nsnode_t *method - method to execute
+// Param:    acpi_state_t *state - execution engine state
 // Return:    int - 0 on success
 
-int acpi_exec_method(acpi_state_t *state)
+int acpi_exec_method(acpi_nsnode_t *method, acpi_state_t *state)
 {
     // Check for OS-defined methods.
-    if(state->handle->method_override)
-        return state->handle->method_override(state->arg, &state->retvalue);
+    if(method->method_override)
+        return method->method_override(state->arg, &state->retvalue);
 
     // Okay, by here it's a real method.
-    //acpi_debug("execute control method %s\n", state->handle->path);
+    //acpi_debug("execute control method %s\n", method->path);
     acpi_stackitem_t *item = acpi_exec_push_stack_or_die(state);
     item->kind = LAI_METHOD_CONTEXT_STACKITEM;
+    item->ctx_handle = method;
+    acpi_exec_update_context(state);
 
     state->pc = 0;
-    state->limit = state->handle->size;
-    int status = acpi_exec_run(state->handle->pointer, state);
+    state->limit = method->size;
+    int status = acpi_exec_run(method->pointer, state);
     if(status)
         return status;
 
-    /*acpi_debug("%s finished, ", state->handle->path);
+    /*acpi_debug("%s finished, ", method->path);
 
     if(state->retvalue.type == ACPI_INTEGER)
         acpi_debug("return value is integer: %d\n", state->retvalue.integer);
@@ -867,10 +901,13 @@ int acpi_exec_method(acpi_state_t *state)
 
 void acpi_eval_operand(acpi_object_t *destination, acpi_state_t *state, uint8_t *code) {
     int opstack = state->opstack_ptr;
+    acpi_stackitem_t *super = acpi_exec_context(state);
 
     acpi_stackitem_t *item = acpi_exec_push_stack_or_die(state);
     item->kind = LAI_EVALOBJECT_CONTEXT_STACKITEM;
-    item->op_opstack = opstack;
+    item->opstack_frame = opstack;
+    item->ctx_handle = super->ctx_handle;
+    acpi_exec_update_context(state);
 
     int status = acpi_exec_run(code, state);
     if(status)
@@ -891,11 +928,13 @@ void acpi_eval_operand(acpi_object_t *destination, acpi_state_t *state, uint8_t 
 
 size_t acpi_eval_object(acpi_object_t *destination, acpi_nsnode_t *context, void *data) {
 	acpi_state_t state;
-	acpi_init_call_state(&state, context);
+	acpi_init_state(&state);
 
     acpi_stackitem_t *item = acpi_exec_push_stack_or_die(&state);
     item->kind = LAI_EVALOBJECT_CONTEXT_STACKITEM;
-    item->op_opstack = 0;
+    item->opstack_frame = 0;
+    item->ctx_handle = context;
+    acpi_exec_update_context(&state);
 
 	state.pc = 0;
 	state.limit = 0x7FFFFFFF;
