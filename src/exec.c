@@ -12,6 +12,8 @@
    DefLoad | DefNoop | DefNotify | DefRelease | DefReset | DefReturn |
    DefSignal | DefSleep | DefStall | DefUnload | DefWhile */
 
+void acpi_eval_operand(acpi_object_t *destination, acpi_state_t *state, uint8_t *code);
+
 // Prepare the interpreter state for a control method call.
 // Param: acpi_state_t *state - will store method name and arguments
 // Param: acpi_nsnode_t *method - identifies the control method
@@ -166,6 +168,15 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
 				acpi_exec_pop_stack_back(state);
 				continue;
 			}
+        }else if(item->kind == LAI_EVALOBJECT_CONTEXT_STACKITEM)
+        {
+            if(state->opstack_ptr == item->op_opstack + 1)
+            {
+                acpi_exec_pop_stack_back(state);
+                return 0;
+            }
+
+            want_exec_result = 1;
         }else if(item->kind == LAI_OP_STACKITEM)
         {
             if(state->opstack_ptr == item->op_opstack + item->op_num_operands) {
@@ -193,7 +204,7 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
                 // We are at the beginning of a loop. We check the predicate; if it is false,
                 // we jump to the end of the loop and remove the stack item.
                 acpi_object_t predicate = {0};
-                state->pc += acpi_eval_object(&predicate, state, method + state->pc);
+                acpi_eval_operand(&predicate, state, method);
                 if(!predicate.integer)
                 {
                     state->pc = item->loop_end;
@@ -370,7 +381,7 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
         {
             state->pc++;
             acpi_object_t result = {0};
-            state->pc += acpi_eval_object(&result, state, method + state->pc);
+            acpi_eval_operand(&result, state, method);
 
             // Find the last LAI_METHOD_CONTEXT_STACKITEM on the stack.
             int j = 0;
@@ -460,7 +471,7 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
 
             // Evaluate the predicate
             acpi_object_t predicate = {0};
-            state->pc += acpi_eval_object(&predicate, state, method + state->pc);
+            acpi_eval_operand(&predicate, state, method);
 
             acpi_stackitem_t *cond_item = acpi_exec_push_stack_or_die(state);
             cond_item->kind = LAI_COND_STACKITEM;
@@ -622,6 +633,28 @@ int acpi_exec_method(acpi_state_t *state)
     acpi_move_object(&state->retvalue, result);
     acpi_exec_pop_opstack(state, 1);
     return 0;
+}
+
+// Like acpi_eval_object() but operates on an existing acpi_state_t.
+// TODO: Eventually, we want to remove this function again. For now, it is useful while
+//       we add all missing opcodes to acpi_exec_run().
+
+void acpi_eval_operand(acpi_object_t *destination, acpi_state_t *state, uint8_t *code) {
+    int opstack = state->opstack_ptr;
+
+    acpi_stackitem_t *item = acpi_exec_push_stack_or_die(state);
+    item->kind = LAI_EVALOBJECT_CONTEXT_STACKITEM;
+    item->op_opstack = opstack;
+
+    int status = acpi_exec_run(code, state);
+    if(status)
+        acpi_panic("acpi_exec_run() failed in acpi_eval_operand()\n");
+
+    if(state->opstack_ptr != opstack + 1) // This would be an internal error.
+        acpi_panic("expected exactly one opstack item after operand evaluation\n");
+    acpi_object_t *result = acpi_exec_get_opstack(state, opstack);
+    acpi_move_object(destination, result);
+    acpi_exec_pop_opstack(state, 1);
 }
 
 // acpi_methodinvoke(): Executes a MethodInvokation
