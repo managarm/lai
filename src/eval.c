@@ -627,6 +627,79 @@ size_t acpi_eval_object(acpi_object_t *destination, acpi_state_t *state, void *d
     return return_size;
 }
 
+// acpi_methodinvoke(): Executes a MethodInvokation
+// Param:    void *data - pointer to MethodInvokation
+// Param:    acpi_state_t *old_state - state of currently executing method
+// Param:    acpi_object_t *method_return - object to store return value
+// Return:    size_t - size in bytes for skipping
+
+size_t acpi_methodinvoke(void *data, acpi_state_t *old_state, acpi_object_t *method_return)
+{
+    uint8_t *methodinvokation = (uint8_t*)data;
+
+    size_t return_size = 0;
+
+    // determine the name of the method
+    char path[ACPI_MAX_NAME];
+    size_t name_size = acpins_resolve_path(old_state->handle, path, methodinvokation);
+    return_size += name_size;
+    methodinvokation += name_size;
+
+    acpi_nsnode_t *method = acpi_exec_resolve(path);
+    if(!method)
+        acpi_panic("undefined MethodInvokation %s\n", path);
+
+    acpi_state_t state;
+    acpi_init_call_state(&state, method);
+    int argc = method->method_flags & METHOD_ARGC_MASK;
+    for(int i = 0; i < argc; i++)
+    {
+        size_t arg_size = acpi_eval_object(&state.arg[i],
+                old_state, methodinvokation);
+        methodinvokation += arg_size;
+        return_size += arg_size;
+    }
+
+    // execute
+    acpi_exec_method(&state);
+    acpi_move_object(method_return, &state.retvalue);
+    acpi_finalize_state(&state);
+
+    return return_size;
+}
+
+// acpi_exec_buffer(): Creates a buffer object
+// Param:    acpi_object_t *destination - destination
+// Param:    acpi_state_t *state - AML VM state
+// Param:    void *data - actual data
+
+size_t acpi_exec_buffer(acpi_object_t *destination, acpi_state_t *state, void *data)
+{
+    size_t return_size = 1;
+
+    uint8_t *buffer = (uint8_t*)data;
+    buffer++;        // skip BUFFER_OP
+
+    size_t pkgsize, size;
+    pkgsize = acpi_parse_pkgsize(buffer, &size);
+    return_size += size;
+
+    acpi_object_t buffer_size = {0};
+    buffer += pkgsize;
+    buffer += acpi_eval_object(&buffer_size, state, buffer);
+
+    destination->type = ACPI_BUFFER;
+    destination->buffer_size = buffer_size.integer;
+    destination->buffer = acpi_malloc(destination->buffer_size);
+
+    size -= ((size_t)buffer - (size_t)data);
+
+    if(size)
+        acpi_memcpy(destination->buffer, buffer, destination->buffer_size);
+
+    return return_size;
+}
+
 // acpi_eval(): Returns an object
 // Param:    acpi_object_t *destination - where to store object
 // Param:    char *path - path of object

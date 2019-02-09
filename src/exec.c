@@ -273,7 +273,22 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
                 state->pc += name_size;
             }else if(handle->type == ACPI_NAMESPACE_METHOD)
             {
-                state->pc += acpi_methodinvoke(method + state->pc, state, &result);
+                char path[ACPI_MAX_NAME];
+                state->pc += acpins_resolve_path(state->handle, path, method + state->pc);
+
+                acpi_nsnode_t *handle = acpi_exec_resolve(path);
+                if(!handle)
+                    acpi_panic("undefined MethodInvokation %s\n", path);
+
+                acpi_state_t nested_state;
+                acpi_init_call_state(&nested_state, handle);
+                int argc = handle->method_flags & METHOD_ARGC_MASK;
+                for(int i = 0; i < argc; i++)
+                    acpi_eval_operand(&nested_state.arg[i], state, method);
+
+                acpi_exec_method(&nested_state);
+                acpi_move_object(&result, &nested_state.retvalue);
+                acpi_finalize_state(&nested_state);
             }else if(handle->type == ACPI_NAMESPACE_FIELD
                     || handle->type == ACPI_NAMESPACE_INDEXFIELD)
             {
@@ -372,7 +387,7 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
         }
 
         case (EXTOP_PREFIX << 8) | SLEEP_OP:
-            state->pc += acpi_exec_sleep(&method[state->pc], state);
+            acpi_exec_sleep(method, state);
             break;
 
         /* A control method can return literally any object */
@@ -489,16 +504,16 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
 
         /* Most of the type 2 opcodes are implemented in exec2.c */
         case NAME_OP:
-            state->pc += acpi_exec_name(&method[state->pc], state);
+            acpi_exec_name(method, state);
             break;
         case BYTEFIELD_OP:
-            state->pc += acpi_exec_bytefield(&method[state->pc], state);
+            acpi_exec_bytefield(method, state);
             break;
         case WORDFIELD_OP:
-            state->pc += acpi_exec_wordfield(&method[state->pc], state);
+            acpi_exec_wordfield(method, state);
             break;
         case DWORDFIELD_OP:
-            state->pc += acpi_exec_dwordfield(&method[state->pc], state);
+            acpi_exec_dwordfield(method, state);
             break;
 
         case ARG0_OP:
@@ -657,74 +672,21 @@ void acpi_eval_operand(acpi_object_t *destination, acpi_state_t *state, uint8_t 
     acpi_exec_pop_opstack(state, 1);
 }
 
-// acpi_methodinvoke(): Executes a MethodInvokation
-// Param:    void *data - pointer to MethodInvokation
-// Param:    acpi_state_t *old_state - state of currently executing method
-// Param:    acpi_object_t *method_return - object to store return value
-// Return:    size_t - size in bytes for skipping
-
-size_t acpi_methodinvoke(void *data, acpi_state_t *old_state, acpi_object_t *method_return)
-{
-    uint8_t *methodinvokation = (uint8_t*)data;
-
-    size_t return_size = 0;
-
-    // determine the name of the method
-    char path[ACPI_MAX_NAME];
-    size_t name_size = acpins_resolve_path(old_state->handle, path, methodinvokation);
-    return_size += name_size;
-    methodinvokation += name_size;
-
-    acpi_nsnode_t *method = acpi_exec_resolve(path);
-    if(!method)
-        acpi_panic("undefined MethodInvokation %s\n", path);
-
-    acpi_state_t state;
-    acpi_init_call_state(&state, method);
-    uint8_t argc = method->method_flags & METHOD_ARGC_MASK;
-    uint8_t current_argc = 0;
-    size_t arg_size;
-    if(argc != 0)
-    {
-        // parse method arguments here
-        while(current_argc < argc)
-        {
-            arg_size = acpi_eval_object(&state.arg[current_argc], old_state, methodinvokation);
-            methodinvokation += arg_size;
-            return_size += arg_size;
-
-            current_argc++;
-        }
-    }
-
-    // execute
-    acpi_exec_method(&state);
-    acpi_move_object(method_return, &state.retvalue);
-    acpi_finalize_state(&state);
-
-    return return_size;
-}
-
 // acpi_exec_sleep(): Executes a Sleep() opcode
-// Param:    void *data - opcode data
+// Param:    void *code - opcode data
 // Param:    acpi_state_t *state - AML VM state
-// Return:    size_t - size in bytes for skipping
 
-size_t acpi_exec_sleep(void *data, acpi_state_t *state)
+void acpi_exec_sleep(void *code, acpi_state_t *state)
 {
-    size_t return_size = 2;
-    uint8_t *opcode = (uint8_t*)data;
-    opcode += 2;        // skip EXTOP_PREFIX and SLEEP_OP
+    state->pc += 2; // Skip EXTOP_PREFIX and SLEEP_OP.
 
     acpi_object_t time = {0};
-    return_size += acpi_eval_object(&time, state, &opcode[0]);
+    acpi_eval_operand(&time, state, code);
 
-    if(time.integer == 0)
+    if(!time.integer)
         time.integer = 1;
 
     acpi_sleep(time.integer);
-
-    return return_size;
 }
 
 
