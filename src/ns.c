@@ -12,6 +12,10 @@
 #define CODE_WINDOW            131072
 #define NAMESPACE_WINDOW       2048
 
+int acpi_do_osi_method(acpi_object_t *args, acpi_object_t *result);
+int acpi_do_os_method(acpi_object_t *args, acpi_object_t *result);
+int acpi_do_rev_method(acpi_object_t *args, acpi_object_t *result);
+
 uint8_t *acpi_acpins_code;
 size_t acpi_acpins_allocation = 0;
 size_t acpi_acpins_size = 0;
@@ -201,18 +205,21 @@ void acpi_create_namespace(void *dsdt)
     osi_node->type = ACPI_NAMESPACE_METHOD;
     acpi_strcpy(osi_node->path, "\\._OSI");
     osi_node->method_flags = 0x01;
+    osi_node->method_override = &acpi_do_osi_method;
     acpins_install_nsnode(osi_node);
 
     acpi_nsnode_t *os_node = acpins_create_nsnode_or_die();
     os_node->type = ACPI_NAMESPACE_METHOD;
     acpi_strcpy(os_node->path, "\\._OS_");
     os_node->method_flags = 0x00;
+    os_node->method_override = &acpi_do_os_method;
     acpins_install_nsnode(os_node);
 
     acpi_nsnode_t *rev_node = acpins_create_nsnode_or_die();
     rev_node->type = ACPI_NAMESPACE_METHOD;
     acpi_strcpy(rev_node->path, "\\._REV");
     rev_node->method_flags = 0x00;
+    rev_node->method_override = &acpi_do_rev_method;
     acpins_install_nsnode(rev_node);
 
     // create the namespace with all the objects

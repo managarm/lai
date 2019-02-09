@@ -218,6 +218,8 @@ typedef struct acpi_nsnode_t
     char field_opregion[ACPI_MAX_NAME];    // for Fields only
 
     uint8_t method_flags;        // for Methods only, includes ARG_COUNT in lowest three bits
+    // Allows the OS to override methods. Mainly useful for _OSI, _OS and _REV.
+    int (*method_override)(acpi_object_t *args, acpi_object_t *result);
 
     uint64_t indexfield_offset;    // for IndexFields, in bits
     char indexfield_index[ACPI_MAX_NAME];    // for IndexFields
