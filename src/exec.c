@@ -762,6 +762,37 @@ void acpi_eval_operand(acpi_object_t *destination, acpi_state_t *state, uint8_t 
     acpi_exec_pop_opstack(state, 1);
 }
 
+// acpi_eval_object(): Evaluates an object
+// Param:    acpi_object_t *destination - pointer to where to store object
+// Param:    acpi_nsnode_t *context - where to look up relative paths
+// Param:    void *data - data of object
+// Return:    size_t - size in bytes for skipping
+
+size_t acpi_eval_object(acpi_object_t *destination, acpi_nsnode_t *context, void *data) {
+	acpi_state_t state;
+	acpi_init_call_state(&state, context);
+
+    acpi_stackitem_t *item = acpi_exec_push_stack_or_die(&state);
+    item->kind = LAI_EVALOBJECT_CONTEXT_STACKITEM;
+    item->op_opstack = 0;
+
+	state.pc = 0;
+	state.limit = 0x7FFFFFFF;
+    int status = acpi_exec_run(data, &state);
+    if(status)
+        acpi_panic("acpi_exec_run() failed in acpi_eval_operand()\n");
+	size_t final_pc = state.pc;
+
+    if(state.opstack_ptr != 1) // This would be an internal error.
+        acpi_panic("expected exactly one opstack item after object evaluation\n");
+    acpi_object_t *result = acpi_exec_get_opstack(&state, 0);
+    acpi_move_object(destination, result);
+    acpi_exec_pop_opstack(&state, 1);
+
+	acpi_finalize_state(&state);
+	return final_pc;
+}
+
 // acpi_exec_sleep(): Executes a Sleep() opcode
 // Param:    void *code - opcode data
 // Param:    acpi_state_t *state - AML VM state
