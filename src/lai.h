@@ -249,6 +249,7 @@ typedef struct acpi_condition_t
 #define LAI_LOOP_STACKITEM 3
 #define LAI_COND_STACKITEM 4
 #define LAI_OP_STACKITEM 5
+#define LAI_NOWRITE_OP_STACKITEM 6
 // This implements acpi_eval_object(). // TODO: Eventually remove
 // acpi_eval_object() by moving all parsing functionality into acpi_exec_run().
 #define LAI_EVALOBJECT_CONTEXT_STACKITEM 10

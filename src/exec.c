@@ -93,6 +93,14 @@ static void acpi_exec_pop_stack_back(acpi_state_t *state) {
     acpi_exec_pop_stack(state, 1);
 }
 
+static int acpi_compare(acpi_object_t *lhs, acpi_object_t *rhs) {
+    // TODO: Allow comparsions of strings and buffers as in the spec.
+    if(lhs->type != ACPI_INTEGER || rhs->type != ACPI_INTEGER)
+        acpi_panic("comparsion of object type %d with type %d is not implemented\n",
+                lhs->type, rhs->type);
+    return lhs->integer - rhs->integer;
+}
+
 static void acpi_exec_reduce(int opcode, acpi_object_t *operands, acpi_object_t *result) {
     //acpi_debug("acpi_exec_reduce: opcode 0x%02X\n", opcode);
     switch(opcode) {
@@ -134,6 +142,26 @@ static void acpi_exec_reduce(int opcode, acpi_object_t *operands, acpi_object_t 
     case SHR_OP:
         result->type = ACPI_INTEGER;
         result->integer = operands[0].integer >> operands[1].integer;
+        break;
+    case LAND_OP:
+        result->type = ACPI_INTEGER;
+        result->integer = operands[0].integer && operands[1].integer;
+        break;
+    case LOR_OP:
+        result->type = ACPI_INTEGER;
+        result->integer = operands[0].integer || operands[1].integer;
+        break;
+    case LEQUAL_OP:
+        result->type = ACPI_INTEGER;
+        result->integer = !acpi_compare(&operands[0], &operands[1]);
+        break;
+    case LLESS_OP:
+        result->type = ACPI_INTEGER;
+        result->integer = acpi_compare(&operands[0], &operands[1]) < 0;
+        break;
+    case LGREATER_OP:
+        result->type = ACPI_INTEGER;
+        result->integer = acpi_compare(&operands[0], &operands[1]) > 0;
         break;
     default:
         acpi_panic("undefined opcode in acpi_exec_reduce: %02X\n", opcode);
@@ -191,6 +219,26 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
                     acpi_copy_object(opstack_res, &result);
                 }
                 acpi_write_object(method, &result, state);
+
+                acpi_exec_pop_stack_back(state);
+                continue;
+            }
+
+            want_exec_result = 1;
+        }else if(item->kind == LAI_NOWRITE_OP_STACKITEM)
+        {
+            if(state->opstack_ptr == item->op_opstack + item->op_num_operands) {
+                acpi_object_t result = {0};
+                acpi_object_t *operands = acpi_exec_get_opstack(state, item->op_opstack);
+                acpi_exec_reduce(item->op_opcode, operands, &result);
+                acpi_exec_pop_opstack(state, item->op_num_operands);
+
+                if(item->op_want_result)
+                {
+                    acpi_object_t *opstack_res = acpi_exec_push_opstack_or_die(state);
+                    acpi_move_object(opstack_res, &result);
+                }
+                acpi_free_object(&result);
 
                 acpi_exec_pop_stack_back(state);
                 continue;
@@ -368,6 +416,39 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
             }
             state->pc += integer_size;
             continue;
+        }
+        case BUFFER_OP:
+        {
+            size_t offset = state->pc;
+            state->pc++;        // Skip BUFFER_OP.
+
+            size_t encoded_size;
+            state->pc += acpi_parse_pkgsize(method + state->pc, &encoded_size);
+
+            acpi_object_t buffer_size = {0};
+            acpi_eval_operand(&buffer_size, state, method);
+
+            acpi_object_t result = {0};
+            result.type = ACPI_BUFFER;
+            result.buffer_size = buffer_size.integer;
+            result.buffer = acpi_malloc(buffer_size.integer);
+            if(!result.buffer)
+                acpi_panic("failed to allocate memory for AML buffer");
+            acpi_memset(result.buffer, 0, buffer_size.integer);
+
+            if(encoded_size < state->pc - offset)
+                acpi_panic("buffer initializer has negative size");
+            size_t initial_size = encoded_size - (state->pc - offset);
+            acpi_memcpy(result.buffer, method + state->pc, initial_size);
+            state->pc += initial_size;
+
+            if(want_exec_result)
+            {
+                acpi_object_t *opstack_res = acpi_exec_push_opstack_or_die(state);
+                acpi_move_object(opstack_res, &result);
+            }
+            acpi_free_object(&result);
+            break;
         }
         case PACKAGE_OP:
         {
@@ -590,19 +671,28 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
         case DIVIDE_OP:
             acpi_exec_divide(method, state);
             break;
+
+        // TODO: Add LNOT_OP
+        case LAND_OP:
+        case LOR_OP:
+        case LEQUAL_OP:
+        case LLESS_OP:
+        case LGREATER_OP:
+        {
+            acpi_stackitem_t *op_item = acpi_exec_push_stack_or_die(state);
+            op_item->kind = LAI_NOWRITE_OP_STACKITEM;
+            op_item->op_opcode = method[state->pc];
+            op_item->op_opstack = state->opstack_ptr;
+            op_item->op_num_operands = 2;
+            op_item->op_want_result = want_exec_result;
+            state->pc++;
+            break;
+        }
+
         default:
-            // Opcodes that we do not natively handle here still need to be passed
-            // to acpi_eval_object(). TODO: Get rid of this call.
-            acpi_debug("opcode 0x%02X is handled by acpi_eval_object()\n", opcode);
-            if(want_exec_result)
-            {
-                acpi_object_t *operand = acpi_exec_push_opstack_or_die(state);
-                state->pc += acpi_eval_object(operand, state, method + state->pc);
-            }else{
-                acpi_object_t discarded = {0};
-                state->pc += acpi_eval_object(&discarded, state, method + state->pc);
-                acpi_free_object(&discarded);
-            }
+            acpi_panic("unexpected opcode in acpi_exec_run(), sequence %02X %02X %02X %02X\n",
+                    method[state->pc + 0], method[state->pc + 1],
+                    method[state->pc + 2], method[state->pc + 3]);
         }
     }
 
