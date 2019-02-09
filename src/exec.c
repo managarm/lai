@@ -321,6 +321,7 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
             acpi_nsnode_t *handle = acpi_exec_resolve(name);
             if(!handle)
                 acpi_panic("undefined reference %s\n", name);
+            //acpi_debug("reference to %s\n", name);
 
             acpi_object_t result = {0};
             if(handle->type == ACPI_NAMESPACE_NAME)
@@ -351,8 +352,13 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
                 // It's an Operation Region field; perform IO in that region.
                 acpi_read_opregion(&result, handle);
                 state->pc += name_size;
+            }else if(handle->type == ACPI_NAMESPACE_DEVICE)
+            {
+                result.type = ACPI_NAME;
+                acpi_strcpy(result.name, name);
+                state->pc += name_size;
             }else
-                acpi_panic("unexpected type of named object\n");
+                acpi_panic("unexpected type %d of named object\n", handle->type);
 
             if(want_exec_result)
             {
@@ -372,6 +378,7 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
             opcode = (EXTOP_PREFIX << 8) | method[state->pc + 1];
         }else
             opcode = method[state->pc];
+        //acpi_debug("handling opcode 0x%02x\n", opcode);
 
         // This switch handles the majority of all opcodes.
         switch(opcode)
@@ -451,9 +458,12 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
             size_t offset = state->pc;
             state->pc++;        // Skip BUFFER_OP.
 
+            // Size of the buffer initializer.
+            // Note that not all elements of the buffer need to be initialized.
             size_t encoded_size;
             state->pc += acpi_parse_pkgsize(method + state->pc, &encoded_size);
 
+            // The size of the buffer in bytes.
             acpi_object_t buffer_size = {0};
             acpi_eval_operand(&buffer_size, state, method);
 
@@ -481,18 +491,39 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
         }
         case PACKAGE_OP:
         {
+            size_t offset = state->pc;
+            state->pc++;
+
+            // Size of the package initializer.
+            // Note that not all elements of the package need to be initialized.
             size_t encoded_size;
-            acpi_parse_pkgsize(method + state->pc + 1, &encoded_size);
+            state->pc += acpi_parse_pkgsize(method + state->pc, &encoded_size);
+
+            // The number of elements of the package.
+            int num_ents = method[state->pc];
+            state->pc++;
+
+            acpi_object_t result = {0};
+            result.type = ACPI_PACKAGE;
+            result.package = acpi_calloc(sizeof(acpi_object_t), ACPI_MAX_PACKAGE_ENTRIES);
+            result.package_size = num_ents;
+
+            int i = 0;
+            while(state->pc < offset + encoded_size + 1) {
+                if(i == num_ents)
+                    acpi_panic("package initializer overflows its size");
+                acpi_eval_operand(&result.package[i], state, method);
+                i++;
+            }
+            if(state->pc != offset + encoded_size + 1) // This would be an internal error.
+                acpi_panic("package initializer out of code range");
 
             if(want_exec_result)
             {
-                acpi_object_t *result = acpi_exec_push_opstack_or_die(state);
-                result->type = ACPI_PACKAGE;
-                result->package = acpi_calloc(sizeof(acpi_object_t), ACPI_MAX_PACKAGE_ENTRIES);
-                result->package_size = acpins_create_package(state->handle,
-                        result->package, method + state->pc);
+                acpi_object_t *opstack_res = acpi_exec_push_opstack_or_die(state);
+                acpi_move_object(opstack_res, &result);
             }
-            state->pc += encoded_size + 1;
+            acpi_free_object(&result);
             break;
         }
 
