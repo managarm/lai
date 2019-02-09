@@ -257,12 +257,12 @@ typedef struct acpi_stackitem_ {
     int kind;
     union {
         struct {
-            size_t loop_pred; // Loop predicate PC.
-            size_t loop_end; // End of loop PC.
+            int loop_pred; // Loop predicate PC.
+            int loop_end; // End of loop PC.
         };
         struct {
             int cond_taken; // Whether the conditional was true or not.
-            size_t cond_end; // End of conditional PC.
+            int cond_end; // End of conditional PC.
         };
         struct {
             int op_opcode;
@@ -276,6 +276,8 @@ typedef struct acpi_stackitem_ {
 typedef struct acpi_state_t
 {
     acpi_nsnode_t *handle;
+    int pc;
+    int limit;
     acpi_object_t retvalue;
     acpi_object_t arg[7];
     acpi_object_t local[8];

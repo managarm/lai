@@ -140,14 +140,11 @@ static void acpi_exec_reduce(int opcode, acpi_object_t *operands, acpi_object_t 
 
 // acpi_exec_run(): Internal function, executes actual AML opcodes
 // Param:  uint8_t *method - pointer to method opcodes
-// Param:  size_t size - size of method of bytes
 // Param:  acpi_state_t *state - machine state
 // Return: int - 0 on success
 
-static int acpi_exec_run(uint8_t *method, size_t size, acpi_state_t *state)
+static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
 {
-    size_t i = 0;
-
     acpi_stackitem_t *item;
     while((item = acpi_exec_peek_stack_back(state)))
     {
@@ -158,7 +155,7 @@ static int acpi_exec_run(uint8_t *method, size_t size, acpi_state_t *state)
         if(item->kind == LAI_METHOD_CONTEXT_STACKITEM)
         {
 			// ACPI does an implicit Return(0) at the end of a control method.
-			if(i == size)
+			if(state->pc == state->limit)
 			{
 				if(state->opstack_ptr) // This is an internal error.
 					acpi_panic("opstack is not empty before return\n");
@@ -182,7 +179,7 @@ static int acpi_exec_run(uint8_t *method, size_t size, acpi_state_t *state)
                     acpi_object_t *opstack_res = acpi_exec_push_opstack_or_die(state);
                     acpi_copy_object(opstack_res, &result);
                 }
-                i += acpi_write_object(method + i, &result, state);
+                state->pc += acpi_write_object(method + state->pc, &result, state);
 
                 acpi_exec_pop_stack_back(state);
                 continue;
@@ -191,37 +188,37 @@ static int acpi_exec_run(uint8_t *method, size_t size, acpi_state_t *state)
             want_exec_result = 1;
         }else if(item->kind == LAI_LOOP_STACKITEM)
         {
-            if(i == item->loop_pred)
+            if(state->pc == item->loop_pred)
             {
                 // We are at the beginning of a loop. We check the predicate; if it is false,
                 // we jump to the end of the loop and remove the stack item.
                 acpi_object_t predicate = {0};
-                i += acpi_eval_object(&predicate, state, method + i);
+                state->pc += acpi_eval_object(&predicate, state, method + state->pc);
                 if(!predicate.integer)
                 {
-                    i = item->loop_end;
+                    state->pc = item->loop_end;
                     acpi_exec_pop_stack_back(state);
                 }
                 continue;
-            }else if(i == item->loop_end)
+            }else if(state->pc == item->loop_end)
             {
                 // Unconditionally jump to the loop's predicate.
-                i = item->loop_pred;
+                state->pc = item->loop_pred;
                 continue;
             }
 
-            if (i > item->loop_end) // This would be an interpreter bug.
+            if (state->pc > item->loop_end) // This would be an interpreter bug.
                 acpi_panic("execution escaped out of While() body\n");
         }else if(item->kind == LAI_COND_STACKITEM)
         {
             // If the condition wasn't taken, execute the Else() block if it exists
             if(!item->cond_taken)
             {
-                if(method[i] == ELSE_OP)
+                if(method[state->pc] == ELSE_OP)
                 {
                     size_t else_size;
-                    i++;
-                    i += acpi_parse_pkgsize(method + i, &else_size);
+                    state->pc++;
+                    state->pc += acpi_parse_pkgsize(method + state->pc, &else_size);
                 }
 
                 acpi_exec_pop_stack_back(state);
@@ -229,16 +226,16 @@ static int acpi_exec_run(uint8_t *method, size_t size, acpi_state_t *state)
             }
 
             // Clean up the execution stack at the end of If().
-            if(i == item->cond_end)
+            if(state->pc == item->cond_end)
             {
                 // Consume a follow-up Else() opcode.
-                if(i < size && method[i] == ELSE_OP) {
+                if(state->pc < state->limit && method[state->pc] == ELSE_OP) {
                     size_t else_size;
-                    i++;
-                    size_t j = i;
-                    i += acpi_parse_pkgsize(method + i, &else_size);
+                    state->pc++;
+                    size_t j = state->pc;
+                    state->pc += acpi_parse_pkgsize(method + state->pc, &else_size);
 
-                    i = j + else_size;
+                    state->pc = j + else_size;
                 }
 
                 acpi_exec_pop_stack_back(state);
@@ -247,13 +244,13 @@ static int acpi_exec_run(uint8_t *method, size_t size, acpi_state_t *state)
         }else
             acpi_panic("unexpected acpi_stackitem_t\n");
 
-        if(i > size) // This would be an interpreter bug.
+        if(state->pc > state->limit) // This would be an interpreter bug.
             acpi_panic("execution escaped out of code range\n");
 
         // Process names.
-        if(acpi_is_name(method[i])) {
+        if(acpi_is_name(method[state->pc])) {
             char name[ACPI_MAX_NAME];
-            size_t name_size = acpins_resolve_path(state->handle, name, method + i);
+            size_t name_size = acpins_resolve_path(state->handle, name, method + state->pc);
             acpi_nsnode_t *handle = acpi_exec_resolve(name);
             if(!handle)
                 acpi_panic("undefined reference %s\n", name);
@@ -262,16 +259,16 @@ static int acpi_exec_run(uint8_t *method, size_t size, acpi_state_t *state)
             if(handle->type == ACPI_NAMESPACE_NAME)
             {
                 acpi_copy_object(&result, &handle->object);
-                i += name_size;
+                state->pc += name_size;
             }else if(handle->type == ACPI_NAMESPACE_METHOD)
             {
-                i += acpi_methodinvoke(method + i, state, &result);
+                state->pc += acpi_methodinvoke(method + state->pc, state, &result);
             }else if(handle->type == ACPI_NAMESPACE_FIELD
                     || handle->type == ACPI_NAMESPACE_INDEXFIELD)
             {
                 // It's an Operation Region field; perform IO in that region.
                 acpi_read_opregion(&result, handle);
-                i += name_size;
+                state->pc += name_size;
             }else
                 acpi_panic("unexpected type of named object\n");
 
@@ -286,19 +283,19 @@ static int acpi_exec_run(uint8_t *method, size_t size, acpi_state_t *state)
 
         /* General opcodes */
         int opcode;
-        if(method[i] == EXTOP_PREFIX)
+        if(method[state->pc] == EXTOP_PREFIX)
         {
-            if(i + 1 == size)
+            if(state->pc + 1 == state->limit)
                 acpi_panic("two-byte opcode on method boundary\n");
-            opcode = (EXTOP_PREFIX << 8) | method[i + 1];
+            opcode = (EXTOP_PREFIX << 8) | method[state->pc + 1];
         }else
-            opcode = method[i];
+            opcode = method[state->pc];
 
         // This switch handles the majority of all opcodes.
         switch(opcode)
         {
         case NOP_OP:
-            i++;
+            state->pc++;
 
         case ZERO_OP:
             if(want_exec_result)
@@ -307,7 +304,7 @@ static int acpi_exec_run(uint8_t *method, size_t size, acpi_state_t *state)
                 result->type = ACPI_INTEGER;
                 result->integer = 0;
             }
-            i++;
+            state->pc++;
             break;
         case ONE_OP:
             if(want_exec_result)
@@ -316,7 +313,7 @@ static int acpi_exec_run(uint8_t *method, size_t size, acpi_state_t *state)
                 result->type = ACPI_INTEGER;
                 result->integer = 1;
             }
-            i++;
+            state->pc++;
             break;
         case ONES_OP:
             if(want_exec_result)
@@ -325,7 +322,7 @@ static int acpi_exec_run(uint8_t *method, size_t size, acpi_state_t *state)
                 result->type = ACPI_INTEGER;
                 result->integer = ~((uint64_t)0);
             }
-            i++;
+            state->pc++;
             break;
 
         case BYTEPREFIX:
@@ -334,7 +331,7 @@ static int acpi_exec_run(uint8_t *method, size_t size, acpi_state_t *state)
         case QWORDPREFIX:
         {
             uint64_t integer;
-            size_t integer_size = acpi_eval_integer(method + i, &integer);
+            size_t integer_size = acpi_eval_integer(method + state->pc, &integer);
             if(!integer_size)
                 acpi_panic("failed to parse integer opcode\n");
             if(want_exec_result)
@@ -343,13 +340,13 @@ static int acpi_exec_run(uint8_t *method, size_t size, acpi_state_t *state)
                 result->type = ACPI_INTEGER;
                 result->integer = integer;
             }
-            i += integer_size;
+            state->pc += integer_size;
             continue;
         }
         case PACKAGE_OP:
         {
             size_t encoded_size;
-            acpi_parse_pkgsize(method + i + 1, &encoded_size);
+            acpi_parse_pkgsize(method + state->pc + 1, &encoded_size);
 
             if(want_exec_result)
             {
@@ -357,23 +354,23 @@ static int acpi_exec_run(uint8_t *method, size_t size, acpi_state_t *state)
                 result->type = ACPI_PACKAGE;
                 result->package = acpi_calloc(sizeof(acpi_object_t), ACPI_MAX_PACKAGE_ENTRIES);
                 result->package_size = acpins_create_package(state->handle,
-                        result->package, method + i);
+                        result->package, method + state->pc);
             }
-            i += encoded_size + 1;
+            state->pc += encoded_size + 1;
             break;
         }
 
         case (EXTOP_PREFIX << 8) | SLEEP_OP:
-            i += acpi_exec_sleep(&method[i], state);
+            state->pc += acpi_exec_sleep(&method[state->pc], state);
             break;
 
         /* A control method can return literally any object */
         /* So we need to take this into consideration */
         case RETURN_OP:
         {
-            i++;
+            state->pc++;
             acpi_object_t result = {0};
-            i += acpi_eval_object(&result, state, method + i);
+            state->pc += acpi_eval_object(&result, state, method + state->pc);
 
             // Find the last LAI_METHOD_CONTEXT_STACKITEM on the stack.
             int j = 0;
@@ -401,13 +398,13 @@ static int acpi_exec_run(uint8_t *method, size_t size, acpi_state_t *state)
         case WHILE_OP:
         {
             size_t loop_size;
-            i++;
-            size_t j = i;
-            i += acpi_parse_pkgsize(&method[i], &loop_size);
+            state->pc++;
+            size_t j = state->pc;
+            state->pc += acpi_parse_pkgsize(&method[state->pc], &loop_size);
 
             acpi_stackitem_t *loop_item = acpi_exec_push_stack_or_die(state);
             loop_item->kind = LAI_LOOP_STACKITEM;
-            loop_item->loop_pred = i;
+            loop_item->loop_pred = state->pc;
             loop_item->loop_end = j + loop_size;
             break;
         }
@@ -428,7 +425,7 @@ static int acpi_exec_run(uint8_t *method, size_t size, acpi_state_t *state)
             }
 
             // Keep the loop item but remove nested items from the exeuction stack.
-            i = loop_item->loop_pred;
+            state->pc = loop_item->loop_pred;
             acpi_exec_pop_stack(state, j);
             break;
         }
@@ -449,7 +446,7 @@ static int acpi_exec_run(uint8_t *method, size_t size, acpi_state_t *state)
             }
 
             // Remove the loop item from the execution stack.
-            i = loop_item->loop_end;
+            state->pc = loop_item->loop_end;
             acpi_exec_pop_stack(state, j + 1);
             break;
         }
@@ -457,13 +454,13 @@ static int acpi_exec_run(uint8_t *method, size_t size, acpi_state_t *state)
         case IF_OP:
         {
             size_t if_size;
-            i++;
-            size_t j = i;
-            i += acpi_parse_pkgsize(method + i, &if_size);
+            state->pc++;
+            size_t j = state->pc;
+            state->pc += acpi_parse_pkgsize(method + state->pc, &if_size);
 
             // Evaluate the predicate
             acpi_object_t predicate = {0};
-            i += acpi_eval_object(&predicate, state, method + i);
+            state->pc += acpi_eval_object(&predicate, state, method + state->pc);
 
             acpi_stackitem_t *cond_item = acpi_exec_push_stack_or_die(state);
             cond_item->kind = LAI_COND_STACKITEM;
@@ -471,7 +468,7 @@ static int acpi_exec_run(uint8_t *method, size_t size, acpi_state_t *state)
             cond_item->cond_end = j + if_size;
 
             if(!cond_item->cond_taken)
-                i = cond_item->cond_end;
+                state->pc = cond_item->cond_end;
 
             break;
         }
@@ -481,16 +478,16 @@ static int acpi_exec_run(uint8_t *method, size_t size, acpi_state_t *state)
 
         /* Most of the type 2 opcodes are implemented in exec2.c */
         case NAME_OP:
-            i += acpi_exec_name(&method[i], state);
+            state->pc += acpi_exec_name(&method[state->pc], state);
             break;
         case BYTEFIELD_OP:
-            i += acpi_exec_bytefield(&method[i], state);
+            state->pc += acpi_exec_bytefield(&method[state->pc], state);
             break;
         case WORDFIELD_OP:
-            i += acpi_exec_wordfield(&method[i], state);
+            state->pc += acpi_exec_wordfield(&method[state->pc], state);
             break;
         case DWORDFIELD_OP:
-            i += acpi_exec_dwordfield(&method[i], state);
+            state->pc += acpi_exec_dwordfield(&method[state->pc], state);
             break;
 
         case ARG0_OP:
@@ -506,7 +503,7 @@ static int acpi_exec_run(uint8_t *method, size_t size, acpi_state_t *state)
                 acpi_object_t *result = acpi_exec_push_opstack_or_die(state);
                 acpi_copy_object(result, &state->arg[opcode - ARG0_OP]);
             }
-            i++;
+            state->pc++;
             break;
         }
 
@@ -524,7 +521,7 @@ static int acpi_exec_run(uint8_t *method, size_t size, acpi_state_t *state)
                 acpi_object_t *result = acpi_exec_push_opstack_or_die(state);
                 acpi_copy_object(result, &state->local[opcode - LOCAL0_OP]);
             }
-            i++;
+            state->pc++;
             break;
         }
 
@@ -533,11 +530,11 @@ static int acpi_exec_run(uint8_t *method, size_t size, acpi_state_t *state)
         {
             acpi_stackitem_t *op_item = acpi_exec_push_stack_or_die(state);
             op_item->kind = LAI_OP_STACKITEM;
-            op_item->op_opcode = method[i];
+            op_item->op_opcode = method[state->pc];
             op_item->op_opstack = state->opstack_ptr;
             op_item->op_num_operands = 1;
             op_item->op_want_result = want_exec_result;
-            i++;
+            state->pc++;
             break;
         }
         case ADD_OP:
@@ -551,21 +548,21 @@ static int acpi_exec_run(uint8_t *method, size_t size, acpi_state_t *state)
         {
             acpi_stackitem_t *op_item = acpi_exec_push_stack_or_die(state);
             op_item->kind = LAI_OP_STACKITEM;
-            op_item->op_opcode = method[i];
+            op_item->op_opcode = method[state->pc];
             op_item->op_opstack = state->opstack_ptr;
             op_item->op_num_operands = 2;
             op_item->op_want_result = want_exec_result;
-            i++;
+            state->pc++;
             break;
         }
         case INCREMENT_OP:
-            i += acpi_exec_increment(&method[i], state);
+            state->pc += acpi_exec_increment(&method[state->pc], state);
             break;
         case DECREMENT_OP:
-            i += acpi_exec_decrement(&method[i], state);
+            state->pc += acpi_exec_decrement(&method[state->pc], state);
             break;
         case DIVIDE_OP:
-            i += acpi_exec_divide(&method[i], state);
+            state->pc += acpi_exec_divide(&method[state->pc], state);
             break;
         default:
             // Opcodes that we do not natively handle here still need to be passed
@@ -574,10 +571,10 @@ static int acpi_exec_run(uint8_t *method, size_t size, acpi_state_t *state)
             if(want_exec_result)
             {
                 acpi_object_t *operand = acpi_exec_push_opstack_or_die(state);
-                i += acpi_eval_object(operand, state, method + i);
+                state->pc += acpi_eval_object(operand, state, method + state->pc);
             }else{
                 acpi_object_t discarded = {0};
-                i += acpi_eval_object(&discarded, state, method + i);
+                state->pc += acpi_eval_object(&discarded, state, method + state->pc);
                 acpi_free_object(&discarded);
             }
         }
@@ -597,14 +594,14 @@ int acpi_exec_method(acpi_state_t *state)
     if(state->handle->method_override)
         return state->handle->method_override(state->arg, &state->retvalue);
 
-    acpi_memset(state->local, 0, sizeof(acpi_object_t) * 8);
-
-    // Okay, by here it's a real method
+    // Okay, by here it's a real method.
     //acpi_debug("execute control method %s\n", state->handle->path);
     acpi_stackitem_t *item = acpi_exec_push_stack_or_die(state);
     item->kind = LAI_METHOD_CONTEXT_STACKITEM;
 
-    int status = acpi_exec_run(state->handle->pointer, state->handle->size, state);
+    state->pc = 0;
+    state->limit = state->handle->size;
+    int status = acpi_exec_run(state->handle->pointer, state);
     if(status)
         return status;
 
