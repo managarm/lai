@@ -242,9 +242,14 @@ typedef struct acpi_condition_t
     size_t end;
 } acpi_condition_t;
 
-#define LAI_LOOP_STACKITEM 1
-#define LAI_COND_STACKITEM 2
-#define LAI_OP_STACKITEM 3
+#define LAI_PARSE_CONTEXT_STACKITEM 1
+#define LAI_METHOD_CONTEXT_STACKITEM 2
+#define LAI_LOOP_STACKITEM 3
+#define LAI_COND_STACKITEM 4
+#define LAI_OP_STACKITEM 5
+// This implements acpi_eval_object(). // TODO: Eventually remove
+// acpi_eval_object() by moving all parsing functionality into acpi_exec_run().
+#define LAI_EVALOBJECT_CONTEXT_STACKITEM 10
 
 typedef struct acpi_stackitem_ {
     int kind;

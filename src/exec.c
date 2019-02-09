@@ -12,7 +12,7 @@
    DefLoad | DefNoop | DefNotify | DefRelease | DefReset | DefReturn |
    DefSignal | DefSleep | DefStall | DefUnload | DefWhile */
 
-int acpi_exec(uint8_t *, size_t, acpi_state_t *, acpi_object_t *);
+static int acpi_exec_run(uint8_t *, size_t, acpi_state_t *);
 
 const char *acpi_emulated_os = "Microsoft Windows NT";        // OS family
 uint64_t acpi_implemented_version = 2;                // ACPI 2.0
@@ -40,6 +40,7 @@ const char *supported_osi_strings[] =
 void acpi_init_call_state(acpi_state_t *state, acpi_nsnode_t *method) {
     acpi_memset(state, 0, sizeof(acpi_state_t));
     state->handle = method;
+    state->stack_ptr = -1;
 }
 
 // Finalize the interpreter state. Frees all memory owned by the state.
@@ -55,80 +56,6 @@ void acpi_finalize_state(acpi_state_t *state) {
     {
         acpi_free_object(&state->local[i]);
     }
-}
-
-// acpi_exec_method(): Finds and executes a control method
-// Param:    acpi_state_t *state - method name and arguments
-// Param:    acpi_object_t *method_return - return value of method
-// Return:    int - 0 on success
-
-int acpi_exec_method(acpi_state_t *state)
-{
-    acpi_memset(state->local, 0, sizeof(acpi_object_t) * 8);
-
-    // When executing the _OSI() method, we'll have one parameter which contains
-    // the name of an OS. We have to pretend to be a modern version of Windows,
-    // for AML to let us use its features.
-    if(!acpi_strcmp(state->handle->path, "\\._OSI"))
-    {
-        uint32_t osi_return = 0;
-        for(int i = 0; i < (sizeof(supported_osi_strings) / sizeof(uintptr_t)); i++)
-        {
-            if(!acpi_strcmp(state->arg[0].string, supported_osi_strings[i]))
-            {
-                osi_return = 0xFFFFFFFF;
-                break;
-            }
-        }
-
-        if(!osi_return && !acpi_strcmp(state->arg[0].string, "Linux"))
-            acpi_warn("buggy BIOS requested _OSI('Linux'), ignoring...\n");
-
-        state->retvalue.type = ACPI_INTEGER;
-        state->retvalue.integer = osi_return;
-
-        acpi_debug("_OSI('%s') returned 0x%08X\n", state->arg[0].string, osi_return);
-        return 0;
-    }
-
-    // OS family -- pretend to be Windows
-    if(!acpi_strcmp(state->handle->path, "\\._OS_"))
-    {
-        state->retvalue.type = ACPI_STRING;
-        state->retvalue.string = acpi_malloc(acpi_strlen(acpi_emulated_os));
-        acpi_strcpy(state->retvalue.string, acpi_emulated_os);
-
-        acpi_debug("_OS_ returned '%s'\n", state->retvalue.string);
-        return 0;
-    }
-
-    // All versions of Windows starting from Windows Vista claim to implement
-    // at least ACPI 2.0. Therefore we also need to do the same.
-    if(!acpi_strcmp(state->handle->path, "\\._REV"))
-    {
-        state->retvalue.type = ACPI_INTEGER;
-        state->retvalue.integer = acpi_implemented_version;
-
-        acpi_debug("_REV returned %d\n", state->retvalue.integer);
-        return 0;
-    }
-
-    // Okay, by here it's a real method
-    //acpi_debug("execute control method %s\n", state->handle->path);
-    int status = acpi_exec(state->handle->pointer, state->handle->size, state, &state->retvalue);
-
-    /*acpi_debug("%s finished, ", state->handle->path);
-
-    if(state->retvalue.type == ACPI_INTEGER)
-        acpi_debug("return value is integer: %d\n", state->retvalue.integer);
-    else if(state->retvalue.type == ACPI_STRING)
-        acpi_debug("return value is string: '%s'\n", state->retvalue.string);
-    else if(state->retvalue.type == ACPI_PACKAGE)
-        acpi_debug("return value is package\n");
-    else if(state->retvalue.type == ACPI_BUFFER)
-        acpi_debug("return value is buffer\n");*/
-
-    return status;
 }
 
 // Pushes a new item to the opstack and returns it.
@@ -232,35 +159,40 @@ static void acpi_exec_reduce(int opcode, acpi_object_t *operands, acpi_object_t 
     }
 }
 
-// acpi_exec(): Internal function, executes actual AML opcodes
-// Param:    uint8_t *method - pointer to method opcodes
-// Param:    size_t size - size of method of bytes
-// Param:    acpi_state_t *state - machine state
-// Param:    acpi_object_t *method_return - return value of method
-// Return:    int - 0 on success
+// acpi_exec_run(): Internal function, executes actual AML opcodes
+// Param:  uint8_t *method - pointer to method opcodes
+// Param:  size_t size - size of method of bytes
+// Param:  acpi_state_t *state - machine state
+// Return: int - 0 on success
 
-int acpi_exec(uint8_t *method, size_t size, acpi_state_t *state, acpi_object_t *method_return)
+static int acpi_exec_run(uint8_t *method, size_t size, acpi_state_t *state)
 {
-    if(!size)
-    {
-        method_return->type = ACPI_INTEGER;
-        method_return->integer = 0;
-        return 0;
-    }
-
     size_t i = 0;
-    state->stack_ptr = -1;
 
-    while(i <= size)
+    acpi_stackitem_t *item;
+    while((item = acpi_exec_peek_stack_back(state)))
     {
         // Whether we use the result of an expression or not.
         // If yes, it will be pushed onto the opstack after the expression is computed.
         int want_exec_result = 0;
 
-        acpi_stackitem_t *item = acpi_exec_peek_stack_back(state);
         if(item)
         {
-            if(item->kind == LAI_OP_STACKITEM)
+            if(item->kind == LAI_METHOD_CONTEXT_STACKITEM)
+            {
+                // ACPI does an implicit Return(0) at the end of a control method.
+                if(i == size)
+                {
+                    if(state->opstack_ptr) // This is an internal error.
+                        acpi_panic("opstack is not empty before return\n");
+                    acpi_object_t *result = acpi_exec_push_opstack_or_die(state);
+                    result->type = ACPI_INTEGER;
+                    result->integer = 0;
+
+                    acpi_exec_pop_stack_back(state);
+                    continue;
+                }
+            }else if(item->kind == LAI_OP_STACKITEM)
             {
                 if(state->opstack_ptr == item->op_opstack + item->op_num_operands) {
                     acpi_object_t result = {0};
@@ -339,10 +271,8 @@ int acpi_exec(uint8_t *method, size_t size, acpi_state_t *state, acpi_object_t *
                 acpi_panic("unexpected acpi_stackitem_t\n");
         }
 
-        if(i == size)
-            break;
         if(i > size) // This would be an interpreter bug.
-            acpi_panic("execution escaped out of method body\n");
+            acpi_panic("execution escaped out of code range\n");
 
         // Process names.
         if(acpi_is_name(method[i])) {
@@ -464,10 +394,33 @@ int acpi_exec(uint8_t *method, size_t size, acpi_state_t *state, acpi_object_t *
         /* A control method can return literally any object */
         /* So we need to take this into consideration */
         case RETURN_OP:
+        {
             i++;
-            acpi_eval_object(method_return, state, &method[i]);
-            return 0;
+            acpi_object_t result = {0};
+            i += acpi_eval_object(&result, state, method + i);
 
+            // Find the last LAI_METHOD_CONTEXT_STACKITEM on the stack.
+            int j = 0;
+            acpi_stackitem_t *method_item;
+            while(1) {
+                method_item = acpi_exec_peek_stack(state, j);
+                if(!method_item)
+                    acpi_panic("Return() outside of control method()\n");
+                if(method_item->kind == LAI_METHOD_CONTEXT_STACKITEM)
+                    break;
+                // TODO: Verify that we only cross conditions/loops.
+                j++;
+            }
+
+            // Remove the method stack item and push the return value.
+            if(state->opstack_ptr) // This is an internal error.
+                acpi_panic("opstack is not empty before return\n");
+            acpi_object_t *opstack_res = acpi_exec_push_opstack_or_die(state);
+            acpi_move_object(opstack_res, &result);
+
+            acpi_exec_pop_stack(state, j + 1);
+            break;
+        }
         /* While Loops */
         case WHILE_OP:
         {
@@ -654,9 +607,90 @@ int acpi_exec(uint8_t *method, size_t size, acpi_state_t *state, acpi_object_t *
         }
     }
 
-    // when it returns nothing, assume Return (0)
-    method_return->type = ACPI_INTEGER;
-    method_return->integer = 0;
+    return 0;
+}
+
+// acpi_exec_method(): Finds and executes a control method
+// Param:    acpi_state_t *state - method name and arguments
+// Param:    acpi_object_t *method_return - return value of method
+// Return:    int - 0 on success
+
+int acpi_exec_method(acpi_state_t *state)
+{
+    acpi_memset(state->local, 0, sizeof(acpi_object_t) * 8);
+
+    // When executing the _OSI() method, we'll have one parameter which contains
+    // the name of an OS. We have to pretend to be a modern version of Windows,
+    // for AML to let us use its features.
+    if(!acpi_strcmp(state->handle->path, "\\._OSI"))
+    {
+        uint32_t osi_return = 0;
+        for(int i = 0; i < (sizeof(supported_osi_strings) / sizeof(uintptr_t)); i++)
+        {
+            if(!acpi_strcmp(state->arg[0].string, supported_osi_strings[i]))
+            {
+                osi_return = 0xFFFFFFFF;
+                break;
+            }
+        }
+
+        if(!osi_return && !acpi_strcmp(state->arg[0].string, "Linux"))
+            acpi_warn("buggy BIOS requested _OSI('Linux'), ignoring...\n");
+
+        state->retvalue.type = ACPI_INTEGER;
+        state->retvalue.integer = osi_return;
+
+        acpi_debug("_OSI('%s') returned 0x%08X\n", state->arg[0].string, osi_return);
+        return 0;
+    }
+
+    // OS family -- pretend to be Windows
+    if(!acpi_strcmp(state->handle->path, "\\._OS_"))
+    {
+        state->retvalue.type = ACPI_STRING;
+        state->retvalue.string = acpi_malloc(acpi_strlen(acpi_emulated_os));
+        acpi_strcpy(state->retvalue.string, acpi_emulated_os);
+
+        acpi_debug("_OS_ returned '%s'\n", state->retvalue.string);
+        return 0;
+    }
+
+    // All versions of Windows starting from Windows Vista claim to implement
+    // at least ACPI 2.0. Therefore we also need to do the same.
+    if(!acpi_strcmp(state->handle->path, "\\._REV"))
+    {
+        state->retvalue.type = ACPI_INTEGER;
+        state->retvalue.integer = acpi_implemented_version;
+
+        acpi_debug("_REV returned %d\n", state->retvalue.integer);
+        return 0;
+    }
+
+    // Okay, by here it's a real method
+    //acpi_debug("execute control method %s\n", state->handle->path);
+    acpi_stackitem_t *item = acpi_exec_push_stack_or_die(state);
+    item->kind = LAI_METHOD_CONTEXT_STACKITEM;
+
+    int status = acpi_exec_run(state->handle->pointer, state->handle->size, state);
+    if(status)
+        return status;
+
+    /*acpi_debug("%s finished, ", state->handle->path);
+
+    if(state->retvalue.type == ACPI_INTEGER)
+        acpi_debug("return value is integer: %d\n", state->retvalue.integer);
+    else if(state->retvalue.type == ACPI_STRING)
+        acpi_debug("return value is string: '%s'\n", state->retvalue.string);
+    else if(state->retvalue.type == ACPI_PACKAGE)
+        acpi_debug("return value is package\n");
+    else if(state->retvalue.type == ACPI_BUFFER)
+        acpi_debug("return value is buffer\n");*/
+
+    if(state->opstack_ptr != 1) // This would be an internal error.
+        acpi_panic("expected exactly one return value after method invocation\n");
+    acpi_object_t *result = acpi_exec_get_opstack(state, 0);
+    acpi_move_object(&state->retvalue, result);
+    acpi_exec_pop_opstack(state, 1);
     return 0;
 }
 
