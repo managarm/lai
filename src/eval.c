@@ -116,11 +116,11 @@ int acpi_eval_package(acpi_object_t *package, size_t index, acpi_object_t *desti
 
 // acpi_eval_object(): Evaluates an object
 // Param:    acpi_object_t *destination - pointer to where to store object
-// Param:    acpi_state_t *state - AML VM state
+// Param:    acpi_nsnode_t *context - where to look up relative paths
 // Param:    void *data - data of object
 // Return:    size_t - size in bytes for skipping
 
-size_t acpi_eval_object(acpi_object_t *destination, acpi_state_t *state, void *data)
+size_t acpi_eval_object(acpi_object_t *destination, acpi_nsnode_t *context, void *data)
 {
     size_t return_size = 0;
     uint8_t *object = (uint8_t*)data;
@@ -130,74 +130,9 @@ size_t acpi_eval_object(acpi_object_t *destination, acpi_state_t *state, void *d
     size_t name_size;
     acpi_nsnode_t *handle;
     char name[ACPI_MAX_NAME];
-    acpi_object_t *destination_reg;
     acpi_object_t *sizeof_object;
     acpi_object_t n1 = {0};
     acpi_object_t n2 = {0};
-
-    // try register
-    if(object[0] >= LOCAL0_OP && object[0] <= LOCAL7_OP)
-    {
-        switch(object[0])
-        {
-        case LOCAL0_OP:
-            destination_reg = &state->local[0];
-            break;
-        case LOCAL1_OP:
-            destination_reg = &state->local[1];
-            break;
-        case LOCAL2_OP:
-            destination_reg = &state->local[2];
-            break;
-        case LOCAL3_OP:
-            destination_reg = &state->local[3];
-            break;
-        case LOCAL4_OP:
-            destination_reg = &state->local[4];
-            break;
-        case LOCAL5_OP:
-            destination_reg = &state->local[5];
-            break;
-        case LOCAL6_OP:
-            destination_reg = &state->local[6];
-            break;
-        case LOCAL7_OP:
-            destination_reg = &state->local[7];
-            break;
-        }
-
-        acpi_copy_object(destination, destination_reg);
-        return 1;
-    } else if(object[0] >= ARG0_OP && object[0] <= ARG6_OP)
-    {
-        switch(object[0])
-        {
-        case ARG0_OP:
-            destination_reg = &state->arg[0];
-            break;
-        case ARG1_OP:
-            destination_reg = &state->arg[1];
-            break;
-        case ARG2_OP:
-            destination_reg = &state->arg[2];
-            break;
-        case ARG3_OP:
-            destination_reg = &state->arg[3];
-            break;
-        case ARG4_OP:
-            destination_reg = &state->arg[4];
-            break;
-        case ARG5_OP:
-            destination_reg = &state->arg[5];
-            break;
-        case ARG6_OP:
-            destination_reg = &state->arg[6];
-            break;
-        }
-
-        acpi_copy_object(destination, destination_reg);
-        return 1;
-    }
 
     // try integer
     integer_size = acpi_eval_integer(object, &integer);
@@ -218,19 +153,19 @@ size_t acpi_eval_object(acpi_object_t *destination, acpi_state_t *state, void *d
         // package
         destination->type = ACPI_PACKAGE;
         destination->package = acpi_calloc(sizeof(acpi_object_t), ACPI_MAX_PACKAGE_ENTRIES);
-        destination->package_size = acpins_create_package(state->handle,
+        destination->package_size = acpins_create_package(context,
                 destination->package, object);
         acpi_parse_pkgsize(&object[1], &return_size);
         return_size++;        // skip PACKAGE_OP
     } else if(object[0] == BUFFER_OP)
     {
         // buffer
-        return_size += acpi_exec_buffer(destination, state, object);
+        return_size += acpi_exec_buffer(destination, context, object);
     } else if(acpi_is_name(object[0]))
     {
         // it's a NameSpec
         // resolve the name
-        name_size = acpins_resolve_path(state->handle, name, &object[0]);
+        name_size = acpins_resolve_path(context, name, &object[0]);
         handle = acpi_exec_resolve(name);
         if(!handle)
         {
@@ -244,7 +179,7 @@ size_t acpi_eval_object(acpi_object_t *destination, acpi_state_t *state, void *d
             return_size += name_size;
         } else if(handle->type == ACPI_NAMESPACE_METHOD)
             // or a MethodInvokation
-            return_size += acpi_methodinvoke(&object[0], state, destination);
+            return_size += acpi_methodinvoke(&object[0], context, destination);
         else if(handle->type == ACPI_NAMESPACE_FIELD || handle->type == ACPI_NAMESPACE_INDEXFIELD)
         {
             // or an Operation Region Field
@@ -261,70 +196,11 @@ size_t acpi_eval_object(acpi_object_t *destination, acpi_state_t *state, void *d
         // try sizeof
         return_size++;
         object++;
-        if(object[0] >= LOCAL0_OP && object[0] <= LOCAL7_OP)
-        {
-            return_size++;
-
-            switch(object[0])
-            {
-            case LOCAL0_OP:
-                sizeof_object = &state->local[0];
-                break;
-            case LOCAL1_OP:
-                sizeof_object = &state->local[1];
-                break;
-            case LOCAL2_OP:
-                sizeof_object = &state->local[2];
-                break;
-            case LOCAL3_OP:
-                sizeof_object = &state->local[3];
-                break;
-            case LOCAL4_OP:
-                sizeof_object = &state->local[4];
-                break;
-            case LOCAL5_OP:
-                sizeof_object = &state->local[5];
-                break;
-            case LOCAL6_OP:
-                sizeof_object = &state->local[6];
-                break;
-            case LOCAL7_OP:
-                sizeof_object = &state->local[7];
-                break;
-            }
-        } else if(object[0] >= ARG0_OP && object[0] <= ARG6_OP)
-        {
-            return_size++;
-
-            switch(object[0])
-            {
-            case ARG0_OP:
-                sizeof_object = &state->arg[0];
-                break;
-            case ARG1_OP:
-                sizeof_object = &state->arg[1];
-                break;
-            case ARG2_OP:
-                sizeof_object = &state->arg[2];
-                break;
-            case ARG3_OP:
-                sizeof_object = &state->arg[3];
-                break;
-            case ARG4_OP:
-                sizeof_object = &state->arg[4];
-                break;
-            case ARG5_OP:
-                sizeof_object = &state->arg[5];
-                break;
-            case ARG6_OP:
-                sizeof_object = &state->arg[6];
-                break;
-            }
-        } else if(acpi_is_name(object[0]))
+        if(acpi_is_name(object[0]))
         {
             acpi_panic("TO-DO: Implement SizeOf for namespec\n");
             /*sizeof_object = acpi_malloc(sizeof(acpi_object_t));
-            return_size += acpi_eval_object(sizeof_object, state, &object[0]);*/
+            return_size += acpi_eval_object(sizeof_object, context, &object[0]);*/
         } else
         {
             acpi_panic("undefined object for SizeOf\n");
@@ -349,7 +225,7 @@ size_t acpi_eval_object(acpi_object_t *destination, acpi_state_t *state, void *d
     } else if(object[0] == DEREF_OP)
     {
         // what a fucking waste of space DeRef is.
-        return_size = acpi_eval_object(destination, state, &object[1]) + 1;
+        return_size = acpi_eval_object(destination, context, &object[1]) + 1;
     } else if(object[0] == INDEX_OP)
     {
         return_size = 2;
@@ -359,11 +235,11 @@ size_t acpi_eval_object(acpi_object_t *destination, acpi_state_t *state, void *d
 
         acpi_object_t ref = {0};
         acpi_object_t index = {0};
-        index_size = acpi_eval_object(&ref, state, &object[0]);
+        index_size = acpi_eval_object(&ref, context, &object[0]);
         return_size += index_size;
         object += index_size;
 
-        index_size = acpi_eval_object(&index, state, &object[0]);
+        index_size = acpi_eval_object(&index, context, &object[0]);
         return_size += index_size;
 
         if(ref.type == ACPI_STRING)
@@ -389,7 +265,7 @@ size_t acpi_eval_object(acpi_object_t *destination, acpi_state_t *state, void *d
         return_size = 1;
         object++;
 
-        return_size += acpi_eval_object(&n1, state, &object[0]);
+        return_size += acpi_eval_object(&n1, context, &object[0]);
         destination->type = ACPI_INTEGER;
         if(n1.integer == 0)
             destination->integer = 1;
@@ -400,11 +276,11 @@ size_t acpi_eval_object(acpi_object_t *destination, acpi_state_t *state, void *d
         return_size = 1;
         object++;
 
-        integer_size = acpi_eval_object(&n1, state, &object[0]);
+        integer_size = acpi_eval_object(&n1, context, &object[0]);
         return_size += integer_size;
         object += integer_size;
 
-        integer_size = acpi_eval_object(&n2, state, &object[0]);
+        integer_size = acpi_eval_object(&n2, context, &object[0]);
         return_size += integer_size;
 
         destination->type = ACPI_INTEGER;
@@ -418,11 +294,11 @@ size_t acpi_eval_object(acpi_object_t *destination, acpi_state_t *state, void *d
         return_size = 1;
         object++;
 
-        integer_size = acpi_eval_object(&n1, state, &object[0]);
+        integer_size = acpi_eval_object(&n1, context, &object[0]);
         return_size += integer_size;
         object += integer_size;
 
-        integer_size = acpi_eval_object(&n2, state, &object[0]);
+        integer_size = acpi_eval_object(&n2, context, &object[0]);
         return_size += integer_size;
 
         destination->type = ACPI_INTEGER;
@@ -436,11 +312,11 @@ size_t acpi_eval_object(acpi_object_t *destination, acpi_state_t *state, void *d
         return_size = 1;
         object++;
 
-        integer_size = acpi_eval_object(&n1, state, &object[0]);
+        integer_size = acpi_eval_object(&n1, context, &object[0]);
         return_size += integer_size;
         object += integer_size;
 
-        integer_size = acpi_eval_object(&n2, state, &object[0]);
+        integer_size = acpi_eval_object(&n2, context, &object[0]);
         return_size += integer_size;
 
         destination->type = ACPI_INTEGER;
@@ -453,11 +329,11 @@ size_t acpi_eval_object(acpi_object_t *destination, acpi_state_t *state, void *d
         return_size = 1;
         object++;
 
-        integer_size = acpi_eval_object(&n1, state, &object[0]);
+        integer_size = acpi_eval_object(&n1, context, &object[0]);
         return_size += integer_size;
         object += integer_size;
 
-        integer_size = acpi_eval_object(&n2, state, &object[0]);
+        integer_size = acpi_eval_object(&n2, context, &object[0]);
         return_size += integer_size;
 
         destination->type = ACPI_INTEGER;
@@ -470,11 +346,11 @@ size_t acpi_eval_object(acpi_object_t *destination, acpi_state_t *state, void *d
         return_size = 1;
         object++;
 
-        integer_size = acpi_eval_object(&n1, state, &object[0]);
+        integer_size = acpi_eval_object(&n1, context, &object[0]);
         return_size += integer_size;
         object += integer_size;
 
-        integer_size = acpi_eval_object(&n2, state, &object[0]);
+        integer_size = acpi_eval_object(&n2, context, &object[0]);
         return_size += integer_size;
 
         destination->type = ACPI_INTEGER;
@@ -487,11 +363,11 @@ size_t acpi_eval_object(acpi_object_t *destination, acpi_state_t *state, void *d
         return_size = 2;
         object++;
 
-        integer_size = acpi_eval_object(&n1, state, &object[0]);
+        integer_size = acpi_eval_object(&n1, context, &object[0]);
         return_size += integer_size;
         object += integer_size;
 
-        integer_size = acpi_eval_object(&n2, state, &object[0]);
+        integer_size = acpi_eval_object(&n2, context, &object[0]);
         return_size += integer_size;
 
         destination->type = ACPI_INTEGER;
@@ -501,11 +377,11 @@ size_t acpi_eval_object(acpi_object_t *destination, acpi_state_t *state, void *d
         return_size = 2;
         object++;
 
-        integer_size = acpi_eval_object(&n1, state, &object[0]);
+        integer_size = acpi_eval_object(&n1, context, &object[0]);
         return_size += integer_size;
         object += integer_size;
 
-        integer_size = acpi_eval_object(&n2, state, &object[0]);
+        integer_size = acpi_eval_object(&n2, context, &object[0]);
         return_size += integer_size;
 
         destination->type = ACPI_INTEGER;
@@ -515,11 +391,11 @@ size_t acpi_eval_object(acpi_object_t *destination, acpi_state_t *state, void *d
         return_size = 2;
         object++;
 
-        integer_size = acpi_eval_object(&n1, state, &object[0]);
+        integer_size = acpi_eval_object(&n1, context, &object[0]);
         return_size += integer_size;
         object += integer_size;
 
-        integer_size = acpi_eval_object(&n2, state, &object[0]);
+        integer_size = acpi_eval_object(&n2, context, &object[0]);
         return_size += integer_size;
 
         destination->type = ACPI_INTEGER;
@@ -529,11 +405,11 @@ size_t acpi_eval_object(acpi_object_t *destination, acpi_state_t *state, void *d
         return_size = 2;
         object++;
 
-        integer_size = acpi_eval_object(&n1, state, &object[0]);
+        integer_size = acpi_eval_object(&n1, context, &object[0]);
         return_size += integer_size;
         object += integer_size;
 
-        integer_size = acpi_eval_object(&n2, state, &object[0]);
+        integer_size = acpi_eval_object(&n2, context, &object[0]);
         return_size += integer_size;
 
         destination->type = ACPI_INTEGER;
@@ -543,7 +419,7 @@ size_t acpi_eval_object(acpi_object_t *destination, acpi_state_t *state, void *d
         return_size = 2;
         object++;
 
-        integer_size = acpi_eval_object(&n1, state, &object[0]);
+        integer_size = acpi_eval_object(&n1, context, &object[0]);
         return_size += integer_size;
 
         destination->type = ACPI_INTEGER;
@@ -553,11 +429,11 @@ size_t acpi_eval_object(acpi_object_t *destination, acpi_state_t *state, void *d
         return_size = 2;
         object++;
 
-        integer_size = acpi_eval_object(&n1, state, &object[0]);
+        integer_size = acpi_eval_object(&n1, context, &object[0]);
         return_size += integer_size;
         object += integer_size;
 
-        integer_size = acpi_eval_object(&n2, state, &object[0]);
+        integer_size = acpi_eval_object(&n2, context, &object[0]);
         return_size += integer_size;
 
         destination->type = ACPI_INTEGER;
@@ -567,11 +443,11 @@ size_t acpi_eval_object(acpi_object_t *destination, acpi_state_t *state, void *d
         return_size = 2;
         object++;
 
-        integer_size = acpi_eval_object(&n1, state, &object[0]);
+        integer_size = acpi_eval_object(&n1, context, &object[0]);
         return_size += integer_size;
         object += integer_size;
 
-        integer_size = acpi_eval_object(&n2, state, &object[0]);
+        integer_size = acpi_eval_object(&n2, context, &object[0]);
         return_size += integer_size;
 
         destination->type = ACPI_INTEGER;
@@ -581,11 +457,11 @@ size_t acpi_eval_object(acpi_object_t *destination, acpi_state_t *state, void *d
         return_size = 2;
         object++;
 
-        integer_size = acpi_eval_object(&n1, state, &object[0]);
+        integer_size = acpi_eval_object(&n1, context, &object[0]);
         return_size += integer_size;
         object += integer_size;
 
-        integer_size = acpi_eval_object(&n2, state, &object[0]);
+        integer_size = acpi_eval_object(&n2, context, &object[0]);
         return_size += integer_size;
 
         destination->type = ACPI_INTEGER;
@@ -595,7 +471,7 @@ size_t acpi_eval_object(acpi_object_t *destination, acpi_state_t *state, void *d
         return_size = 3;
         object += 2;
 
-        name_size = acpins_resolve_path(state->handle, name, &object[0]);
+        name_size = acpins_resolve_path(context, name, &object[0]);
         return_size += name_size;
 
         acpi_nsnode_t *handle = acpi_exec_resolve(name);
@@ -610,11 +486,11 @@ size_t acpi_eval_object(acpi_object_t *destination, acpi_state_t *state, void *d
         return_size = 2;
         object++;
 
-        integer_size = acpi_eval_object(&n1, state, &object[0]);
+        integer_size = acpi_eval_object(&n1, context, &object[0]);
         return_size += integer_size;
         object += integer_size;
 
-        integer_size = acpi_eval_object(&n2, state, &object[0]);
+        integer_size = acpi_eval_object(&n2, context, &object[0]);
         return_size += integer_size;
 
         destination->type = ACPI_INTEGER;
@@ -629,11 +505,11 @@ size_t acpi_eval_object(acpi_object_t *destination, acpi_state_t *state, void *d
 
 // acpi_methodinvoke(): Executes a MethodInvokation
 // Param:    void *data - pointer to MethodInvokation
-// Param:    acpi_state_t *old_state - state of currently executing method
+// Param:    acpi_nsnode_t *context - where to look up relative paths
 // Param:    acpi_object_t *method_return - object to store return value
 // Return:    size_t - size in bytes for skipping
 
-size_t acpi_methodinvoke(void *data, acpi_state_t *old_state, acpi_object_t *method_return)
+size_t acpi_methodinvoke(void *data, acpi_nsnode_t *context, acpi_object_t *method_return)
 {
     uint8_t *methodinvokation = (uint8_t*)data;
 
@@ -641,7 +517,7 @@ size_t acpi_methodinvoke(void *data, acpi_state_t *old_state, acpi_object_t *met
 
     // determine the name of the method
     char path[ACPI_MAX_NAME];
-    size_t name_size = acpins_resolve_path(old_state->handle, path, methodinvokation);
+    size_t name_size = acpins_resolve_path(context, path, methodinvokation);
     return_size += name_size;
     methodinvokation += name_size;
 
@@ -655,7 +531,7 @@ size_t acpi_methodinvoke(void *data, acpi_state_t *old_state, acpi_object_t *met
     for(int i = 0; i < argc; i++)
     {
         size_t arg_size = acpi_eval_object(&state.arg[i],
-                old_state, methodinvokation);
+                context, methodinvokation);
         methodinvokation += arg_size;
         return_size += arg_size;
     }
@@ -670,10 +546,10 @@ size_t acpi_methodinvoke(void *data, acpi_state_t *old_state, acpi_object_t *met
 
 // acpi_exec_buffer(): Creates a buffer object
 // Param:    acpi_object_t *destination - destination
-// Param:    acpi_state_t *state - AML VM state
+// Param:    acpi_nsnode_t *context - where to look up relative paths
 // Param:    void *data - actual data
 
-size_t acpi_exec_buffer(acpi_object_t *destination, acpi_state_t *state, void *data)
+size_t acpi_exec_buffer(acpi_object_t *destination, acpi_nsnode_t *context, void *data)
 {
     size_t return_size = 1;
 
@@ -686,7 +562,7 @@ size_t acpi_exec_buffer(acpi_object_t *destination, acpi_state_t *state, void *d
 
     acpi_object_t buffer_size = {0};
     buffer += pkgsize;
-    buffer += acpi_eval_object(&buffer_size, state, buffer);
+    buffer += acpi_eval_object(&buffer_size, context, buffer);
 
     destination->type = ACPI_BUFFER;
     destination->buffer_size = buffer_size.integer;

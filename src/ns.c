@@ -26,8 +26,6 @@ acpi_nsnode_t **acpi_namespace;
 size_t acpi_ns_size = 0;
 size_t acpi_ns_capacity = NAMESPACE_WINDOW;
 
-acpi_state_t acpins_state;    // not really used
-
 void acpins_load_table(void *);
 
 // Helper function to allocate a acpi_nsnode_t.
@@ -362,7 +360,7 @@ void acpins_register_scope(acpi_nsnode_t *scope, uint8_t *data, size_t size)
 
             count += predicate_skip;
 
-            count += acpi_eval_object(&predicate, &acpins_state, &data[count]);
+            count += acpi_eval_object(&predicate, scope, &data[count]);
             if(predicate.integer == 0)
                 count = if_end;
 
@@ -435,7 +433,8 @@ size_t acpins_create_opregion(acpi_nsnode_t *parent, void *data)
     node->op_address_space = opregion[size];
     size++;
 
-    integer_size = acpi_eval_object(&object, &acpins_state, &opregion[size]);
+	// FIXME: Do we want to resolve paths relative to the parent or the opregion?
+    integer_size = acpi_eval_object(&object, parent, &opregion[size]);
     integer = object.integer;
     if(integer_size == 0)
     {
@@ -773,7 +772,8 @@ size_t acpins_create_name(acpi_nsnode_t *parent, void *data)
         pkgsize = acpi_parse_pkgsize(&name[1], &node->object.buffer_size);
         node->object.buffer = &name[0] + pkgsize + 1;
 
-        object_size = acpi_eval_object(&object, &acpins_state, node->object.buffer);
+		// FIXME: Do we want to resolve paths relative to the parent or the name?
+        object_size = acpi_eval_object(&object, parent, node->object.buffer);
         node->object.buffer += object_size;
         node->object.buffer_size = object.integer;
     } else if(name[0] == STRINGPREFIX)
