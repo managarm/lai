@@ -220,8 +220,7 @@ void acpi_create_namespace(void *dsdt)
     rev_node->method_override = &acpi_do_rev_method;
     acpins_install_nsnode(rev_node);
 
-    // create the namespace with all the objects
-    // most of the functions are recursive
+    // Create the namespace with all the objects.
     acpins_register_scope(NULL, acpi_acpins_code, acpi_acpins_size);
 
     acpi_debug("ACPI namespace created, total of %d predefined objects.\n", acpi_ns_size);
@@ -256,126 +255,10 @@ void acpins_load_table(void *ptr)
 
 void acpins_register_scope(acpi_nsnode_t *scope, uint8_t *data, size_t size)
 {
-    size_t count = 0;
-    size_t pkgsize;
-    acpi_object_t predicate = {0};
-    while(count < size)
-    {
-        switch(data[count])
-        {
-        case ZERO_OP:
-        case ONE_OP:
-        case ONES_OP:
-        case NOP_OP:
-            count++;
-            break;
-
-        case BYTEPREFIX:
-            count += 2;
-            break;
-        case WORDPREFIX:
-            count += 3;
-            break;
-        case DWORDPREFIX:
-            count += 5;
-            break;
-        case QWORDPREFIX:
-            count += 9;
-            break;
-        case STRINGPREFIX:
-            count += acpi_strlen((const char *)&data[count]) + 1;
-            break;
-
-        case NAME_OP:
-            count += acpins_create_name(scope, &data[count]);
-            break;
-
-        case ALIAS_OP:
-            count += acpins_create_alias(scope, &data[count]);
-            break;
-
-        case SCOPE_OP:
-            count += acpins_create_scope(scope, &data[count]);
-            break;
-
-        case METHOD_OP:
-            count += acpins_create_method(scope, &data[count]);
-            break;
-
-        case BUFFER_OP:
-        case PACKAGE_OP:
-        case VARPACKAGE_OP:
-            count++;
-            acpi_parse_pkgsize(&data[count], &pkgsize);
-            count += pkgsize;
-            break;
-
-        case BYTEFIELD_OP:
-            count += acpins_create_bytefield(scope, &data[count]);
-            break;
-        case WORDFIELD_OP:
-            count += acpins_create_wordfield(scope, &data[count]);
-            break;
-        case DWORDFIELD_OP:
-            count += acpins_create_dwordfield(scope, &data[count]);
-            break;
-        case QWORDFIELD_OP:
-            count += acpins_create_qwordfield(scope, &data[count]);
-            break;
-
-        case EXTOP_PREFIX:
-            switch(data[count+1])
-            {
-            case MUTEX:
-                count += acpins_create_mutex(scope, &data[count]);
-                break;
-            case OPREGION:
-                count += acpins_create_opregion(scope, &data[count]);
-                break;
-            case FIELD:
-                count += acpins_create_field(scope, &data[count]);
-                break;
-            case DEVICE:
-                count += acpins_create_device(scope, &data[count]);
-                break;
-            case THERMALZONE:
-                count += acpins_create_thermalzone(scope, &data[count]);
-                break;
-            case INDEXFIELD:
-                count += acpins_create_indexfield(scope, &data[count]);
-                break;
-            case PROCESSOR:
-                count += acpins_create_processor(scope, &data[count]);
-                break;
-
-            default:
-                acpi_panic("undefined opcode, sequence: %02X %02X %02X %02X\n", data[count], data[count+1], data[count+2], data[count+3]);
-            }
-            break;
-
-        case IF_OP:
-            count++;
-            size_t predicate_skip = acpi_parse_pkgsize(&data[count], &pkgsize);
-            size_t if_end = count + pkgsize;
-
-            count += predicate_skip;
-
-            count += acpi_eval_object(&predicate, scope, &data[count]);
-            if(predicate.integer == 0)
-                count = if_end;
-
-            break;
-
-        case ELSE_OP:
-            count++;
-            acpi_parse_pkgsize(&data[count], &pkgsize);
-            count += pkgsize;
-            break;
-
-        default:
-            acpi_panic("undefined opcode, sequence: %02X %02X %02X %02X\n", data[count], data[count+1], data[count+2], data[count+3]);
-        }
-    }
+    acpi_state_t state;
+    acpi_init_call_state(&state, scope);
+    acpi_populate(data, size, &state);
+    acpi_finalize_state(&state);
 }
 
 // acpins_create_scope(): Creates a scope in the namespace

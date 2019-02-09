@@ -182,7 +182,14 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
         // If yes, it will be pushed onto the opstack after the expression is computed.
         int want_exec_result = 0;
 
-        if(item->kind == LAI_METHOD_CONTEXT_STACKITEM)
+        if(item->kind == LAI_POPULATE_CONTEXT_STACKITEM)
+        {
+			if(state->pc == state->limit)
+            {
+				acpi_exec_pop_stack_back(state);
+				continue;
+			}
+        }else if(item->kind == LAI_METHOD_CONTEXT_STACKITEM)
         {
 			// ACPI does an implicit Return(0) at the end of a control method.
 			if(state->pc == state->limit)
@@ -303,8 +310,9 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
         }else
             acpi_panic("unexpected acpi_stackitem_t\n");
 
-        if(state->pc > state->limit) // This would be an interpreter bug.
-            acpi_panic("execution escaped out of code range\n");
+        if(state->pc >= state->limit) // This would be an interpreter bug.
+            acpi_panic("execution escaped out of code range (PC is 0x%x with limit 0x%x)\n",
+                    state->pc, state->limit);
 
         // Process names.
         if(acpi_is_name(method[state->pc])) {
@@ -415,7 +423,28 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
                 result->integer = integer;
             }
             state->pc += integer_size;
-            continue;
+            break;
+        }
+        case STRINGPREFIX:
+        {
+            state->pc++;
+
+            size_t n = 0; // Determine the length of null-terminated string.
+            while(state->pc + n < state->limit && method[state->pc + n])
+                n++;
+            if(state->pc + n == state->limit)
+                acpi_panic("unterminated string in AML code");
+
+            if(want_exec_result)
+            {
+                acpi_object_t *opstack_res = acpi_exec_push_opstack_or_die(state);
+                opstack_res->type = ACPI_STRING;
+                opstack_res->string = acpi_malloc(n + 1);
+                acpi_memcpy(opstack_res->string, method + state->pc, n);
+                opstack_res->string[n] = 0;
+            }
+            state->pc += n + 1;
+            break;
         }
         case BUFFER_OP:
         {
@@ -583,7 +612,7 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
             acpi_panic("Else() outside of If()\n");
             break;
 
-        /* Most of the type 2 opcodes are implemented in exec2.c */
+        // "Simple" objects in the ACPI namespace.
         case NAME_OP:
             acpi_exec_name(method, state);
             break;
@@ -596,6 +625,55 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
         case DWORDFIELD_OP:
             acpi_exec_dwordfield(method, state);
             break;
+
+        // Scope-like objects in the ACPI namespace.
+        case SCOPE_OP:
+        {
+            state->pc += acpins_create_scope(state->handle, method + state->pc);
+            break;
+        }
+        case (EXTOP_PREFIX << 8) | DEVICE:
+        {
+            state->pc += acpins_create_device(state->handle, method + state->pc);
+            break;
+        }
+        case (EXTOP_PREFIX << 8) | PROCESSOR:
+        {
+            state->pc += acpins_create_processor(state->handle, method + state->pc);
+            break;
+        }
+        case (EXTOP_PREFIX << 8) | THERMALZONE:
+        {
+            state->pc += acpins_create_thermalzone(state->handle, method + state->pc);
+            break;
+        }
+        case (EXTOP_PREFIX << 8) | OPREGION:
+        {
+            state->pc += acpins_create_opregion(state->handle, method + state->pc);
+            break;
+        }
+
+        // Leafs in the ACPI namespace.
+        case METHOD_OP:
+        {
+            state->pc += acpins_create_method(state->handle, method + state->pc);
+            break;
+        }
+        case (EXTOP_PREFIX << 8) | MUTEX:
+        {
+            state->pc += acpins_create_mutex(state->handle, method + state->pc);
+            break;
+        }
+        case (EXTOP_PREFIX << 8) | FIELD:
+        {
+            state->pc += acpins_create_field(state->handle, method + state->pc);
+            break;
+        }
+        case (EXTOP_PREFIX << 8) | INDEXFIELD:
+        {
+            state->pc += acpins_create_indexfield(state->handle, method + state->pc);
+            break;
+        }
 
         case ARG0_OP:
         case ARG1_OP:
@@ -699,6 +777,18 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
     return 0;
 }
 
+int acpi_populate(void *data, size_t size, acpi_state_t *state) {
+    acpi_stackitem_t *item = acpi_exec_push_stack_or_die(state);
+    item->kind = LAI_POPULATE_CONTEXT_STACKITEM;
+
+    state->pc = 0;
+    state->limit = size;
+    int status = acpi_exec_run(data, state);
+    if(status)
+        acpi_panic("acpi_exec_run() failed in acpi_populate()\n");
+    return 0;
+}
+
 // acpi_exec_method(): Finds and executes a control method
 // Param:    acpi_state_t *state - method name and arguments
 // Param:    acpi_object_t *method_return - return value of method
@@ -780,7 +870,7 @@ size_t acpi_eval_object(acpi_object_t *destination, acpi_nsnode_t *context, void
 	state.limit = 0x7FFFFFFF;
     int status = acpi_exec_run(data, &state);
     if(status)
-        acpi_panic("acpi_exec_run() failed in acpi_eval_operand()\n");
+        acpi_panic("acpi_exec_run() failed in acpi_eval_object()\n");
 	size_t final_pc = state.pc;
 
     if(state.opstack_ptr != 1) // This would be an internal error.

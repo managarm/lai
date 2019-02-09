@@ -244,7 +244,7 @@ typedef struct acpi_condition_t
     size_t end;
 } acpi_condition_t;
 
-#define LAI_PARSE_CONTEXT_STACKITEM 1
+#define LAI_POPULATE_CONTEXT_STACKITEM 1
 #define LAI_METHOD_CONTEXT_STACKITEM 2
 #define LAI_LOOP_STACKITEM 3
 #define LAI_COND_STACKITEM 4
@@ -387,6 +387,7 @@ void acpi_move_object(acpi_object_t *, acpi_object_t *);
 void acpi_copy_object(acpi_object_t *, acpi_object_t *);
 void acpi_write_object(void *, acpi_object_t *, acpi_state_t *);
 acpi_nsnode_t *acpi_exec_resolve(char *);
+int acpi_populate(void *, size_t, acpi_state_t *);
 int acpi_exec_method(acpi_state_t *);
 void acpi_read_opregion(acpi_object_t *, acpi_nsnode_t *);
 void acpi_write_opregion(acpi_nsnode_t *, acpi_object_t *);
