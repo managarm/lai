@@ -200,18 +200,26 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
     acpi_stackitem_t *item;
     while((item = acpi_exec_peek_stack_back(state)))
     {
+        // Package-size encoding (and similar) needs to know the PC of the opcode.
+        // If an opcode sequence contains a pkgsize, the sequence generally ends at:
+        //     opcode_pc + pkgsize + opcode size.
+        int opcode_pc = state->pc;
+
         // Whether we use the result of an expression or not.
         // If yes, it will be pushed onto the opstack after the expression is computed.
         int want_exec_result = 0;
 
         if(item->kind == LAI_POPULATE_CONTEXT_STACKITEM)
         {
-			if(state->pc == state->limit)
+			if(state->pc == item->ctx_limit)
             {
 				acpi_exec_pop_stack_back(state);
                 acpi_exec_update_context(state);
 				continue;
 			}
+
+            if(state->pc > item->ctx_limit) // This would be an interpreter bug.
+                acpi_panic("namespace population escaped out of code range\n");
         }else if(item->kind == LAI_METHOD_CONTEXT_STACKITEM)
         {
 			// ACPI does an implicit Return(0) at the end of a control method.
@@ -320,12 +328,10 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
             {
                 // Consume a follow-up Else() opcode.
                 if(state->pc < state->limit && method[state->pc] == ELSE_OP) {
-                    size_t else_size;
                     state->pc++;
-                    size_t j = state->pc;
+                    size_t else_size;
                     state->pc += acpi_parse_pkgsize(method + state->pc, &else_size);
-
-                    state->pc = j + else_size;
+                    state->pc = opcode_pc + else_size + 1;
                 }
 
                 acpi_exec_pop_stack_back(state);
@@ -482,7 +488,6 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
         }
         case BUFFER_OP:
         {
-            size_t offset = state->pc;
             state->pc++;        // Skip BUFFER_OP.
 
             // Size of the buffer initializer.
@@ -502,9 +507,11 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
                 acpi_panic("failed to allocate memory for AML buffer");
             acpi_memset(result.buffer, 0, buffer_size.integer);
 
-            if(encoded_size < state->pc - offset)
-                acpi_panic("buffer initializer has negative size");
-            size_t initial_size = encoded_size - (state->pc - offset);
+            int initial_size = (opcode_pc + encoded_size + 1) - state->pc;
+            if(initial_size < 0)
+                acpi_panic("buffer initializer has negative size\n");
+            if(initial_size > result.buffer_size)
+                acpi_panic("buffer initializer overflows buffer\n");
             acpi_memcpy(result.buffer, method + state->pc, initial_size);
             state->pc += initial_size;
 
@@ -518,7 +525,6 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
         }
         case PACKAGE_OP:
         {
-            size_t offset = state->pc;
             state->pc++;
 
             // Size of the package initializer.
@@ -536,13 +542,13 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
             result.package_size = num_ents;
 
             int i = 0;
-            while(state->pc < offset + encoded_size + 1) {
+            while(state->pc < opcode_pc + encoded_size + 1) {
                 if(i == num_ents)
                     acpi_panic("package initializer overflows its size");
                 acpi_eval_operand(&result.package[i], state, method);
                 i++;
             }
-            if(state->pc != offset + encoded_size + 1) // This would be an internal error.
+            if(state->pc != opcode_pc + encoded_size + 1) // This would be an internal error.
                 acpi_panic("package initializer out of code range");
 
             if(want_exec_result)
@@ -594,13 +600,12 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
         {
             size_t loop_size;
             state->pc++;
-            size_t j = state->pc;
             state->pc += acpi_parse_pkgsize(&method[state->pc], &loop_size);
 
             acpi_stackitem_t *loop_item = acpi_exec_push_stack_or_die(state);
             loop_item->kind = LAI_LOOP_STACKITEM;
             loop_item->loop_pred = state->pc;
-            loop_item->loop_end = j + loop_size;
+            loop_item->loop_end = opcode_pc + loop_size + 1;
             break;
         }
         /* Continue Looping */
@@ -650,7 +655,6 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
         {
             size_t if_size;
             state->pc++;
-            size_t j = state->pc;
             state->pc += acpi_parse_pkgsize(method + state->pc, &if_size);
 
             // Evaluate the predicate
@@ -660,7 +664,7 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
             acpi_stackitem_t *cond_item = acpi_exec_push_stack_or_die(state);
             cond_item->kind = LAI_COND_STACKITEM;
             cond_item->cond_taken = predicate.integer;
-            cond_item->cond_end = j + if_size;
+            cond_item->cond_end = opcode_pc + if_size + 1;
 
             if(!cond_item->cond_taken)
                 state->pc = cond_item->cond_end;
@@ -688,12 +692,44 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
         // Scope-like objects in the ACPI namespace.
         case SCOPE_OP:
         {
-            state->pc += acpins_create_scope(ctx_handle, method + state->pc);
+            state->pc++;
+
+            size_t encoded_size;
+            state->pc += acpi_parse_pkgsize(method + state->pc, &encoded_size);
+            char name[ACPI_MAX_NAME];
+            state->pc += acpins_resolve_path(ctx_handle, name, method + state->pc);
+
+            acpi_nsnode_t *node = acpins_create_nsnode_or_die();
+            node->type = ACPI_NAMESPACE_SCOPE;
+            acpi_strcpy(node->path, name);
+            acpins_install_nsnode(node);
+
+            acpi_stackitem_t *item = acpi_exec_push_stack_or_die(state);
+            item->kind = LAI_POPULATE_CONTEXT_STACKITEM;
+            item->ctx_handle = node;
+            item->ctx_limit = opcode_pc + encoded_size + 1;
+            acpi_exec_update_context(state);
             break;
         }
         case (EXTOP_PREFIX << 8) | DEVICE:
         {
-            state->pc += acpins_create_device(ctx_handle, method + state->pc);
+            state->pc += 2;
+
+            size_t encoded_size;
+            state->pc += acpi_parse_pkgsize(method + state->pc, &encoded_size);
+            char name[ACPI_MAX_NAME];
+            state->pc += acpins_resolve_path(ctx_handle, name, method + state->pc);
+
+            acpi_nsnode_t *node = acpins_create_nsnode_or_die();
+            node->type = ACPI_NAMESPACE_DEVICE;
+            acpi_strcpy(node->path, name);
+            acpins_install_nsnode(node);
+
+            acpi_stackitem_t *item = acpi_exec_push_stack_or_die(state);
+            item->kind = LAI_POPULATE_CONTEXT_STACKITEM;
+            item->ctx_handle = node;
+            item->ctx_limit = opcode_pc + encoded_size + 2;
+            acpi_exec_update_context(state);
             break;
         }
         case (EXTOP_PREFIX << 8) | PROCESSOR:
@@ -703,7 +739,23 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
         }
         case (EXTOP_PREFIX << 8) | THERMALZONE:
         {
-            state->pc += acpins_create_thermalzone(ctx_handle, method + state->pc);
+            state->pc += 2;
+
+            size_t encoded_size;
+            state->pc += acpi_parse_pkgsize(method + state->pc, &encoded_size);
+            char name[ACPI_MAX_NAME];
+            state->pc += acpins_resolve_path(ctx_handle, name, method + state->pc);
+
+            acpi_nsnode_t *node = acpins_create_nsnode_or_die();
+            node->type = ACPI_NAMESPACE_THERMALZONE;
+            acpi_strcpy(node->path, name);
+            acpins_install_nsnode(node);
+
+            acpi_stackitem_t *item = acpi_exec_push_stack_or_die(state);
+            item->kind = LAI_POPULATE_CONTEXT_STACKITEM;
+            item->ctx_handle = node;
+            item->ctx_limit = opcode_pc + encoded_size + 2;
+            acpi_exec_update_context(state);
             break;
         }
 
@@ -859,6 +911,7 @@ int acpi_populate(acpi_nsnode_t *parent, void *data, size_t size, acpi_state_t *
     acpi_stackitem_t *item = acpi_exec_push_stack_or_die(state);
     item->kind = LAI_POPULATE_CONTEXT_STACKITEM;
     item->ctx_handle = parent;
+    item->ctx_limit = size;
     acpi_exec_update_context(state);
 
     state->pc = 0;

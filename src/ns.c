@@ -221,7 +221,10 @@ void acpi_create_namespace(void *dsdt)
     acpins_install_nsnode(rev_node);
 
     // Create the namespace with all the objects.
-    acpins_register_scope(NULL, acpi_acpins_code, acpi_acpins_size);
+    acpi_state_t state;
+    acpi_init_state(&state);
+    acpi_populate(NULL, acpi_acpins_code, acpi_acpins_size, &state);
+    acpi_finalize_state(&state);
 
     acpi_debug("ACPI namespace created, total of %d predefined objects.\n", acpi_ns_size);
 }
@@ -246,51 +249,6 @@ void acpins_load_table(void *ptr)
     acpi_debug("loaded AML table '%c%c%c%c', total %d bytes of AML code.\n", table->header.signature[0], table->header.signature[1], table->header.signature[2], table->header.signature[3], acpi_acpins_size);
 
     acpi_acpins_count++;
-}
-
-// acpins_register_scope(): Registers a scope
-// Param:    uint8_t *data - data
-// Param:    size_t size - size of scope in bytes
-// Return:    Nothing
-
-void acpins_register_scope(acpi_nsnode_t *scope, uint8_t *data, size_t size)
-{
-    acpi_state_t state;
-    acpi_init_state(&state);
-    acpi_populate(scope, data, size, &state);
-    acpi_finalize_state(&state);
-}
-
-// acpins_create_scope(): Creates a scope in the namespace
-// Param:    void *data - scope data
-// Return:    size_t - size of scope in bytes
-
-size_t acpins_create_scope(acpi_nsnode_t *parent, void *data)
-{
-    uint8_t *scope = (uint8_t*)data;
-    size_t size;
-    size_t pkgsize;
-
-    pkgsize = acpi_parse_pkgsize(scope + 1, &size);
-
-    // register the scope
-    scope += pkgsize + 1;
-    acpi_nsnode_t *node = acpins_create_nsnode_or_die();
-    size_t name_length = acpins_resolve_path(parent, node->path, scope);
-
-    //acpi_debug("scope %s, size %d bytes\n", node->path, size);
-
-    // put the scope in the namespace
-    node->type = ACPI_NAMESPACE_SCOPE;
-    node->size = size - pkgsize - name_length;
-    node->pointer = (void*)(data + 1 + pkgsize + name_length);
-    acpins_install_nsnode(node);
-
-    // register the child objects of the scope
-    acpins_register_scope(node, (uint8_t*)data + 1 + pkgsize + name_length,
-            size - pkgsize - name_length);
-
-    return size + 1;
 }
 
 // acpins_create_field(): Creates a Field object in the namespace
@@ -471,71 +429,6 @@ size_t acpins_create_method(acpi_nsnode_t *parent, void *data)
 
     acpins_install_nsnode(node);
     return size + 1;
-}
-
-// acpins_create_device(): Creates a device scope in the namespace
-// Param:    void *data - device scope data
-// Return:    size_t - size of device scope in bytes
-
-size_t acpins_create_device(acpi_nsnode_t *parent, void *data)
-{
-    uint8_t *device = (uint8_t*)data;
-    size_t size;
-    size_t pkgsize;
-
-    pkgsize = acpi_parse_pkgsize(device + 2, &size);
-
-    // register the device
-    device += pkgsize + 2;
-
-    acpi_nsnode_t *node = acpins_create_nsnode_or_die();
-    size_t name_length = acpins_resolve_path(parent, node->path, device);
-
-    //acpi_debug("device scope %s, size %d bytes\n", node->path, size);
-
-    // put the device scope in the namespace
-    node->type = ACPI_NAMESPACE_DEVICE;
-    node->size = size - pkgsize - name_length;
-    node->pointer = (void*)(data + 2 + pkgsize + name_length);
-    acpins_install_nsnode(node);
-
-    // register the child objects of the device scope
-    acpins_register_scope(node, (uint8_t*)data + 2 + pkgsize + name_length,
-            size - pkgsize - name_length);
-
-    return size + 2;
-}
-
-// acpins_create_thermalzone(): Creates a thermal zone scope in the namespace
-// Param:    void *data - thermal zone scope data
-// Return:    size_t - size of thermal zone scope in bytes
-
-size_t acpins_create_thermalzone(acpi_nsnode_t *parent, void *data)
-{
-    uint8_t *thermalzone = (uint8_t*)data;
-    size_t size;
-    size_t pkgsize;
-
-    pkgsize = acpi_parse_pkgsize(thermalzone + 2, &size);
-
-    // register the thermalzone
-    thermalzone += pkgsize + 2;
-
-    acpi_nsnode_t *node = acpins_create_nsnode_or_die();
-    size_t name_length = acpins_resolve_path(parent, node->path, thermalzone);
-
-    // put the device scope in the namespace
-    node->type = ACPI_NAMESPACE_THERMALZONE;
-    node->size = size - pkgsize - name_length;
-    node->pointer = (void*)(data + 2 + pkgsize + name_length);
-
-    acpins_install_nsnode(node);
-
-    // register the child objects of the thermal zone scope
-    acpins_register_scope(node, (uint8_t*)data + 2 + pkgsize + name_length,
-            size - pkgsize - name_length);
-
-    return size + 2;
 }
 
 // acpins_create_alias(): Creates an alias object in the namespace

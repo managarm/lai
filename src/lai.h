@@ -260,6 +260,7 @@ typedef struct acpi_stackitem_ {
     union {
         struct {
             acpi_nsnode_t *ctx_handle;
+            int ctx_limit;
         };
         struct {
             int loop_pred; // Loop predicate PC.
