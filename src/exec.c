@@ -708,11 +708,6 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
             state->pc += acpins_create_thermalzone(ctx_handle, method + state->pc);
             break;
         }
-        case (EXTOP_PREFIX << 8) | OPREGION:
-        {
-            state->pc += acpins_create_opregion(ctx_handle, method + state->pc);
-            break;
-        }
 
         // Leafs in the ACPI namespace.
         case METHOD_OP:
@@ -723,6 +718,30 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
         case (EXTOP_PREFIX << 8) | MUTEX:
         {
             state->pc += acpins_create_mutex(ctx_handle, method + state->pc);
+            break;
+        }
+        case (EXTOP_PREFIX << 8) | OPREGION:
+        {
+            state->pc += 2;
+            char name[ACPI_MAX_NAME];
+            state->pc += acpins_resolve_path(ctx_handle, name, method + state->pc);
+
+            // First byte identifies the address space (memory, I/O ports, PCI, etc.).
+            int address_space = method[state->pc];
+            state->pc++;
+
+            // Now, parse the offset and length of the opregion.
+            acpi_object_t disp = {0};
+            acpi_object_t length = {0};
+            acpi_eval_operand(&disp, state, method);
+            acpi_eval_operand(&length, state, method);
+
+            acpi_nsnode_t *node = acpins_create_nsnode_or_die();
+            acpi_strcpy(node->path, name);
+            node->op_address_space = address_space;
+            node->op_base = disp.integer;
+            node->op_length = length.integer;
+            acpins_install_nsnode(node);
             break;
         }
         case (EXTOP_PREFIX << 8) | FIELD:
