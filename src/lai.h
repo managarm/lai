@@ -250,9 +250,9 @@ typedef struct acpi_condition_t
 #define LAI_COND_STACKITEM 4
 #define LAI_OP_STACKITEM 5
 #define LAI_NOWRITE_OP_STACKITEM 6
-// This implements acpi_eval_object(). // TODO: Eventually remove
-// acpi_eval_object() by moving all parsing functionality into acpi_exec_run().
-#define LAI_EVALOBJECT_CONTEXT_STACKITEM 10
+// This implements acpi_eval_operand(). // TODO: Eventually remove
+// acpi_eval_operand() by moving all parsing functionality into acpi_exec_run().
+#define LAI_EVALOPERAND_STACKITEM 10
 
 typedef struct acpi_stackitem_ {
     int kind;
@@ -382,7 +382,6 @@ void acpi_eisaid(acpi_object_t *, char *);
 size_t acpi_read_resource(acpi_nsnode_t *, acpi_resource_t *);
 
 // ACPI Control Methods
-size_t acpi_eval_object(acpi_object_t *, acpi_nsnode_t *, void *);
 void acpi_eval_operand(acpi_object_t *, acpi_state_t *, uint8_t *);
 int acpi_eval(acpi_object_t *, char *);
 void acpi_free_object(acpi_object_t *);

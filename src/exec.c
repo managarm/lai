@@ -107,8 +107,7 @@ static void acpi_exec_update_context(acpi_state_t *state) {
         if(!ctx_item)
             break;
         if(ctx_item->kind == LAI_POPULATE_CONTEXT_STACKITEM
-                || ctx_item->kind == LAI_METHOD_CONTEXT_STACKITEM
-                || ctx_item->kind == LAI_EVALOBJECT_CONTEXT_STACKITEM)
+                || ctx_item->kind == LAI_METHOD_CONTEXT_STACKITEM)
             break;
         j++;
     }
@@ -228,12 +227,11 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
                 acpi_exec_update_context(state);
 				continue;
 			}
-        }else if(item->kind == LAI_EVALOBJECT_CONTEXT_STACKITEM)
+        }else if(item->kind == LAI_EVALOPERAND_STACKITEM)
         {
             if(state->opstack_ptr == item->opstack_frame + 1)
             {
                 acpi_exec_pop_stack_back(state);
-                acpi_exec_update_context(state);
                 return 0;
             }
 
@@ -914,19 +912,16 @@ int acpi_exec_method(acpi_nsnode_t *method, acpi_state_t *state)
     return 0;
 }
 
-// Like acpi_eval_object() but operates on an existing acpi_state_t.
-// TODO: Eventually, we want to remove this function again. For now, it is useful while
-//       we add all missing opcodes to acpi_exec_run().
+// Evaluates an AML expression recursively.
+// TODO: Eventually, we want to remove this function. However, this requires refactoring
+//       acpi_exec_run() to avoid all kinds of recursion.
 
 void acpi_eval_operand(acpi_object_t *destination, acpi_state_t *state, uint8_t *code) {
     int opstack = state->opstack_ptr;
-    acpi_stackitem_t *super = acpi_exec_context(state);
 
     acpi_stackitem_t *item = acpi_exec_push_stack_or_die(state);
-    item->kind = LAI_EVALOBJECT_CONTEXT_STACKITEM;
+    item->kind = LAI_EVALOPERAND_STACKITEM;
     item->opstack_frame = opstack;
-    item->ctx_handle = super->ctx_handle;
-    acpi_exec_update_context(state);
 
     int status = acpi_exec_run(code, state);
     if(status)
@@ -937,39 +932,6 @@ void acpi_eval_operand(acpi_object_t *destination, acpi_state_t *state, uint8_t 
     acpi_object_t *result = acpi_exec_get_opstack(state, opstack);
     acpi_move_object(destination, result);
     acpi_exec_pop_opstack(state, 1);
-}
-
-// acpi_eval_object(): Evaluates an object
-// Param:    acpi_object_t *destination - pointer to where to store object
-// Param:    acpi_nsnode_t *context - where to look up relative paths
-// Param:    void *data - data of object
-// Return:    size_t - size in bytes for skipping
-
-size_t acpi_eval_object(acpi_object_t *destination, acpi_nsnode_t *context, void *data) {
-	acpi_state_t state;
-	acpi_init_state(&state);
-
-    acpi_stackitem_t *item = acpi_exec_push_stack_or_die(&state);
-    item->kind = LAI_EVALOBJECT_CONTEXT_STACKITEM;
-    item->opstack_frame = 0;
-    item->ctx_handle = context;
-    acpi_exec_update_context(&state);
-
-	state.pc = 0;
-	state.limit = 0x7FFFFFFF;
-    int status = acpi_exec_run(data, &state);
-    if(status)
-        acpi_panic("acpi_exec_run() failed in acpi_eval_object()\n");
-	size_t final_pc = state.pc;
-
-    if(state.opstack_ptr != 1) // This would be an internal error.
-        acpi_panic("expected exactly one opstack item after object evaluation\n");
-    acpi_object_t *result = acpi_exec_get_opstack(&state, 0);
-    acpi_move_object(destination, result);
-    acpi_exec_pop_opstack(&state, 1);
-
-	acpi_finalize_state(&state);
-	return final_pc;
 }
 
 // acpi_exec_sleep(): Executes a Sleep() opcode
