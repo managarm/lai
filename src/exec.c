@@ -777,10 +777,8 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
             break;
         }
         case (EXTOP_PREFIX << 8) | PROCESSOR:
-        {
             state->pc += acpins_create_processor(ctx_handle, method + state->pc);
             break;
-        }
         case (EXTOP_PREFIX << 8) | THERMALZONE:
         {
             state->pc += 2;
@@ -805,15 +803,14 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
 
         // Leafs in the ACPI namespace.
         case METHOD_OP:
-        {
             state->pc += acpins_create_method(ctx_handle, method + state->pc);
             break;
-        }
+        case ALIAS_OP:
+            state->pc += acpins_create_alias(ctx_handle, method + state->pc);
+            break;
         case (EXTOP_PREFIX << 8) | MUTEX:
-        {
             state->pc += acpins_create_mutex(ctx_handle, method + state->pc);
             break;
-        }
         case (EXTOP_PREFIX << 8) | OPREGION:
         {
             state->pc += 2;
@@ -839,15 +836,11 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
             break;
         }
         case (EXTOP_PREFIX << 8) | FIELD:
-        {
             state->pc += acpins_create_field(ctx_handle, method + state->pc);
             break;
-        }
         case (EXTOP_PREFIX << 8) | INDEXFIELD:
-        {
             state->pc += acpins_create_indexfield(ctx_handle, method + state->pc);
             break;
-        }
 
         case ARG0_OP:
         case ARG1_OP:
