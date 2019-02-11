@@ -185,6 +185,32 @@ static void acpi_exec_reduce(int opcode, acpi_object_t *operands, acpi_object_t 
         result->type = ACPI_INTEGER;
         result->integer = acpi_compare(&operands[0], &operands[1]) > 0;
         break;
+    case INDEX_OP:
+    {
+        acpi_object_t *object = &operands[0];
+        int n = operands[1].integer;
+        if(object->type == ACPI_STRING)
+        {
+            if(n >= acpi_strlen(object->string))
+                acpi_panic("string Index() out of bounds");
+            result->type = ACPI_INTEGER;
+            result->integer = object->string[n];
+        }else if(object->type == ACPI_BUFFER)
+        {
+            if(n >= object->buffer_size)
+                acpi_panic("buffer Index() out of bounds");
+            uint8_t *window = object->buffer;
+            result->type = ACPI_INTEGER;
+            result->integer = window[n];
+        }else if(object->type == ACPI_PACKAGE)
+        {
+            if(n >= object->package_size)
+                acpi_panic("package Index() out of bounds");
+            acpi_copy_object(result, &object->package[n]);
+        }else
+            acpi_panic("Index() is only defined for buffers, strings and packages\n");
+        break;
+    }
     case SIZEOF_OP:
     {
         if(operands->type == ACPI_STRING)
@@ -915,6 +941,17 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
             break;
         }
 
+        case INDEX_OP:
+        {
+            acpi_stackitem_t *op_item = acpi_exec_push_stack_or_die(state);
+            op_item->kind = LAI_OP_STACKITEM;
+            op_item->op_opcode = method[state->pc];
+            op_item->opstack_frame = state->opstack_ptr;
+            op_item->op_num_operands = 2;
+            op_item->op_want_result = want_exec_result;
+            state->pc++;
+            break;
+        }
         case SIZEOF_OP:
         {
             acpi_stackitem_t *op_item = acpi_exec_push_stack_or_die(state);
