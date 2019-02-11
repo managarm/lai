@@ -165,6 +165,10 @@ static void acpi_exec_reduce(int opcode, acpi_object_t *operands, acpi_object_t 
         result->type = ACPI_INTEGER;
         result->integer = operands[0].integer >> operands[1].integer;
         break;
+    case LNOT_OP:
+        result->type = ACPI_INTEGER;
+        result->integer = !operands[0].integer;
+        break;
     case LAND_OP:
         result->type = ACPI_INTEGER;
         result->integer = operands[0].integer && operands[1].integer;
@@ -917,7 +921,17 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
             acpi_exec_divide(method, state);
             break;
 
-        // TODO: Add LNOT_OP
+        case LNOT_OP:
+        {
+            acpi_stackitem_t *op_item = acpi_exec_push_stack_or_die(state);
+            op_item->kind = LAI_NOWRITE_OP_STACKITEM;
+            op_item->op_opcode = method[state->pc];
+            op_item->opstack_frame = state->opstack_ptr;
+            op_item->op_num_operands = 1;
+            op_item->op_want_result = want_exec_result;
+            state->pc++;
+            break;
+        }
         case LAND_OP:
         case LOR_OP:
         case LEQUAL_OP:
