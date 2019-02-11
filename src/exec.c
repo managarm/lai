@@ -185,6 +185,24 @@ static void acpi_exec_reduce(int opcode, acpi_object_t *operands, acpi_object_t 
         result->type = ACPI_INTEGER;
         result->integer = acpi_compare(&operands[0], &operands[1]) > 0;
         break;
+    case SIZEOF_OP:
+    {
+        if(operands->type == ACPI_STRING)
+        {
+            result->type = ACPI_INTEGER;
+            result->integer = acpi_strlen(operands->string);
+        }else if(operands->type == ACPI_BUFFER)
+        {
+            result->type = ACPI_INTEGER;
+            result->integer = operands->buffer_size;
+        }else if(operands->type == ACPI_PACKAGE)
+        {
+            result->type = ACPI_INTEGER;
+            result->integer = operands->package_size;
+        }else
+            acpi_panic("SizeOf() is only defined for buffers, strings and packages\n");
+        break;
+    }
     default:
         acpi_panic("undefined opcode in acpi_exec_reduce: %02X\n", opcode);
     }
@@ -892,6 +910,18 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
             op_item->op_opcode = method[state->pc];
             op_item->opstack_frame = state->opstack_ptr;
             op_item->op_num_operands = 2;
+            op_item->op_want_result = want_exec_result;
+            state->pc++;
+            break;
+        }
+
+        case SIZEOF_OP:
+        {
+            acpi_stackitem_t *op_item = acpi_exec_push_stack_or_die(state);
+            op_item->kind = LAI_NOWRITE_OP_STACKITEM;
+            op_item->op_opcode = method[state->pc];
+            op_item->opstack_frame = state->opstack_ptr;
+            op_item->op_num_operands = 1;
             op_item->op_want_result = want_exec_result;
             state->pc++;
             break;
