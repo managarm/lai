@@ -246,6 +246,19 @@ void acpi_write_object(void *data, acpi_object_t *source, acpi_state_t *state)
         // Do not store the object.
         state->pc++;
         return;
+    }else if(opcode[state->pc] == EXTOP_PREFIX && opcode[state->pc + 1] == DEBUG_OP)
+    {
+        state->pc += 2;
+        if(source->type == ACPI_INTEGER)
+            acpi_debug("Debug(): integer(%ld)\n", source->integer);
+        else if(source->type == ACPI_STRING)
+            acpi_debug("Debug(): string(\"%s\")\n", source->string);
+        else if(source->type == ACPI_BUFFER)
+            // TODO: Print in hex and respect size.
+            acpi_debug("Debug(): buffer(\"%s\")\n", source->buffer);
+        else
+            acpi_debug("Debug(): type %d\n", source->type);
+        return;
     }else if(acpi_is_name(opcode[state->pc]))
     {
         char name[ACPI_MAX_NAME];
