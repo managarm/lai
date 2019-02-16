@@ -139,7 +139,6 @@ resolve_pin:
     if(status != 0)
         return 1;
 
-    acpi_nsnode_t *link;        // PCI link device
     acpi_resource_t *res;
     size_t res_count;
 
@@ -156,18 +155,14 @@ resolve_pin:
 
         acpi_debug("PCI device %02X:%02X:%02X is using IRQ %d\n", bus, slot, function, (int)dest->base);
         return 0;
-    } else if(prt_entry.type == ACPI_NAME)
+    } else if(prt_entry.type == ACPI_HANDLE)
     {
         // PCI Interrupt Link Device
-        link = acpi_exec_resolve(prt_entry.name);
-        if(!link)
-            return 1;
-
-        acpi_debug("PCI interrupt link is %s\n", link->path);
+        acpi_debug("PCI interrupt link is %s\n", prt_entry.handle->path);
 
         // read the resource template of the device
         res = acpi_calloc(sizeof(acpi_resource_t), ACPI_MAX_RESOURCES);
-        res_count = acpi_read_resource(link, res);
+        res_count = acpi_read_resource(prt_entry.handle, res);
 
         if(!res_count)
             return 1;

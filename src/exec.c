@@ -5,6 +5,7 @@
  */
 
 #include "lai.h"
+#include "exec_impl.h"
 #include "ns_impl.h"
 
 /* ACPI Control Method Execution */
@@ -123,112 +124,166 @@ static int acpi_compare(acpi_object_t *lhs, acpi_object_t *rhs) {
     return lhs->integer - rhs->integer;
 }
 
-static void acpi_exec_reduce(int opcode, acpi_object_t *operands, acpi_object_t *result) {
-    //acpi_debug("acpi_exec_reduce: opcode 0x%02X\n", opcode);
+static void acpi_exec_reduce(int result_mode, int opcode,
+        acpi_state_t *state, acpi_object_t *operands, acpi_object_t *reduction_res) {
+//    acpi_debug("acpi_exec_reduce: opcode 0x%02X\n", opcode);
+    acpi_object_t result = {0};
     switch(opcode) {
     case STORE_OP:
-        acpi_move_object(result, operands);
+        acpi_copy_object(&result, &operands[0]);
+        acpi_store_operand(state, &operands[1], &result);
         break;
     case NOT_OP:
-        result->type = ACPI_INTEGER;
-        result->integer = ~operands[0].integer;
+        result.type = ACPI_INTEGER;
+        result.integer = ~operands[0].integer;
+        acpi_store_operand(state, &operands[1], &result);
         break;
     case ADD_OP:
-        result->type = ACPI_INTEGER;
-        result->integer = operands[0].integer + operands[1].integer;
+        result.type = ACPI_INTEGER;
+        result.integer = operands[0].integer + operands[1].integer;
+        acpi_store_operand(state, &operands[2], &result);
         break;
     case SUBTRACT_OP:
-        result->type = ACPI_INTEGER;
-        result->integer = operands[0].integer - operands[1].integer;
+        result.type = ACPI_INTEGER;
+        result.integer = operands[0].integer - operands[1].integer;
+        acpi_store_operand(state, &operands[2], &result);
         break;
     case MULTIPLY_OP:
-        result->type = ACPI_INTEGER;
-        result->integer = operands[0].integer * operands[1].integer;
+        result.type = ACPI_INTEGER;
+        result.integer = operands[0].integer * operands[1].integer;
+        acpi_store_operand(state, &operands[2], &result);
         break;
     case AND_OP:
-        result->type = ACPI_INTEGER;
-        result->integer = operands[0].integer & operands[1].integer;
+        result.type = ACPI_INTEGER;
+        result.integer = operands[0].integer & operands[1].integer;
+        acpi_store_operand(state, &operands[2], &result);
         break;
     case OR_OP:
-        result->type = ACPI_INTEGER;
-        result->integer = operands[0].integer | operands[1].integer;
+        result.type = ACPI_INTEGER;
+        result.integer = operands[0].integer | operands[1].integer;
+        acpi_store_operand(state, &operands[2], &result);
         break;
     case XOR_OP:
-        result->type = ACPI_INTEGER;
-        result->integer = operands[0].integer ^ operands[1].integer;
+        result.type = ACPI_INTEGER;
+        result.integer = operands[0].integer ^ operands[1].integer;
+        acpi_store_operand(state, &operands[2], &result);
         break;
     case SHL_OP:
-        result->type = ACPI_INTEGER;
-        result->integer = operands[0].integer << operands[1].integer;
+        result.type = ACPI_INTEGER;
+        result.integer = operands[0].integer << operands[1].integer;
+        acpi_store_operand(state, &operands[2], &result);
         break;
     case SHR_OP:
-        result->type = ACPI_INTEGER;
-        result->integer = operands[0].integer >> operands[1].integer;
+        result.type = ACPI_INTEGER;
+        result.integer = operands[0].integer >> operands[1].integer;
+        acpi_store_operand(state, &operands[2], &result);
+        break;
+    case DIVIDE_OP:
+    {
+        acpi_object_t mod = {0};
+        acpi_object_t div = {0};
+        mod.type = ACPI_INTEGER;
+        div.type = ACPI_INTEGER;
+        mod.integer = operands[0].integer % operands[1].integer;
+        div.integer = operands[0].integer / operands[1].integer;
+        acpi_store_operand(state, &operands[2], &mod);
+        acpi_store_operand(state, &operands[3], &div);
+        break;
+    }
+    case INCREMENT_OP:
+        acpi_load_operand(state, operands, &result);
+        result.integer++;
+        acpi_store_operand(state, operands, &result);
+        break;
+    case DECREMENT_OP:
+        acpi_load_operand(state, operands, &result);
+        result.integer--;
+        acpi_store_operand(state, operands, &result);
         break;
     case LNOT_OP:
-        result->type = ACPI_INTEGER;
-        result->integer = !operands[0].integer;
+        result.type = ACPI_INTEGER;
+        result.integer = !operands[0].integer;
         break;
     case LAND_OP:
-        result->type = ACPI_INTEGER;
-        result->integer = operands[0].integer && operands[1].integer;
+        result.type = ACPI_INTEGER;
+        result.integer = operands[0].integer && operands[1].integer;
         break;
     case LOR_OP:
-        result->type = ACPI_INTEGER;
-        result->integer = operands[0].integer || operands[1].integer;
+        result.type = ACPI_INTEGER;
+        result.integer = operands[0].integer || operands[1].integer;
         break;
     case LEQUAL_OP:
-        result->type = ACPI_INTEGER;
-        result->integer = !acpi_compare(&operands[0], &operands[1]);
+        result.type = ACPI_INTEGER;
+        result.integer = !acpi_compare(&operands[0], &operands[1]);
         break;
     case LLESS_OP:
-        result->type = ACPI_INTEGER;
-        result->integer = acpi_compare(&operands[0], &operands[1]) < 0;
+        result.type = ACPI_INTEGER;
+        result.integer = acpi_compare(&operands[0], &operands[1]) < 0;
         break;
     case LGREATER_OP:
-        result->type = ACPI_INTEGER;
-        result->integer = acpi_compare(&operands[0], &operands[1]) > 0;
+        result.type = ACPI_INTEGER;
+        result.integer = acpi_compare(&operands[0], &operands[1]) > 0;
         break;
     case INDEX_OP:
     {
-        acpi_object_t *object = &operands[0];
+        acpi_object_t storage = {0};
+        acpi_alias_operand(state, &operands[0], &storage);
         int n = operands[1].integer;
-        if(object->type == ACPI_STRING)
+
+        acpi_object_t index = {0};
+        if(storage.type == ACPI_STRING_REFERENCE)
         {
-            if(n >= acpi_strlen(object->string))
+            if(n >= acpi_strlen(storage.string))
                 acpi_panic("string Index() out of bounds");
-            result->type = ACPI_INTEGER;
-            result->integer = object->string[n];
-        }else if(object->type == ACPI_BUFFER)
+            index.type = ACPI_STRING_INDEX;
+            index.string = storage.string;
+            index.integer = n;
+        }else if(storage.type == ACPI_BUFFER_REFERENCE)
         {
-            if(n >= object->buffer_size)
+            if(n >= storage.buffer_size)
                 acpi_panic("buffer Index() out of bounds");
-            uint8_t *window = object->buffer;
-            result->type = ACPI_INTEGER;
-            result->integer = window[n];
-        }else if(object->type == ACPI_PACKAGE)
+            index.type = ACPI_BUFFER_INDEX;
+            index.buffer = storage.buffer;
+            index.integer = n;
+        }else if(storage.type == ACPI_PACKAGE_REFERENCE)
         {
-            if(n >= object->package_size)
+            if(n >= storage.package_size)
                 acpi_panic("package Index() out of bounds");
-            acpi_copy_object(result, &object->package[n]);
+            index.type = ACPI_PACKAGE_INDEX;
+            index.package = storage.package;
+            index.integer = n;
         }else
             acpi_panic("Index() is only defined for buffers, strings and packages\n");
+        acpi_free_object(&storage);
+
+        acpi_store_operand(state, &operands[2], &index);
+
+        // TODO: This interaction should probably be revisited.
+        //       Passing the result_mode into this function is ugly, too.
+        if(result_mode == LAI_TARGET_MODE)
+            acpi_move_object(&result, &index);
+        else
+        {
+            LAI_ENSURE(result_mode == LAI_OBJECT_MODE);
+            acpi_load_operand(state, &result, &index);
+        }
+
         break;
     }
     case SIZEOF_OP:
     {
         if(operands->type == ACPI_STRING)
         {
-            result->type = ACPI_INTEGER;
-            result->integer = acpi_strlen(operands->string);
+            result.type = ACPI_INTEGER;
+            result.integer = acpi_strlen(operands->string);
         }else if(operands->type == ACPI_BUFFER)
         {
-            result->type = ACPI_INTEGER;
-            result->integer = operands->buffer_size;
+            result.type = ACPI_INTEGER;
+            result.integer = operands->buffer_size;
         }else if(operands->type == ACPI_PACKAGE)
         {
-            result->type = ACPI_INTEGER;
-            result->integer = operands->package_size;
+            result.type = ACPI_INTEGER;
+            result.integer = operands->package_size;
         }else
             acpi_panic("SizeOf() is only defined for buffers, strings and packages\n");
         break;
@@ -236,6 +291,7 @@ static void acpi_exec_reduce(int opcode, acpi_object_t *operands, acpi_object_t 
     default:
         acpi_panic("undefined opcode in acpi_exec_reduce: %02X\n", opcode);
     }
+    acpi_move_object(reduction_res, &result);
 }
 
 // acpi_exec_run(): Internal function, executes actual AML opcodes
@@ -255,7 +311,7 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
 
         // Whether we use the result of an expression or not.
         // If yes, it will be pushed onto the opstack after the expression is computed.
-        int want_exec_result = 0;
+        int exec_result_mode = LAI_EXEC_MODE;
 
         if(item->kind == LAI_POPULATE_CONTEXT_STACKITEM)
         {
@@ -291,47 +347,30 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
                 return 0;
             }
 
-            want_exec_result = 1;
+            exec_result_mode = LAI_OBJECT_MODE;
         }else if(item->kind == LAI_OP_STACKITEM)
         {
-            if(state->opstack_ptr == item->opstack_frame + item->op_num_operands) {
+            int k = state->opstack_ptr - item->opstack_frame;
+//            acpi_debug("got %d parameters\n", k);
+            if(!item->op_arg_modes[k]) {
                 acpi_object_t result = {0};
                 acpi_object_t *operands = acpi_exec_get_opstack(state, item->opstack_frame);
-                acpi_exec_reduce(item->op_opcode, operands, &result);
-                acpi_exec_pop_opstack(state, item->op_num_operands);
+                acpi_exec_reduce(item->op_result_mode, item->op_opcode, state, operands, &result);
+                acpi_exec_pop_opstack(state, k);
 
-                if(item->op_want_result)
-                {
-                    acpi_object_t *opstack_res = acpi_exec_push_opstack_or_die(state);
-                    acpi_copy_object(opstack_res, &result);
-                }
-                acpi_write_object(method, &result, state);
-
-                acpi_exec_pop_stack_back(state);
-                continue;
-            }
-
-            want_exec_result = 1;
-        }else if(item->kind == LAI_NOWRITE_OP_STACKITEM)
-        {
-            if(state->opstack_ptr == item->opstack_frame + item->op_num_operands) {
-                acpi_object_t result = {0};
-                acpi_object_t *operands = acpi_exec_get_opstack(state, item->opstack_frame);
-                acpi_exec_reduce(item->op_opcode, operands, &result);
-                acpi_exec_pop_opstack(state, item->op_num_operands);
-
-                if(item->op_want_result)
+                if(item->op_result_mode == LAI_OBJECT_MODE
+                        || item->op_result_mode == LAI_TARGET_MODE)
                 {
                     acpi_object_t *opstack_res = acpi_exec_push_opstack_or_die(state);
                     acpi_move_object(opstack_res, &result);
-                }
-                acpi_free_object(&result);
+                }else
+                    LAI_ENSURE(item->op_result_mode == LAI_EXEC_MODE);
 
                 acpi_exec_pop_stack_back(state);
                 continue;
             }
 
-            want_exec_result = 1;
+            exec_result_mode = item->op_arg_modes[k];
         }else if(item->kind == LAI_LOOP_STACKITEM)
         {
             if(state->pc == item->loop_pred)
@@ -397,56 +436,44 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
 
         // Process names.
         if(acpi_is_name(method[state->pc])) {
-            char name[ACPI_MAX_NAME];
-            size_t name_size = acpins_resolve_path(ctx_handle, name, method + state->pc);
-            acpi_nsnode_t *handle = acpi_exec_resolve(name);
-            if(!handle)
-                acpi_panic("undefined reference %s\n", name);
-            //acpi_debug("reference to %s\n", name);
+            acpi_object_t unresolved = {0};
+            unresolved.type = ACPI_UNRESOLVED_NAME;
+            state->pc += acpins_resolve_path(ctx_handle, unresolved.name, method + state->pc);
 
-            acpi_object_t result = {0};
-            if(handle->type == ACPI_NAMESPACE_NAME)
-            {
-                acpi_copy_object(&result, &handle->object);
-                state->pc += name_size;
-            }else if(handle->type == ACPI_NAMESPACE_METHOD)
-            {
-                char path[ACPI_MAX_NAME];
-                state->pc += acpins_resolve_path(ctx_handle, path, method + state->pc);
-
-                acpi_nsnode_t *handle = acpi_exec_resolve(path);
-                if(!handle)
-                    acpi_panic("undefined MethodInvokation %s\n", path);
-
-                acpi_state_t nested_state;
-                acpi_init_state(&nested_state);
-                int argc = handle->method_flags & METHOD_ARGC_MASK;
-                for(int i = 0; i < argc; i++)
-                    acpi_eval_operand(&nested_state.arg[i], state, method);
-
-                acpi_exec_method(handle, &nested_state);
-                acpi_move_object(&result, &nested_state.retvalue);
-                acpi_finalize_state(&nested_state);
-            }else if(handle->type == ACPI_NAMESPACE_FIELD
-                    || handle->type == ACPI_NAMESPACE_INDEXFIELD)
-            {
-                // It's an Operation Region field; perform IO in that region.
-                acpi_read_opregion(&result, handle);
-                state->pc += name_size;
-            }else if(handle->type == ACPI_NAMESPACE_DEVICE)
-            {
-                result.type = ACPI_NAME;
-                acpi_strcpy(result.name, name);
-                state->pc += name_size;
-            }else
-                acpi_panic("unexpected type %d of named object\n", handle->type);
-
-            if(want_exec_result)
+            if(exec_result_mode == LAI_DATA_MODE || exec_result_mode == LAI_TARGET_MODE)
             {
                 acpi_object_t *opstack_res = acpi_exec_push_opstack_or_die(state);
-                acpi_move_object(opstack_res, &result);
+                acpi_move_object(opstack_res, &unresolved);
+            }else
+            {
+                LAI_ENSURE(exec_result_mode == LAI_OBJECT_MODE
+                           || exec_result_mode == LAI_EXEC_MODE);
+                acpi_nsnode_t *handle = acpi_exec_resolve(unresolved.name);
+                if(!handle)
+                    acpi_panic("undefined reference %s in object mode\n", unresolved.name);
+
+                acpi_object_t result = {0};
+                if(handle->type == ACPI_NAMESPACE_METHOD)
+                {
+                    acpi_state_t nested_state;
+                    acpi_init_state(&nested_state);
+                    int argc = handle->method_flags & METHOD_ARGC_MASK;
+                    for(int i = 0; i < argc; i++)
+                        acpi_eval_operand(&nested_state.arg[i], state, method);
+
+                    acpi_exec_method(handle, &nested_state);
+                    acpi_move_object(&result, &nested_state.retvalue);
+                    acpi_finalize_state(&nested_state);
+                }else
+                    acpi_load_ns(handle, &result);
+
+                if(exec_result_mode == LAI_OBJECT_MODE)
+                {
+                    acpi_object_t *opstack_res = acpi_exec_push_opstack_or_die(state);
+                    acpi_move_object(opstack_res, &result);
+                }
             }
-            acpi_free_object(&result);
+            acpi_free_object(&unresolved);
             continue;
         }
 
@@ -468,30 +495,41 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
             state->pc++;
 
         case ZERO_OP:
-            if(want_exec_result)
+            if(exec_result_mode == LAI_DATA_MODE || exec_result_mode == LAI_OBJECT_MODE)
             {
                 acpi_object_t *result = acpi_exec_push_opstack_or_die(state);
                 result->type = ACPI_INTEGER;
                 result->integer = 0;
+            }else if(exec_result_mode == LAI_TARGET_MODE)
+            {
+                // In target mode, ZERO_OP generates a null target and not an integer!
+                acpi_object_t *result = acpi_exec_push_opstack_or_die(state);
+                result->type = ACPI_NULL_NAME;
+            }else
+            {
+                acpi_warn("Zero() in execution mode has no effect\n");
+                LAI_ENSURE(exec_result_mode == LAI_EXEC_MODE);
             }
             state->pc++;
             break;
         case ONE_OP:
-            if(want_exec_result)
+            if(exec_result_mode == LAI_DATA_MODE || exec_result_mode == LAI_OBJECT_MODE)
             {
                 acpi_object_t *result = acpi_exec_push_opstack_or_die(state);
                 result->type = ACPI_INTEGER;
                 result->integer = 1;
-            }
+            }else
+                LAI_ENSURE(exec_result_mode == LAI_EXEC_MODE);
             state->pc++;
             break;
         case ONES_OP:
-            if(want_exec_result)
+            if(exec_result_mode == LAI_DATA_MODE || exec_result_mode == LAI_OBJECT_MODE)
             {
                 acpi_object_t *result = acpi_exec_push_opstack_or_die(state);
                 result->type = ACPI_INTEGER;
                 result->integer = ~((uint64_t)0);
-            }
+            }else
+                LAI_ENSURE(exec_result_mode == LAI_EXEC_MODE);
             state->pc++;
             break;
 
@@ -504,12 +542,13 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
             size_t integer_size = acpi_eval_integer(method + state->pc, &integer);
             if(!integer_size)
                 acpi_panic("failed to parse integer opcode\n");
-            if(want_exec_result)
+            if(exec_result_mode == LAI_DATA_MODE || exec_result_mode == LAI_OBJECT_MODE)
             {
                 acpi_object_t *result = acpi_exec_push_opstack_or_die(state);
                 result->type = ACPI_INTEGER;
                 result->integer = integer;
-            }
+            }else
+                LAI_ENSURE(exec_result_mode == LAI_EXEC_MODE);
             state->pc += integer_size;
             break;
         }
@@ -523,14 +562,15 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
             if(state->pc + n == state->limit)
                 acpi_panic("unterminated string in AML code");
 
-            if(want_exec_result)
+            if(exec_result_mode == LAI_DATA_MODE || exec_result_mode == LAI_OBJECT_MODE)
             {
                 acpi_object_t *opstack_res = acpi_exec_push_opstack_or_die(state);
                 opstack_res->type = ACPI_STRING;
                 opstack_res->string = acpi_malloc(n + 1);
                 acpi_memcpy(opstack_res->string, method + state->pc, n);
                 opstack_res->string[n] = 0;
-            }
+            }else
+                LAI_ENSURE(exec_result_mode == LAI_EXEC_MODE);
             state->pc += n + 1;
             break;
         }
@@ -563,11 +603,12 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
             acpi_memcpy(result.buffer, method + state->pc, initial_size);
             state->pc += initial_size;
 
-            if(want_exec_result)
+            if(exec_result_mode == LAI_DATA_MODE || exec_result_mode == LAI_OBJECT_MODE)
             {
                 acpi_object_t *opstack_res = acpi_exec_push_opstack_or_die(state);
                 acpi_move_object(opstack_res, &result);
-            }
+            }else
+                LAI_ENSURE(exec_result_mode == LAI_EXEC_MODE);
             acpi_free_object(&result);
             break;
         }
@@ -599,11 +640,12 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
             if(state->pc != opcode_pc + encoded_size + 1) // This would be an internal error.
                 acpi_panic("package initializer out of code range");
 
-            if(want_exec_result)
+            if(exec_result_mode == LAI_DATA_MODE || exec_result_mode == LAI_OBJECT_MODE)
             {
                 acpi_object_t *opstack_res = acpi_exec_push_opstack_or_die(state);
                 acpi_move_object(opstack_res, &result);
-            }
+            }else
+                LAI_ENSURE(exec_result_mode == LAI_EXEC_MODE);
             acpi_free_object(&result);
             break;
         }
@@ -854,10 +896,16 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
         case ARG5_OP:
         case ARG6_OP:
         {
-            if(want_exec_result)
+            if(exec_result_mode == LAI_OBJECT_MODE)
             {
                 acpi_object_t *result = acpi_exec_push_opstack_or_die(state);
                 acpi_copy_object(result, &state->arg[opcode - ARG0_OP]);
+            }else
+            {
+                LAI_ENSURE(exec_result_mode == LAI_TARGET_MODE);
+                acpi_object_t *result = acpi_exec_push_opstack_or_die(state);
+                result->type = ACPI_ARG_NAME;
+                result->index = opcode - ARG0_OP;
             }
             state->pc++;
             break;
@@ -872,10 +920,16 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
         case LOCAL6_OP:
         case LOCAL7_OP:
         {
-            if(want_exec_result)
+            if(exec_result_mode == LAI_OBJECT_MODE)
             {
                 acpi_object_t *result = acpi_exec_push_opstack_or_die(state);
                 acpi_copy_object(result, &state->local[opcode - LOCAL0_OP]);
+            }else
+            {
+                LAI_ENSURE(exec_result_mode == LAI_TARGET_MODE);
+                acpi_object_t *result = acpi_exec_push_opstack_or_die(state);
+                result->type = ACPI_LOCAL_NAME;
+                result->index = opcode - LOCAL0_OP;
             }
             state->pc++;
             break;
@@ -888,8 +942,10 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
             op_item->kind = LAI_OP_STACKITEM;
             op_item->op_opcode = method[state->pc];
             op_item->opstack_frame = state->opstack_ptr;
-            op_item->op_num_operands = 1;
-            op_item->op_want_result = want_exec_result;
+            op_item->op_arg_modes[0] = LAI_OBJECT_MODE;
+            op_item->op_arg_modes[1] = LAI_TARGET_MODE;
+            op_item->op_arg_modes[2] = 0;
+            op_item->op_result_mode = exec_result_mode;
             state->pc++;
             break;
         }
@@ -906,29 +962,53 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
             op_item->kind = LAI_OP_STACKITEM;
             op_item->op_opcode = method[state->pc];
             op_item->opstack_frame = state->opstack_ptr;
-            op_item->op_num_operands = 2;
-            op_item->op_want_result = want_exec_result;
+            op_item->op_arg_modes[0] = LAI_OBJECT_MODE;
+            op_item->op_arg_modes[1] = LAI_OBJECT_MODE;
+            op_item->op_arg_modes[2] = LAI_TARGET_MODE;
+            op_item->op_arg_modes[3] = 0;
+            op_item->op_result_mode = exec_result_mode;
             state->pc++;
             break;
         }
-        case INCREMENT_OP:
-            acpi_exec_increment(method, state);
-            break;
-        case DECREMENT_OP:
-            acpi_exec_decrement(method, state);
-            break;
         case DIVIDE_OP:
-            acpi_exec_divide(method, state);
+        {
+            acpi_stackitem_t *op_item = acpi_exec_push_stack_or_die(state);
+            op_item->kind = LAI_OP_STACKITEM;
+            op_item->op_opcode = method[state->pc];
+            op_item->opstack_frame = state->opstack_ptr;
+            op_item->op_arg_modes[0] = LAI_OBJECT_MODE;
+            op_item->op_arg_modes[1] = LAI_OBJECT_MODE;
+            op_item->op_arg_modes[2] = LAI_TARGET_MODE;
+            op_item->op_arg_modes[3] = LAI_TARGET_MODE;
+            op_item->op_arg_modes[4] = 0;
+            op_item->op_result_mode = exec_result_mode;
+            state->pc++;
             break;
+        }
+
+        case INCREMENT_OP:
+        case DECREMENT_OP:
+        {
+            acpi_stackitem_t *op_item = acpi_exec_push_stack_or_die(state);
+            op_item->kind = LAI_OP_STACKITEM;
+            op_item->op_opcode = method[state->pc];
+            op_item->opstack_frame = state->opstack_ptr;
+            op_item->op_arg_modes[0] = LAI_TARGET_MODE;
+            op_item->op_arg_modes[1] = 0;
+            op_item->op_result_mode = exec_result_mode;
+            state->pc++;
+            break;
+        }
 
         case LNOT_OP:
         {
             acpi_stackitem_t *op_item = acpi_exec_push_stack_or_die(state);
-            op_item->kind = LAI_NOWRITE_OP_STACKITEM;
+            op_item->kind = LAI_OP_STACKITEM;
             op_item->op_opcode = method[state->pc];
             op_item->opstack_frame = state->opstack_ptr;
-            op_item->op_num_operands = 1;
-            op_item->op_want_result = want_exec_result;
+            op_item->op_arg_modes[0] = LAI_OBJECT_MODE;
+            op_item->op_arg_modes[1] = 0;
+            op_item->op_result_mode = exec_result_mode;
             state->pc++;
             break;
         }
@@ -939,11 +1019,13 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
         case LGREATER_OP:
         {
             acpi_stackitem_t *op_item = acpi_exec_push_stack_or_die(state);
-            op_item->kind = LAI_NOWRITE_OP_STACKITEM;
+            op_item->kind = LAI_OP_STACKITEM;
             op_item->op_opcode = method[state->pc];
             op_item->opstack_frame = state->opstack_ptr;
-            op_item->op_num_operands = 2;
-            op_item->op_want_result = want_exec_result;
+            op_item->op_arg_modes[0] = LAI_OBJECT_MODE;
+            op_item->op_arg_modes[1] = LAI_OBJECT_MODE;
+            op_item->op_arg_modes[2] = 0;
+            op_item->op_result_mode = exec_result_mode;
             state->pc++;
             break;
         }
@@ -954,19 +1036,23 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
             op_item->kind = LAI_OP_STACKITEM;
             op_item->op_opcode = method[state->pc];
             op_item->opstack_frame = state->opstack_ptr;
-            op_item->op_num_operands = 2;
-            op_item->op_want_result = want_exec_result;
+            op_item->op_arg_modes[0] = LAI_TARGET_MODE;
+            op_item->op_arg_modes[1] = LAI_OBJECT_MODE;
+            op_item->op_arg_modes[2] = LAI_TARGET_MODE;
+            op_item->op_arg_modes[3] = 0;
+            op_item->op_result_mode = exec_result_mode;
             state->pc++;
             break;
         }
         case SIZEOF_OP:
         {
             acpi_stackitem_t *op_item = acpi_exec_push_stack_or_die(state);
-            op_item->kind = LAI_NOWRITE_OP_STACKITEM;
+            op_item->kind = LAI_OP_STACKITEM;
             op_item->op_opcode = method[state->pc];
             op_item->opstack_frame = state->opstack_ptr;
-            op_item->op_num_operands = 1;
-            op_item->op_want_result = want_exec_result;
+            op_item->op_arg_modes[0] = LAI_OBJECT_MODE;
+            op_item->op_arg_modes[1] = 0;
+            op_item->op_result_mode = exec_result_mode;
             state->pc++;
             break;
         }

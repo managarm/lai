@@ -169,86 +169,147 @@ void acpi_copy_object(acpi_object_t *destination, acpi_object_t *source)
     acpi_free_object(&temp);
 }
 
-// acpi_take_reference(): Returns a pointer to an encoded acpi_object_t
-// Param:    void *data - destination to be parsed
-// Param:    acpi_state_t *state - state of the AML VM
-// Param:    acpi_object_t **out - output pointer
-// Return:    size_t - size in bytes for skipping
+// acpi_alias_copy(): Creates a reference to the storage of an object.
 
-static void acpi_take_reference(void *data, acpi_state_t *state, acpi_object_t **out)
+void acpi_alias_object(acpi_object_t *alias, acpi_object_t *object)
 {
-    uint8_t *code = (uint8_t*)data;
-
-    if(code[state->pc] >= LOCAL0_OP && code[state->pc] <= LOCAL7_OP)
+    if(object->type == ACPI_STRING)
     {
-        int index = code[state->pc] - LOCAL0_OP;
-        state->pc++;
-        *out = &state->local[index];
-    } else if(code[state->pc] >= ARG0_OP && code[state->pc] <= ARG6_OP)
+        alias->type = ACPI_STRING_REFERENCE;
+        alias->string = object->string;
+    }else if(object->type == ACPI_BUFFER)
     {
-        int index = code[state->pc] - ARG0_OP;
-        state->pc++;
-        *out = &state->arg[index];
-    } else if(acpi_is_name(code[state->pc]))
+        alias->type = ACPI_BUFFER_REFERENCE;
+        alias->buffer_size = object->buffer_size;
+        alias->buffer = object->buffer;
+    }else if(object->type == ACPI_PACKAGE)
     {
-        char name[ACPI_MAX_NAME];
-        // TODO: It's ugly to rely on acpi_state_t internals here. Clean this up.
-        acpi_stackitem_t *ctx_item = &state->stack[state->context_ptr];
-        acpi_nsnode_t *ctx_handle = ctx_item->ctx_handle;
-        state->pc += acpins_resolve_path(ctx_handle, name, code + state->pc);
-
-        acpi_nsnode_t *handle = acpi_exec_resolve(name);
-        if(!handle)
-            acpi_panic("undefined reference %s\n", name);
-
-        if(handle->type == ACPI_NAMESPACE_NAME)
-            *out = &handle->object;
-        else
-            acpi_panic("NameSpec destination is not a writeable object.\n");
-    } else if(code[state->pc] == INDEX_OP)
-    {
-        state->pc++;
-
-        // the first object should be a package
-        acpi_object_t *object;
-        acpi_take_reference(code, state, &object);
-
-        acpi_object_t index = {0};
-        acpi_eval_operand(&index, state, code);
-
-        if(object->type == ACPI_PACKAGE)
-        {
-            if(index.integer >= object->package_size)
-                acpi_panic("attempt to write to index %d of package of length %d\n",
-                        index.integer, object->package_size);
-
-            *out = &object->package[index.integer];
-        } else
-            acpi_panic("cannot write Index() to non-package object: %d\n", object->type);
-    } else
-        acpi_panic("undefined opcode in acpi_take_reference(), sequence %02X %02X %02X %02X\n",
-                code[state->pc + 0], code[state->pc + 1],
-                code[state->pc + 2], code[state->pc + 3]);
+        alias->type = ACPI_PACKAGE_REFERENCE;
+        alias->package_size = object->package_size;
+        alias->package = object->package;
+    }else
+        acpi_panic("object type %d is not valid for acpi_alias_object()\n", object->type);
 }
 
-// acpi_write_object(): Writes to an object. Moves out of (i.e. destroys) the source object.
-// Param:    void *data - destination to be parsed
-// Param:    acpi_object_t *source - source object
-// Param:    acpi_state_t *state - state of the AML VM
-
-void acpi_write_object(void *data, acpi_object_t *source, acpi_state_t *state)
+void acpi_load_ns(acpi_nsnode_t *source, acpi_object_t *object)
 {
-    uint8_t *opcode = data;
+    if(source->type == ACPI_NAMESPACE_NAME)
+        acpi_copy_object(object, &source->object);
+    else if(source->type == ACPI_NAMESPACE_FIELD || source->type == ACPI_NAMESPACE_INDEXFIELD)
+        // It's an Operation Region field; perform IO in that region.
+        acpi_read_opregion(object, source);
+    else if(source->type == ACPI_NAMESPACE_DEVICE)
+    {
+        object->type = ACPI_HANDLE;
+        object->handle = source;
+    }else
+        acpi_panic("unexpected type %d of named object in acpi_load_ns()\n", source->type);
+}
 
-    // First, handle stores that do not target acpi_object_t objects.
-    if(opcode[state->pc] == ZERO_OP)
+void acpi_store_ns(acpi_nsnode_t *target, acpi_object_t *object)
+{
+    if(target->type == ACPI_NAMESPACE_NAME)
+        acpi_copy_object(&target->object, object);
+    else if(target->type == ACPI_NAMESPACE_FIELD || target->type == ACPI_NAMESPACE_INDEXFIELD)
     {
-        // Do not store the object.
-        state->pc++;
-        return;
-    }else if(opcode[state->pc] == EXTOP_PREFIX && opcode[state->pc + 1] == DEBUG_OP)
+        acpi_write_opregion(target, object);
+    }else if(target->type == ACPI_NAMESPACE_BUFFER_FIELD)
     {
-        state->pc += 2;
+        acpi_write_buffer(target, object);
+    }else
+        acpi_panic("unexpected type %d of named object in acpi_store_ns()\n", target->type);
+}
+
+void acpi_alias_operand(acpi_state_t *state, acpi_object_t *object, acpi_object_t *ref) {
+    switch(object->type)
+    {
+    case ACPI_ARG_NAME:
+        acpi_alias_object(ref, &state->arg[object->index]);
+        break;
+    case ACPI_LOCAL_NAME:
+        acpi_alias_object(ref, &state->local[object->index]);
+        break;
+    default:
+        acpi_panic("object type %d is not valid for acpi_alias_operand()\n", object->type);
+    }
+}
+
+// acpi_load_operand(): Load an object from a reference.
+
+void acpi_load_operand(acpi_state_t *state, acpi_object_t *source, acpi_object_t *object)
+{
+    switch(source->type)
+    {
+    case ACPI_STRING_INDEX:
+        object->type = ACPI_INTEGER;
+        object->integer = source->string[source->integer];
+        break;
+    case ACPI_BUFFER_INDEX:
+    {
+        uint8_t *window = source->buffer;
+        object->type = ACPI_INTEGER;
+        object->integer = window[source->integer];
+        break;
+    }
+    case ACPI_PACKAGE_INDEX:
+        acpi_copy_object(object, &source->package[source->integer]);
+        break;
+    case ACPI_UNRESOLVED_NAME:
+    {
+        acpi_nsnode_t *handle = acpi_exec_resolve(source->name);
+        if(!handle)
+            acpi_panic("undefined reference %s\n", source->name);
+        acpi_load_ns(handle, object);
+        break;
+    }
+    case ACPI_ARG_NAME:
+        acpi_copy_object(object, &state->arg[source->index]);
+        break;
+    case ACPI_LOCAL_NAME:
+        acpi_copy_object(object, &state->local[source->index]);
+        break;
+    default:
+        acpi_panic("object type %d is not valid for acpi_load_operand()\n", source->type);
+    }
+}
+
+// acpi_store_operand(): Stores a copy of the object to a reference.
+
+void acpi_store_operand(acpi_state_t *state, acpi_object_t *target, acpi_object_t *object)
+{
+    switch(target->type)
+    {
+    case ACPI_NULL_NAME:
+        // Stores to the null target are ignored.
+        break;
+    case ACPI_STRING_INDEX:
+        target->string[target->integer] = object->integer;
+        break;
+    case ACPI_BUFFER_INDEX:
+    {
+        uint8_t *window = target->buffer;
+        window[target->integer] = object->integer;
+        break;
+    }
+    case ACPI_PACKAGE_INDEX:
+        acpi_copy_object(&target->package[target->integer], object);
+        break;
+    case ACPI_UNRESOLVED_NAME:
+    {
+        acpi_nsnode_t *handle = acpi_exec_resolve(target->name);
+        if(!handle)
+            acpi_panic("undefined reference %s\n", target->name);
+        acpi_store_ns(handle, object);
+        break;
+    }
+    case ACPI_ARG_NAME:
+        acpi_copy_object(&state->arg[target->index], object);
+        break;
+    case ACPI_LOCAL_NAME:
+        acpi_copy_object(&state->local[target->index], object);
+        break;
+/*
+    // TODO: Re-implement the Debug object.
         if(source->type == ACPI_INTEGER)
             acpi_debug("Debug(): integer(%ld)\n", source->integer);
         else if(source->type == ACPI_STRING)
@@ -258,36 +319,10 @@ void acpi_write_object(void *data, acpi_object_t *source, acpi_state_t *state)
             acpi_debug("Debug(): buffer(\"%s\")\n", source->buffer);
         else
             acpi_debug("Debug(): type %d\n", source->type);
-        return;
-    }else if(acpi_is_name(opcode[state->pc]))
-    {
-        char name[ACPI_MAX_NAME];
-        // TODO: It's ugly to rely on acpi_state_t internals here. Clean this up.
-        acpi_stackitem_t *ctx_item = &state->stack[state->context_ptr];
-        acpi_nsnode_t *ctx_handle = ctx_item->ctx_handle;
-        size_t name_size = acpins_resolve_path(ctx_handle, name, opcode + state->pc);
-
-        acpi_nsnode_t *handle = acpi_exec_resolve(name);
-        if(!handle)
-            acpi_panic("undefined reference %s\n", name);
-
-        if(handle->type == ACPI_NAMESPACE_FIELD || handle->type == ACPI_NAMESPACE_INDEXFIELD)
-        {
-            state->pc += name_size;
-            acpi_write_opregion(handle, source);
-            return;
-        }else if(handle->type == ACPI_NAMESPACE_BUFFER_FIELD)
-        {
-            state->pc += name_size;
-            acpi_write_buffer(handle, source);
-            return;
-        }
+*/
+    default:
+        acpi_panic("object type %d is not valid for acpi_store_operand()\n", target->type);
     }
-
-    // Now, handle stores to acpi_object_t objects.
-    acpi_object_t *dest;
-    acpi_take_reference(opcode, state, &dest);
-    acpi_move_object(dest, source);
 }
 
 // acpi_write_buffer(): Writes to a Buffer Field
@@ -338,66 +373,4 @@ void acpi_write_buffer(acpi_nsnode_t *handle, acpi_object_t *source)
         qword[0] |= value;
     }
 }
-
-// acpi_exec_increment(): Executes Increment() instruction
-// Param:    void *code - pointer to opcode
-// Param:    acpi_state_t *state - ACPI AML state
-// Return:    size_t - size in bytes for skipping
-
-void acpi_exec_increment(void *code, acpi_state_t *state)
-{
-    state->pc++;
-
-    acpi_object_t n = {0};
-    size_t offset = state->pc;
-    acpi_eval_operand(&n, state, code);
-    n.integer++;
-    state->pc = offset; // Reset the PC.
-    acpi_write_object(code, &n, state);
-}
-
-// acpi_exec_decrement(): Executes Decrement() instruction
-// Param:    void *code - pointer to opcode
-// Param:    acpi_state_t *state - ACPI AML state
-// Return:    size_t - size in bytes for skipping
-
-void acpi_exec_decrement(void *code, acpi_state_t *state)
-{
-    state->pc++;
-
-    acpi_object_t n = {0};
-    size_t offset = state->pc;
-    acpi_eval_operand(&n, state, code);
-    n.integer--;
-    state->pc = offset; // Reset the PC.
-    acpi_write_object(code + offset, &n, state);
-}
-
-// acpi_exec_divide(): Executes a Divide() opcode
-// Param:    void *code - pointer to opcode
-// Param:    acpi_state_t *state - ACPI AML state
-// Return:    size_t - size in bytes for skipping
-
-void acpi_exec_divide(void *code, acpi_state_t *state)
-{
-    state->pc++;
-
-    acpi_object_t n1 = {0};
-    acpi_object_t n2 = {0};
-    acpi_object_t mod = {0};
-    acpi_object_t quo = {0};
-
-    acpi_eval_operand(&n1, state, code);
-    acpi_eval_operand(&n2, state, code);
-
-    mod.type = ACPI_INTEGER;
-    quo.type = ACPI_INTEGER;
-    mod.integer = n1.integer % n2.integer;
-    quo.integer = n1.integer / n2.integer;
-
-    acpi_write_object(code, &mod, state);
-    acpi_write_object(code, &quo, state);
-}
-
-
 

@@ -9,6 +9,16 @@
 #include <lai_system.h>
 #include "aml_opcodes.h"
 
+#define LAI_STRINGIFY(x) #x
+#define LAI_EXPAND_STRINGIFY(x) LAI_STRINGIFY(x)
+
+#define LAI_ENSURE(cond) \
+    do { \
+        if(!(cond)) \
+            acpi_panic("assertion failed: " #cond " at " \
+                       __FILE__ ":" LAI_EXPAND_STRINGIFY(__LINE__) "\n"); \
+    } while(0)
+
 #define ACPI_MAX_NAME            64
 #define ACPI_MAX_RESOURCES        512
 
@@ -30,11 +40,32 @@
 #define ACPI_NAMESPACE_BUFFER_FIELD    10
 #define ACPI_NAMESPACE_THERMALZONE    11
 
+// ----------------------------------------------------------------------------
+// Data types defined by AML.
+// ----------------------------------------------------------------------------
+// Value types: integer, string, buffer, package.
 #define ACPI_INTEGER            1
-#define ACPI_STRING            2
-#define ACPI_PACKAGE            3
-#define ACPI_BUFFER            4
-#define ACPI_NAME            5
+#define ACPI_STRING             2
+#define ACPI_BUFFER             3
+#define ACPI_PACKAGE            4
+// Handle type: this is used to represent device (and other) namespace nodes.
+#define ACPI_HANDLE             5
+// Reference types: obtained from RefOp() or Index().
+#define ACPI_STRING_INDEX       6
+#define ACPI_BUFFER_INDEX       7
+#define ACPI_PACKAGE_INDEX      8
+// ----------------------------------------------------------------------------
+// Internal data types of the interpreter.
+// ----------------------------------------------------------------------------
+// Name types: unresolved names and names of certain objects.
+#define ACPI_NULL_NAME          9
+#define ACPI_UNRESOLVED_NAME   10
+#define ACPI_ARG_NAME          11
+#define ACPI_LOCAL_NAME        12
+// Reference types: references to object storage.
+#define ACPI_STRING_REFERENCE  13
+#define ACPI_BUFFER_REFERENCE  14
+#define ACPI_PACKAGE_REFERENCE 15
 
 // Device _STA object
 #define ACPI_STA_PRESENT        0x01
@@ -196,6 +227,9 @@ typedef struct acpi_object_t
     void *buffer;            // for Buffer(), actual bytes
 
     char name[ACPI_MAX_NAME];    // for Name References
+    struct acpi_nsnode_t *handle;
+
+    int index;
 } acpi_object_t;
 
 typedef struct acpi_nsnode_t
@@ -249,7 +283,6 @@ typedef struct acpi_condition_t
 #define LAI_LOOP_STACKITEM 3
 #define LAI_COND_STACKITEM 4
 #define LAI_OP_STACKITEM 5
-#define LAI_NOWRITE_OP_STACKITEM 6
 // This implements acpi_eval_operand(). // TODO: Eventually remove
 // acpi_eval_operand() by moving all parsing functionality into acpi_exec_run().
 #define LAI_EVALOPERAND_STACKITEM 10
@@ -272,8 +305,8 @@ typedef struct acpi_stackitem_ {
         };
         struct {
             int op_opcode;
-            int op_num_operands;
-            int op_want_result;
+            uint8_t op_arg_modes[8];
+            uint8_t op_result_mode;
         };
     };
 } acpi_stackitem_t;
@@ -388,21 +421,16 @@ int acpi_eval(acpi_object_t *, char *);
 void acpi_free_object(acpi_object_t *);
 void acpi_move_object(acpi_object_t *, acpi_object_t *);
 void acpi_copy_object(acpi_object_t *, acpi_object_t *);
-void acpi_write_object(void *, acpi_object_t *, acpi_state_t *);
 acpi_nsnode_t *acpi_exec_resolve(char *);
 int acpi_populate(acpi_nsnode_t *, void *, size_t, acpi_state_t *);
 int acpi_exec_method(acpi_nsnode_t *, acpi_state_t *);
 void acpi_read_opregion(acpi_object_t *, acpi_nsnode_t *);
 void acpi_write_opregion(acpi_nsnode_t *, acpi_object_t *);
 void acpi_exec_name(void *, acpi_nsnode_t *, acpi_state_t *);
-void acpi_exec_increment(void *, acpi_state_t *);
-void acpi_exec_decrement(void *, acpi_state_t *);
 void acpi_exec_sleep(void *, acpi_state_t *);
 uint16_t acpi_bswap16(uint16_t);
 uint32_t acpi_bswap32(uint32_t);
 uint8_t acpi_char_to_hex(char);
-size_t acpi_exec_multiply(void *, acpi_state_t *);
-void acpi_exec_divide(void *, acpi_state_t *);
 void acpi_write_buffer(acpi_nsnode_t *, acpi_object_t *);
 void acpi_exec_bytefield(void *, acpi_nsnode_t *, acpi_state_t *);
 void acpi_exec_wordfield(void *, acpi_nsnode_t *, acpi_state_t *);
