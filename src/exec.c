@@ -369,6 +369,27 @@ static void acpi_exec_reduce(int opcode, acpi_state_t *state, acpi_object_t *ope
         acpi_store_operand(state, &operands[2], &result);
         break;
     }
+    case DEREF_OP:
+    {
+        acpi_object_t ref = {0};
+        acpi_load_operand(state, &operands[0], &ref);
+
+        if(ref.type == ACPI_STRING_INDEX)
+        {
+            result.type = ACPI_INTEGER;
+            result.integer = ref.string[ref.integer];
+        }else if(ref.type == ACPI_BUFFER)
+        {
+            uint8_t *window = ref.buffer;
+            result.type = ACPI_INTEGER;
+            result.integer = window[ref.integer];
+        }else if(ref.type == ACPI_PACKAGE)
+        {
+            acpi_copy_object(&result, &ref.package[ref.integer]);
+        }else
+            acpi_panic("DeRefOf() is only defined for references\n");
+        break;
+    }
     case SIZEOF_OP:
     {
         acpi_object_t object = {0};
@@ -390,9 +411,44 @@ static void acpi_exec_reduce(int opcode, acpi_state_t *state, acpi_object_t *ope
             acpi_panic("SizeOf() is only defined for buffers, strings and packages\n");
         break;
     }
+    case (EXTOP_PREFIX << 8) | CONDREF_OP:
+    {
+        acpi_object_t *operand = &operands[0];
+        acpi_object_t *target = &operands[1];
+
+        // TODO: The resolution code should be shared with REF_OP.
+        acpi_object_t ref = {0};
+        switch(operand->type)
+        {
+        case ACPI_UNRESOLVED_NAME:
+        {
+            acpi_nsnode_t *handle = acpi_exec_resolve(operand->name);
+            if(handle) {
+                ref.type = ACPI_HANDLE;
+                ref.handle = handle;
+            }
+            break;
+        }
+        default:
+            acpi_panic("CondRefOp() is only defined for names\n");
+        }
+
+        if(ref.type)
+        {
+            result.type = ACPI_INTEGER;
+            result.type = 1;
+            acpi_store_operand(state, target, &ref);
+        }else
+        {
+            result.type = ACPI_INTEGER;
+            result.type = 0;
+        }
+        break;
+    }
     default:
         acpi_panic("undefined opcode in acpi_exec_reduce: %02X\n", opcode);
     }
+
     acpi_move_object(reduction_res, &result);
 }
 
@@ -1058,7 +1114,7 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
         {
             acpi_stackitem_t *op_item = acpi_exec_push_stack_or_die(state);
             op_item->kind = LAI_OP_STACKITEM;
-            op_item->op_opcode = method[state->pc];
+            op_item->op_opcode = opcode;
             op_item->opstack_frame = state->opstack_ptr;
             op_item->op_arg_modes[0] = LAI_OBJECT_MODE;
             op_item->op_arg_modes[1] = LAI_TARGET_MODE;
@@ -1078,7 +1134,7 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
         {
             acpi_stackitem_t *op_item = acpi_exec_push_stack_or_die(state);
             op_item->kind = LAI_OP_STACKITEM;
-            op_item->op_opcode = method[state->pc];
+            op_item->op_opcode = opcode;
             op_item->opstack_frame = state->opstack_ptr;
             op_item->op_arg_modes[0] = LAI_OBJECT_MODE;
             op_item->op_arg_modes[1] = LAI_OBJECT_MODE;
@@ -1092,7 +1148,7 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
         {
             acpi_stackitem_t *op_item = acpi_exec_push_stack_or_die(state);
             op_item->kind = LAI_OP_STACKITEM;
-            op_item->op_opcode = method[state->pc];
+            op_item->op_opcode = opcode;
             op_item->opstack_frame = state->opstack_ptr;
             op_item->op_arg_modes[0] = LAI_OBJECT_MODE;
             op_item->op_arg_modes[1] = LAI_OBJECT_MODE;
@@ -1109,7 +1165,7 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
         {
             acpi_stackitem_t *op_item = acpi_exec_push_stack_or_die(state);
             op_item->kind = LAI_OP_STACKITEM;
-            op_item->op_opcode = method[state->pc];
+            op_item->op_opcode = opcode;
             op_item->opstack_frame = state->opstack_ptr;
             op_item->op_arg_modes[0] = LAI_TARGET_MODE;
             op_item->op_arg_modes[1] = 0;
@@ -1122,7 +1178,7 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
         {
             acpi_stackitem_t *op_item = acpi_exec_push_stack_or_die(state);
             op_item->kind = LAI_OP_STACKITEM;
-            op_item->op_opcode = method[state->pc];
+            op_item->op_opcode = opcode;
             op_item->opstack_frame = state->opstack_ptr;
             op_item->op_arg_modes[0] = LAI_OBJECT_MODE;
             op_item->op_arg_modes[1] = 0;
@@ -1138,7 +1194,7 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
         {
             acpi_stackitem_t *op_item = acpi_exec_push_stack_or_die(state);
             op_item->kind = LAI_OP_STACKITEM;
-            op_item->op_opcode = method[state->pc];
+            op_item->op_opcode = opcode;
             op_item->opstack_frame = state->opstack_ptr;
             op_item->op_arg_modes[0] = LAI_OBJECT_MODE;
             op_item->op_arg_modes[1] = LAI_OBJECT_MODE;
@@ -1152,7 +1208,7 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
         {
             acpi_stackitem_t *op_item = acpi_exec_push_stack_or_die(state);
             op_item->kind = LAI_OP_STACKITEM;
-            op_item->op_opcode = method[state->pc];
+            op_item->op_opcode = opcode;
             op_item->opstack_frame = state->opstack_ptr;
             op_item->op_arg_modes[0] = LAI_TARGET_MODE;
             op_item->op_arg_modes[1] = LAI_OBJECT_MODE;
@@ -1162,16 +1218,31 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
             state->pc++;
             break;
         }
+        case DEREF_OP:
         case SIZEOF_OP:
         {
             acpi_stackitem_t *op_item = acpi_exec_push_stack_or_die(state);
             op_item->kind = LAI_OP_STACKITEM;
-            op_item->op_opcode = method[state->pc];
+            op_item->op_opcode = opcode;
             op_item->opstack_frame = state->opstack_ptr;
             op_item->op_arg_modes[0] = LAI_OBJECT_MODE;
             op_item->op_arg_modes[1] = 0;
             op_item->op_result_mode = exec_result_mode;
             state->pc++;
+            break;
+        }
+        case (EXTOP_PREFIX << 8) | CONDREF_OP:
+        {
+            acpi_stackitem_t *op_item = acpi_exec_push_stack_or_die(state);
+            op_item->kind = LAI_OP_STACKITEM;
+            op_item->op_opcode = opcode;
+            op_item->opstack_frame = state->opstack_ptr;
+            // TODO: There should be a NAME_MODE that allows only names to be parsed.
+            op_item->op_arg_modes[0] = LAI_DATA_MODE;
+            op_item->op_arg_modes[1] = LAI_TARGET_MODE;
+            op_item->op_arg_modes[2] = 0;
+            op_item->op_result_mode = exec_result_mode;
+            state->pc += 2;
             break;
         }
 
