@@ -351,6 +351,39 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
             }
 
             exec_result_mode = LAI_OBJECT_MODE;
+        }else if(item->kind == LAI_PKG_INITIALIZER_STACKITEM)
+        {
+            acpi_object_t *frame = acpi_exec_get_opstack(state, item->opstack_frame);
+            acpi_object_t *package = &frame[0];
+            acpi_object_t *initializer = &frame[1];
+            if(state->opstack_ptr == item->opstack_frame + 2)
+            {
+                if(item->pkg_index == package->package_size)
+                    acpi_panic("package initializer overflows its size");
+                LAI_ENSURE(item->pkg_index < package->package_size);
+
+                acpi_move_object(&package->package[item->pkg_index], initializer);
+                item->pkg_index++;
+                acpi_exec_pop_opstack(state, 1);
+            }
+            LAI_ENSURE(state->opstack_ptr == item->opstack_frame + 1);
+
+            if(state->pc == item->pkg_end)
+            {
+                if(item->pkg_result_mode == LAI_EXEC_MODE)
+                    acpi_exec_pop_opstack(state, 1);
+                else
+                    LAI_ENSURE(item->pkg_result_mode == LAI_DATA_MODE
+                               || item->pkg_result_mode == LAI_OBJECT_MODE);
+
+                acpi_exec_pop_stack_back(state);
+                continue;
+            }
+
+            if(state->pc > item->pkg_end) // This would be an interpreter bug.
+                acpi_panic("package initializer escaped out of code range\n");
+
+            exec_result_mode = LAI_DATA_MODE;
         }else if(item->kind == LAI_OP_STACKITEM)
         {
             int k = state->opstack_ptr - item->opstack_frame;
@@ -630,28 +663,17 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
             int num_ents = method[state->pc];
             state->pc++;
 
-            acpi_object_t result = {0};
-            result.type = ACPI_PACKAGE;
-            result.package = acpi_calloc(sizeof(acpi_object_t), ACPI_MAX_PACKAGE_ENTRIES);
-            result.package_size = num_ents;
+            acpi_stackitem_t *pkg_item = acpi_exec_push_stack_or_die(state);
+            pkg_item->kind = LAI_PKG_INITIALIZER_STACKITEM;
+            pkg_item->opstack_frame = state->opstack_ptr;
+            pkg_item->pkg_index = 0;
+            pkg_item->pkg_end = opcode_pc + encoded_size + 1;
+            pkg_item->pkg_result_mode = exec_result_mode;
 
-            int i = 0;
-            while(state->pc < opcode_pc + encoded_size + 1) {
-                if(i == num_ents)
-                    acpi_panic("package initializer overflows its size");
-                acpi_eval_operand(&result.package[i], state, method);
-                i++;
-            }
-            if(state->pc != opcode_pc + encoded_size + 1) // This would be an internal error.
-                acpi_panic("package initializer out of code range");
-
-            if(exec_result_mode == LAI_DATA_MODE || exec_result_mode == LAI_OBJECT_MODE)
-            {
-                acpi_object_t *opstack_res = acpi_exec_push_opstack_or_die(state);
-                acpi_move_object(opstack_res, &result);
-            }else
-                LAI_ENSURE(exec_result_mode == LAI_EXEC_MODE);
-            acpi_free_object(&result);
+            acpi_object_t *opstack_pkg = acpi_exec_push_opstack_or_die(state);
+            opstack_pkg->type = ACPI_PACKAGE;
+            opstack_pkg->package = acpi_calloc(sizeof(acpi_object_t), ACPI_MAX_PACKAGE_ENTRIES);
+            opstack_pkg->package_size = num_ents;
             break;
         }
 

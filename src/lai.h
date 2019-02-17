@@ -282,7 +282,8 @@ typedef struct acpi_condition_t
 #define LAI_METHOD_CONTEXT_STACKITEM 2
 #define LAI_LOOP_STACKITEM 3
 #define LAI_COND_STACKITEM 4
-#define LAI_OP_STACKITEM 5
+#define LAI_PKG_INITIALIZER_STACKITEM 5
+#define LAI_OP_STACKITEM 6
 // This implements acpi_eval_operand(). // TODO: Eventually remove
 // acpi_eval_operand() by moving all parsing functionality into acpi_exec_run().
 #define LAI_EVALOPERAND_STACKITEM 10
@@ -302,6 +303,11 @@ typedef struct acpi_stackitem_ {
         struct {
             int cond_taken; // Whether the conditional was true or not.
             int cond_end; // End of conditional PC.
+        };
+        struct {
+            int pkg_index;
+            int pkg_end;
+            uint8_t pkg_result_mode;
         };
         struct {
             int op_opcode;
