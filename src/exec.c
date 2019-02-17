@@ -8,6 +8,8 @@
 #include "exec_impl.h"
 #include "ns_impl.h"
 
+static int debug_opcodes = 1;
+
 /* ACPI Control Method Execution */
 /* Type1Opcode := DefBreak | DefBreakPoint | DefContinue | DefFatal | DefIfElse |
    DefLoad | DefNoop | DefNotify | DefRelease | DefReset | DefReturn |
@@ -126,7 +128,8 @@ static int acpi_compare(acpi_object_t *lhs, acpi_object_t *rhs) {
 
 static void acpi_exec_reduce(int result_mode, int opcode,
         acpi_state_t *state, acpi_object_t *operands, acpi_object_t *reduction_res) {
-//    acpi_debug("acpi_exec_reduce: opcode 0x%02X\n", opcode);
+    if(debug_opcodes)
+        acpi_debug("acpi_exec_reduce: opcode 0x%02X\n", opcode);
     acpi_object_t result = {0};
     switch(opcode) {
     case STORE_OP:
@@ -486,7 +489,8 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
             opcode = (EXTOP_PREFIX << 8) | method[state->pc + 1];
         }else
             opcode = method[state->pc];
-        //acpi_debug("handling opcode 0x%02x\n", opcode);
+        if(debug_opcodes)
+            acpi_debug("parsing opcode 0x%02x\n", opcode);
 
         // This switch handles the majority of all opcodes.
         switch(opcode)
