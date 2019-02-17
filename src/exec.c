@@ -838,7 +838,7 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
 
             acpi_object_t *opstack_pkg = acpi_exec_push_opstack_or_die(state);
             opstack_pkg->type = ACPI_PACKAGE;
-            opstack_pkg->package = acpi_calloc(sizeof(acpi_object_t), ACPI_MAX_PACKAGE_ENTRIES);
+            opstack_pkg->package = acpi_calloc(num_ents, sizeof(acpi_object_t));
             opstack_pkg->package_size = num_ents;
             break;
         }

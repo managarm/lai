@@ -133,12 +133,9 @@ static void acpi_clone_string(acpi_object_t *destination, acpi_object_t *source)
 
 static void acpi_clone_package(acpi_object_t *destination, acpi_object_t *source)
 {
-    if(source->package_size > ACPI_MAX_PACKAGE_ENTRIES)
-        acpi_panic("package too large\n");
-
     destination->type = ACPI_PACKAGE;
     destination->package_size = source->package_size;
-    destination->package = acpi_calloc(ACPI_MAX_PACKAGE_ENTRIES, sizeof(acpi_object_t));
+    destination->package = acpi_calloc(source->package_size, sizeof(acpi_object_t));
     if(!destination->package)
         acpi_panic("unable to allocate memory for package object.\n");
 
