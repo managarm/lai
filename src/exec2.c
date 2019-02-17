@@ -240,20 +240,23 @@ void acpi_load_operand(acpi_state_t *state, acpi_object_t *source, acpi_object_t
 {
     switch(source->type)
     {
-    case ACPI_STRING_INDEX:
-        object->type = ACPI_INTEGER;
-        object->integer = source->string[source->integer];
-        break;
-    case ACPI_BUFFER_INDEX:
+    case ACPI_INTEGER:
+    case ACPI_BUFFER:
+    case ACPI_STRING:
+    case ACPI_PACKAGE:
     {
-        uint8_t *window = source->buffer;
-        object->type = ACPI_INTEGER;
-        object->integer = window[source->integer];
+        // Anonymous objects are just returned as-is.
+        acpi_copy_object(object, source);
         break;
     }
+    case ACPI_STRING_INDEX:
+    case ACPI_BUFFER_INDEX:
     case ACPI_PACKAGE_INDEX:
-        acpi_copy_object(object, &source->package[source->integer]);
+    {
+        // Indices are resolved for stores, but returned as-is for loads.
+        acpi_copy_object(object, source);
         break;
+    }
     case ACPI_UNRESOLVED_NAME:
     {
         acpi_nsnode_t *handle = acpi_exec_resolve(source->name);
