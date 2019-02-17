@@ -497,6 +497,7 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
         {
         case NOP_OP:
             state->pc++;
+            break;
 
         case ZERO_OP:
             if(exec_result_mode == LAI_DATA_MODE || exec_result_mode == LAI_OBJECT_MODE)
