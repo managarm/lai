@@ -8,7 +8,7 @@
 #include "exec_impl.h"
 #include "ns_impl.h"
 
-static int debug_opcodes = 1;
+static int debug_opcodes = 0;
 
 /* ACPI Control Method Execution */
 /* Type1Opcode := DefBreak | DefBreakPoint | DefContinue | DefFatal | DefIfElse |
@@ -633,6 +633,9 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
 
             if(exec_result_mode == LAI_DATA_MODE || exec_result_mode == LAI_TARGET_MODE)
             {
+                if(debug_opcodes)
+                    acpi_debug("parsing name %s [@ %d]\n", unresolved.name, opcode_pc);
+
                 acpi_object_t *opstack_res = acpi_exec_push_opstack_or_die(state);
                 acpi_move_object(opstack_res, &unresolved);
             }else
@@ -646,6 +649,9 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
                 acpi_object_t result = {0};
                 if(handle->type == ACPI_NAMESPACE_METHOD)
                 {
+                    if(debug_opcodes)
+                        acpi_debug("parsing invocation %s [@ %d]\n", unresolved.name, opcode_pc);
+
                     acpi_state_t nested_state;
                     acpi_init_state(&nested_state);
                     int argc = handle->method_flags & METHOD_ARGC_MASK;
@@ -656,7 +662,12 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
                     acpi_move_object(&result, &nested_state.retvalue);
                     acpi_finalize_state(&nested_state);
                 }else
+                {
+                    if(debug_opcodes)
+                        acpi_debug("parsing name %s [@ %d]\n", unresolved.name, opcode_pc);
+
                     acpi_load_ns(handle, &result);
+                }
 
                 if(exec_result_mode == LAI_OBJECT_MODE)
                 {
@@ -678,7 +689,7 @@ static int acpi_exec_run(uint8_t *method, acpi_state_t *state)
         }else
             opcode = method[state->pc];
         if(debug_opcodes)
-            acpi_debug("parsing opcode 0x%02x\n", opcode);
+            acpi_debug("parsing opcode 0x%02x [@ %d]\n", opcode, opcode_pc);
 
         // This switch handles the majority of all opcodes.
         switch(opcode)
