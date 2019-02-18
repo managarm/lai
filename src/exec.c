@@ -436,12 +436,12 @@ static void acpi_exec_reduce(int opcode, acpi_state_t *state, acpi_object_t *ope
         if(ref.type)
         {
             result.type = ACPI_INTEGER;
-            result.type = 1;
+            result.integer = 1;
             acpi_store_operand(state, target, &ref);
         }else
         {
             result.type = ACPI_INTEGER;
-            result.type = 0;
+            result.integer = 0;
         }
         break;
     }

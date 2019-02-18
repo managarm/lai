@@ -376,8 +376,10 @@ size_t acpins_create_field(acpi_nsnode_t *parent, void *data)
         byte_count += name_size;
 
         // FIXME: This looks odd. Why do we insert a dot in the middle of the path?
-        node->path[acpi_strlen(parent->path)] = '.';
+        /*node->path[acpi_strlen(parent->path)] = '.';*/
+
         acpi_strcpy(node->field_opregion, opregion->path);
+
         node->field_flags = field_flags;
         node->field_size = field[0];
         node->field_offset = current_offset;
@@ -555,6 +557,7 @@ size_t acpins_create_indexfield(acpi_nsnode_t *parent, void *data)
 
     uint64_t current_offset = 0;
     size_t skip_size, skip_bits;
+    size_t name_size;
 
     while(byte_count < size)
     {
@@ -574,21 +577,28 @@ size_t acpins_create_indexfield(acpi_nsnode_t *parent, void *data)
         acpi_nsnode_t *node = acpins_create_nsnode_or_die();
         node->type = ACPI_NAMESPACE_INDEXFIELD;
         // FIXME: This looks odd. Why don't we all acpins_resolve_path()?
-        acpi_memcpy(node->path, parent->path, acpi_strlen(parent->path));
+
+        /*acpi_memcpy(node->path, parent->path, acpi_strlen(parent->path));
         node->path[acpi_strlen(parent->path)] = '.';
-        acpi_memcpy(node->path + acpi_strlen(parent->path) + 1, indexfield, 4);
+        acpi_memcpy(node->path + acpi_strlen(parent->path) + 1, indexfield, 4);*/
+
+        name_size = acpins_resolve_path(parent, node->path, &indexfield[0]);
+
+        indexfield += name_size;
+        byte_count += name_size;
 
         acpi_strcpy(node->indexfield_data, datar);
         acpi_strcpy(node->indexfield_index, indexr);
+
         node->indexfield_flags = flags;
-        node->indexfield_size = indexfield[4];
+        node->indexfield_size = indexfield[0];
         node->indexfield_offset = current_offset;
 
-        current_offset += (uint64_t)(indexfield[4]);
+        current_offset += (uint64_t)(indexfield[0]);
         acpins_install_nsnode(node);
 
-        indexfield += 5;
-        byte_count += 5;
+        indexfield++;
+        byte_count++;
     }
 
     return size + 2;

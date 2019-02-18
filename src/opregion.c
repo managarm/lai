@@ -60,7 +60,7 @@ void acpi_read_field(acpi_object_t *destination, acpi_nsnode_t *field)
     opregion = acpins_resolve(field->field_opregion);
     if(!opregion)
     {
-        acpi_panic("OpRegion %s doesn't exist.\n", field->field_opregion);
+        acpi_panic("Field: %s, OpRegion %s doesn't exist.\n", field->path, field->field_opregion);
     }
 
     uint64_t offset, value, mask;
@@ -219,7 +219,7 @@ void acpi_write_field(acpi_nsnode_t *field, acpi_object_t *source)
     opregion = acpins_resolve(field->field_opregion);
     if(!opregion)
     {
-        acpi_panic("OpRegion %s doesn't exist.\n", field->field_opregion);
+        acpi_panic("Field %s, OpRegion %s doesn't exist.\n", field->path, field->field_opregion);
     }
 
     uint64_t offset, value, mask;
