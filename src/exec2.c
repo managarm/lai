@@ -218,6 +218,7 @@ void acpi_store_ns(acpi_nsnode_t *target, acpi_object_t *object)
 }
 
 void acpi_alias_operand(acpi_state_t *state, acpi_object_t *object, acpi_object_t *ref) {
+    acpi_nsnode_t *node;
     switch(object->type)
     {
     case ACPI_ARG_NAME:
@@ -225,6 +226,17 @@ void acpi_alias_operand(acpi_state_t *state, acpi_object_t *object, acpi_object_
         break;
     case ACPI_LOCAL_NAME:
         acpi_alias_object(ref, &state->local[object->index]);
+        break;
+    case ACPI_UNRESOLVED_NAME:
+        node = acpi_exec_resolve(object->name);
+        if(!node)
+            acpi_panic("node %s not found.\n", object->name);
+
+        if(node->type == ACPI_NAMESPACE_NAME)
+            acpi_alias_object(ref, &node->object);
+        else
+            acpi_panic("node %s type %d is not valid for acpi_alias_operand()\n", node->path, node->type);
+
         break;
     default:
         acpi_panic("object type %d is not valid for acpi_alias_operand()\n", object->type);
