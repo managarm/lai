@@ -10,7 +10,8 @@
 
 /* TO-DO: I should implement the embedded controller, because some real HW use it */
 
-#include "lai.h"
+#include <lai/core.h>
+#include "aml_opcodes.h"
 
 void acpi_read_field(acpi_object_t *, acpi_nsnode_t *);
 void acpi_write_field(acpi_nsnode_t *, acpi_object_t *);

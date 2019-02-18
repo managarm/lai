@@ -4,7 +4,8 @@
  * Copyright (C) 2018-2019 by Omar Muhamed
  */
 
-#include "lai.h"
+#include <lai/core.h>
+#include "aml_opcodes.h"
 #include "ns_impl.h"
 
 // acpi_is_name(): Evaluates a name character

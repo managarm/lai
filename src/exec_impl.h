@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include <lai.h>
+#include <lai/core.h>
 
 // Evaluate constant data (and keep result).
 //     Primitive objects are parsed.

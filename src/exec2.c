@@ -4,7 +4,7 @@
  * Copyright (C) 2018-2019 by Omar Muhamed
  */
 
-#include "lai.h"
+#include <lai/core.h>
 
 /* ACPI Control Method Execution */
 /* Type2Opcode := DefAcquire | DefAdd | DefAnd | DefBuffer | DefConcat |

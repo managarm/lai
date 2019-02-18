@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include <lai.h>
+#include <lai/core.h>
 
 // Namespace management.
 acpi_nsnode_t *acpins_create_nsnode();

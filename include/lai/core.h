@@ -7,7 +7,6 @@
 #pragma once
 
 #include <lai_system.h>
-#include "aml_opcodes.h"
 
 #define LAI_STRINGIFY(x) #x
 #define LAI_EXPAND_STRINGIFY(x) LAI_STRINGIFY(x)

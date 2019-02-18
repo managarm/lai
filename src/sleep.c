@@ -8,7 +8,7 @@
 /* As of now, it's only for S5 (shutdown) sleep, because other sleeping states
  * need NVS and other things I still need to research */
 
-#include "lai.h"
+#include <lai/core.h>
 
 // acpi_enter_sleep(): Enters a sleeping state
 // Param:    uint8_t state - 0-5 to correspond with states S0-S5

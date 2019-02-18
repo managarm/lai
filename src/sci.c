@@ -6,7 +6,7 @@
 
 /* System Control Interrupt Initialization */
 
-#include "lai.h"
+#include <lai/core.h>
 
 static void acpi_init_children(char *);
 

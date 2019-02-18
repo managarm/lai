@@ -6,7 +6,7 @@
 
 /* ACPI Namespace Management During Control Method Execution */
 
-#include "lai.h"
+#include <lai/core.h>
 #include "ns_impl.h"
 
 // acpi_exec_name(): Creates a Name() object in a Method's private namespace

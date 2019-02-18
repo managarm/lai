@@ -12,7 +12,7 @@
    -specific use. Therefore, nobody should assume it contains the real IRQ. Instead,
    the four PCI pins should be used: LNKA, LNKB, LNKC and LNKD. */
 
-#include "lai.h"
+#include <lai/core.h>
 
 #define PCI_PNP_ID        "PNP0A03"
 

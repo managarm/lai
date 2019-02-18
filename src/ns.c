@@ -6,7 +6,8 @@
 
 /* Generic ACPI Namespace Management */
 
-#include "lai.h"
+#include <lai/core.h>
+#include "aml_opcodes.h"
 #include "ns_impl.h"
 
 #define CODE_WINDOW            131072
