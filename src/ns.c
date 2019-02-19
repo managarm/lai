@@ -13,60 +13,60 @@
 #define CODE_WINDOW            131072
 #define NAMESPACE_WINDOW       2048
 
-int acpi_do_osi_method(acpi_object_t *args, acpi_object_t *result);
-int acpi_do_os_method(acpi_object_t *args, acpi_object_t *result);
-int acpi_do_rev_method(acpi_object_t *args, acpi_object_t *result);
+int lai_do_osi_method(lai_object_t *args, lai_object_t *result);
+int lai_do_os_method(lai_object_t *args, lai_object_t *result);
+int lai_do_rev_method(lai_object_t *args, lai_object_t *result);
 
-uint8_t *acpi_acpins_code;
-size_t acpi_acpins_allocation = 0;
-size_t acpi_acpins_size = 0;
-size_t acpi_acpins_count = 0;
+uint8_t *lai_acpins_code;
+size_t lai_acpins_allocation = 0;
+size_t lai_acpins_size = 0;
+size_t lai_acpins_count = 0;
 extern char aml_test[];
 
-acpi_nsnode_t **acpi_namespace;
-size_t acpi_ns_size = 0;
-size_t acpi_ns_capacity = NAMESPACE_WINDOW;
+lai_nsnode_t **lai_namespace;
+size_t lai_ns_size = 0;
+size_t lai_ns_capacity = NAMESPACE_WINDOW;
 
 void acpins_load_table(void *);
 
-// Helper function to allocate a acpi_nsnode_t.
-acpi_nsnode_t *acpins_create_nsnode()
+// Helper function to allocate a lai_nsnode_t.
+lai_nsnode_t *acpins_create_nsnode()
 {
-    acpi_nsnode_t *node = acpi_malloc(sizeof(acpi_nsnode_t));
+    lai_nsnode_t *node = lai_malloc(sizeof(lai_nsnode_t));
     if(!node)
         return NULL;
-    acpi_memset(node, 0, sizeof(acpi_nsnode_t));
+    lai_memset(node, 0, sizeof(lai_nsnode_t));
     return node;
 }
 
-// Helper function to allocate a acpi_nsnode_t.
-acpi_nsnode_t *acpins_create_nsnode_or_die()
+// Helper function to allocate a lai_nsnode_t.
+lai_nsnode_t *acpins_create_nsnode_or_die()
 {
-    acpi_nsnode_t *node = acpins_create_nsnode();
+    lai_nsnode_t *node = acpins_create_nsnode();
     if(!node)
-        acpi_panic("could not allocate new namespace node\n");
+        lai_panic("could not allocate new namespace node\n");
     return node;
 }
 
 // Installs the nsnode to the namespace.
-void acpins_install_nsnode(acpi_nsnode_t *node)
+void acpins_install_nsnode(lai_nsnode_t *node)
 {
     // Classical doubling strategy to grow the namespace table.
-    if(acpi_ns_size == acpi_ns_capacity)
+    if(lai_ns_size == lai_ns_capacity)
     {
-        size_t new_capacity = acpi_ns_capacity * 2;
+        size_t new_capacity = lai_ns_capacity * 2;
         if(!new_capacity)
             new_capacity = NAMESPACE_WINDOW;
-        acpi_nsnode_t **new_array;
-        new_array = acpi_realloc(acpi_namespace, sizeof(acpi_nsnode_t *) * new_capacity);
+        lai_nsnode_t **new_array;
+        new_array = lai_realloc(lai_namespace, sizeof(lai_nsnode_t *) * new_capacity);
         if(!new_array)
-            acpi_panic("could not reallocate namespace table\n");
-        acpi_namespace = new_array;
-        acpi_ns_capacity = new_capacity;
+            lai_panic("could not reallocate namespace table\n");
+        lai_namespace = new_array;
+        lai_ns_capacity = new_capacity;
     }
 
-    /*acpi_debug("created %s\n", node->path);*/
-    acpi_namespace[acpi_ns_size++] = node;
+    /*lai_debug("created %s\n", node->path);*/
+    lai_namespace[lai_ns_size++] = node;
 }
 
 // acpins_resolve_path(): Resolves a path
@@ -74,13 +74,13 @@ void acpins_install_nsnode(acpi_nsnode_t *node)
 // Param:    uint8_t *path - path to resolve
 // Return:    size_t - size of path data parsed in AML
 
-size_t acpins_resolve_path(acpi_nsnode_t *context, char *fullpath, uint8_t *path)
+size_t acpins_resolve_path(lai_nsnode_t *context, char *fullpath, uint8_t *path)
 {
     size_t name_size = 0;
     size_t multi_count = 0;
     size_t current_count = 0;
 
-    acpi_memset(fullpath, 0, ACPI_MAX_NAME);
+    lai_memset(fullpath, 0, ACPI_MAX_NAME);
 
     if(path[0] == ROOT_CHAR)
     {
@@ -88,7 +88,7 @@ size_t acpins_resolve_path(acpi_nsnode_t *context, char *fullpath, uint8_t *path
         fullpath[0] = ROOT_CHAR;
         fullpath[1] = 0;
         path++;
-        if(acpi_is_name(path[0]) || path[0] == DUAL_PREFIX || path[0] == MULTI_PREFIX)
+        if(lai_is_name(path[0]) || path[0] == DUAL_PREFIX || path[0] == MULTI_PREFIX)
         {
             fullpath[1] = '.';
             fullpath[2] = 0;
@@ -98,30 +98,30 @@ size_t acpins_resolve_path(acpi_nsnode_t *context, char *fullpath, uint8_t *path
     }
 
     if(context)
-        acpi_strcpy(fullpath, context->path);
+        lai_strcpy(fullpath, context->path);
     else
-        acpi_strcpy(fullpath, "\\");
-    fullpath[acpi_strlen(fullpath)] = '.';
+        lai_strcpy(fullpath, "\\");
+    fullpath[lai_strlen(fullpath)] = '.';
 
 start:
     while(path[0] == PARENT_CHAR)
     {
         path++;
-        if(acpi_strlen(fullpath) <= 2)
+        if(lai_strlen(fullpath) <= 2)
             break;
 
         name_size++;
-        fullpath[acpi_strlen(fullpath) - 5] = 0;
-        acpi_memset(fullpath + acpi_strlen(fullpath), 0, 32);
+        fullpath[lai_strlen(fullpath) - 5] = 0;
+        lai_memset(fullpath + lai_strlen(fullpath), 0, 32);
     }
 
     if(path[0] == DUAL_PREFIX)
     {
         name_size += 9;
         path++;
-        acpi_memcpy(fullpath + acpi_strlen(fullpath), path, 4);
-        fullpath[acpi_strlen(fullpath)] = '.';
-        acpi_memcpy(fullpath + acpi_strlen(fullpath), path + 4, 4);
+        lai_memcpy(fullpath + lai_strlen(fullpath), path, 4);
+        fullpath[lai_strlen(fullpath)] = '.';
+        lai_memcpy(fullpath + lai_strlen(fullpath), path + 4, 4);
     } else if(path[0] == MULTI_PREFIX)
     {
         // skip MULTI_PREFIX and name count
@@ -136,43 +136,43 @@ start:
         while(current_count < multi_count)
         {
             name_size += 4;
-            acpi_memcpy(fullpath + acpi_strlen(fullpath), path, 4);
+            lai_memcpy(fullpath + lai_strlen(fullpath), path, 4);
             path += 4;
             current_count++;
             if(current_count >= multi_count)
                 break;
 
-            fullpath[acpi_strlen(fullpath)] = '.';
+            fullpath[lai_strlen(fullpath)] = '.';
         }
     } else
     {
         name_size += 4;
-        acpi_memcpy(fullpath + acpi_strlen(fullpath), path, 4);
+        lai_memcpy(fullpath + lai_strlen(fullpath), path, 4);
     }
 
     return name_size;
 }
 
-// acpi_create_namespace(): Initializes the AML interpreter and creates the ACPI namespace
+// lai_create_namespace(): Initializes the AML interpreter and creates the ACPI namespace
 // Param:    void *dsdt - pointer to the DSDT
 // Return:    Nothing
 
-void acpi_create_namespace(void *dsdt)
+void lai_create_namespace(void *dsdt)
 {
-    acpi_namespace = acpi_calloc(sizeof(acpi_nsnode_t *), acpi_ns_capacity);
-    if(!acpi_namespace)
-        acpi_panic("unable to allocate memory.\n");
+    lai_namespace = lai_calloc(sizeof(lai_nsnode_t *), lai_ns_capacity);
+    if(!lai_namespace)
+        lai_panic("unable to allocate memory.\n");
 
-    acpi_acpins_code = acpi_malloc(CODE_WINDOW);
-    acpi_acpins_allocation = CODE_WINDOW;
+    lai_acpins_code = lai_malloc(CODE_WINDOW);
+    lai_acpins_allocation = CODE_WINDOW;
 
     //acpins_load_table(aml_test);    // custom AML table just for testing
 
     // we need the FADT
-    acpi_fadt = acpi_scan("FACP", 0);
-    if(!acpi_fadt)
+    lai_fadt = lai_scan("FACP", 0);
+    if(!lai_fadt)
     {
-        acpi_panic("unable to find ACPI FADT.\n");
+        lai_panic("unable to find ACPI FADT.\n");
     }
 
     // load the DSDT
@@ -180,54 +180,54 @@ void acpi_create_namespace(void *dsdt)
 
     // load all SSDTs
     size_t index = 0;
-    acpi_aml_t *ssdt = acpi_scan("SSDT", index);
+    acpi_aml_t *ssdt = lai_scan("SSDT", index);
     while(ssdt != NULL)
     {
         acpins_load_table(ssdt);
         index++;
-        ssdt = acpi_scan("SSDT", index);
+        ssdt = lai_scan("SSDT", index);
     }
 
     // the PSDT is treated the same way as the SSDT
     // scan for PSDTs too for compatibility with some ACPI 1.0 PCs
     index = 0;
-    acpi_aml_t *psdt = acpi_scan("PSDT", index);
+    acpi_aml_t *psdt = lai_scan("PSDT", index);
     while(psdt != NULL)
     {
         acpins_load_table(psdt);
         index++;
-        psdt = acpi_scan("PSDT", index);
+        psdt = lai_scan("PSDT", index);
     }
 
     // create the OS-defined objects first
-    acpi_nsnode_t *osi_node = acpins_create_nsnode_or_die();
-    osi_node->type = ACPI_NAMESPACE_METHOD;
-    acpi_strcpy(osi_node->path, "\\._OSI");
+    lai_nsnode_t *osi_node = acpins_create_nsnode_or_die();
+    osi_node->type = LAI_NAMESPACE_METHOD;
+    lai_strcpy(osi_node->path, "\\._OSI");
     osi_node->method_flags = 0x01;
-    osi_node->method_override = &acpi_do_osi_method;
+    osi_node->method_override = &lai_do_osi_method;
     acpins_install_nsnode(osi_node);
 
-    acpi_nsnode_t *os_node = acpins_create_nsnode_or_die();
-    os_node->type = ACPI_NAMESPACE_METHOD;
-    acpi_strcpy(os_node->path, "\\._OS_");
+    lai_nsnode_t *os_node = acpins_create_nsnode_or_die();
+    os_node->type = LAI_NAMESPACE_METHOD;
+    lai_strcpy(os_node->path, "\\._OS_");
     os_node->method_flags = 0x00;
-    os_node->method_override = &acpi_do_os_method;
+    os_node->method_override = &lai_do_os_method;
     acpins_install_nsnode(os_node);
 
-    acpi_nsnode_t *rev_node = acpins_create_nsnode_or_die();
-    rev_node->type = ACPI_NAMESPACE_METHOD;
-    acpi_strcpy(rev_node->path, "\\._REV");
+    lai_nsnode_t *rev_node = acpins_create_nsnode_or_die();
+    rev_node->type = LAI_NAMESPACE_METHOD;
+    lai_strcpy(rev_node->path, "\\._REV");
     rev_node->method_flags = 0x00;
-    rev_node->method_override = &acpi_do_rev_method;
+    rev_node->method_override = &lai_do_rev_method;
     acpins_install_nsnode(rev_node);
 
     // Create the namespace with all the objects.
-    acpi_state_t state;
-    acpi_init_state(&state);
-    acpi_populate(NULL, acpi_acpins_code, acpi_acpins_size, &state);
-    acpi_finalize_state(&state);
+    lai_state_t state;
+    lai_init_state(&state);
+    lai_populate(NULL, lai_acpins_code, lai_acpins_size, &state);
+    lai_finalize_state(&state);
 
-    acpi_debug("ACPI namespace created, total of %d predefined objects.\n", acpi_ns_size);
+    lai_debug("ACPI namespace created, total of %d predefined objects.\n", lai_ns_size);
 }
 
 // acpins_load_table(): Loads an AML table
@@ -237,26 +237,26 @@ void acpi_create_namespace(void *dsdt)
 void acpins_load_table(void *ptr)
 {
     acpi_aml_t *table = (acpi_aml_t*)ptr;
-    while(acpi_acpins_size + table->header.length >= acpi_acpins_allocation)
+    while(lai_acpins_size + table->header.length >= lai_acpins_allocation)
     {
-        acpi_acpins_allocation += CODE_WINDOW;
-        acpi_acpins_code = acpi_realloc(acpi_acpins_code, acpi_acpins_allocation);
+        lai_acpins_allocation += CODE_WINDOW;
+        lai_acpins_code = lai_realloc(lai_acpins_code, lai_acpins_allocation);
     }
 
     // copy the actual AML code
-    acpi_memcpy(acpi_acpins_code + acpi_acpins_size, table->data, table->header.length - sizeof(acpi_header_t));
-    acpi_acpins_size += (table->header.length - sizeof(acpi_header_t));
+    lai_memcpy(lai_acpins_code + lai_acpins_size, table->data, table->header.length - sizeof(acpi_header_t));
+    lai_acpins_size += (table->header.length - sizeof(acpi_header_t));
 
-    acpi_debug("loaded AML table '%c%c%c%c', total %d bytes of AML code.\n", table->header.signature[0], table->header.signature[1], table->header.signature[2], table->header.signature[3], acpi_acpins_size);
+    lai_debug("loaded AML table '%c%c%c%c', total %d bytes of AML code.\n", table->header.signature[0], table->header.signature[1], table->header.signature[2], table->header.signature[3], lai_acpins_size);
 
-    acpi_acpins_count++;
+    lai_acpins_count++;
 }
 
 // acpins_create_field(): Creates a Field object in the namespace
 // Param:    void *data - pointer to field data
 // Return:    size_t - total size of field in bytes
 
-size_t acpins_create_field(acpi_nsnode_t *parent, void *data)
+size_t acpins_create_field(lai_nsnode_t *parent, void *data)
 {
     uint8_t *field = (uint8_t*)data;
     field += 2;        // skip opcode
@@ -264,11 +264,11 @@ size_t acpins_create_field(acpi_nsnode_t *parent, void *data)
     // package size
     size_t pkgsize, size;
 
-    pkgsize = acpi_parse_pkgsize(field, &size);
+    pkgsize = lai_parse_pkgsize(field, &size);
     field += pkgsize;
 
     // determine name of opregion
-    acpi_nsnode_t *opregion;
+    lai_nsnode_t *opregion;
     char opregion_name[ACPI_MAX_NAME];
     size_t name_size = 0;
 
@@ -277,7 +277,7 @@ size_t acpins_create_field(acpi_nsnode_t *parent, void *data)
     opregion = acpins_resolve(opregion_name);
     if(!opregion)
     {
-        acpi_debug("error parsing field for non-existant OpRegion %s, ignoring...\n", opregion_name);
+        lai_debug("error parsing field for non-existant OpRegion %s, ignoring...\n", opregion_name);
         return size + 2;
     }
 
@@ -286,49 +286,49 @@ size_t acpins_create_field(acpi_nsnode_t *parent, void *data)
     field = (uint8_t*)data + 2 + pkgsize + name_size;
     field_flags = field[0];
 
-    /*acpi_debug("field for OpRegion %s, flags 0x%X (", opregion->path, field_flags);
+    /*lai_debug("field for OpRegion %s, flags 0x%X (", opregion->path, field_flags);
     switch(field_flags & 0x0F)
     {
     case FIELD_ANY_ACCESS:
-        acpi_debug("any ");
+        lai_debug("any ");
         break;
     case FIELD_BYTE_ACCESS:
-        acpi_debug("byte ");
+        lai_debug("byte ");
         break;
     case FIELD_WORD_ACCESS:
-        acpi_debug("word ");
+        lai_debug("word ");
         break;
     case FIELD_DWORD_ACCESS:
-        acpi_debug("dword ");
+        lai_debug("dword ");
         break;
     case FIELD_QWORD_ACCESS:
-        acpi_debug("qword ");
+        lai_debug("qword ");
         break;
     default:
-        acpi_debug("undefined access size: assuming any, ");
+        lai_debug("undefined access size: assuming any, ");
         break;
     }
 
     if(field_flags & FIELD_LOCK)
-        acpi_debug("lock ");
+        lai_debug("lock ");
 
     switch((field_flags >> 5) & 0x0F)
     {
     case FIELD_PRESERVE:
-        acpi_debug("preserve");
+        lai_debug("preserve");
         break;
     case FIELD_WRITE_ONES:
-        acpi_debug("ones");
+        lai_debug("ones");
         break;
     case FIELD_WRITE_ZEROES:
-        acpi_debug("zeroes");
+        lai_debug("zeroes");
         break;
     default:
-        acpi_debug("undefined update type");
+        lai_debug("undefined update type");
         break;
     }
 
-    acpi_debug(")\n");*/
+    lai_debug(")\n");*/
 
     // FIXME: Why this increment_namespace()?
     //acpins_increment_namespace();
@@ -346,7 +346,7 @@ size_t acpins_create_field(acpi_nsnode_t *parent, void *data)
             field++;
             byte_count++;
 
-            skip_size = acpi_parse_pkgsize(field, &skip_bits);
+            skip_size = lai_parse_pkgsize(field, &skip_bits);
             current_offset += skip_bits;
 
             field += skip_size;
@@ -359,7 +359,7 @@ size_t acpins_create_field(acpi_nsnode_t *parent, void *data)
             byte_count += 3;
         }
 
-        if(!acpi_is_name(field[0]))
+        if(!lai_is_name(field[0]))
         {
             field++;
             byte_count++;
@@ -368,18 +368,18 @@ size_t acpins_create_field(acpi_nsnode_t *parent, void *data)
         if(byte_count >= size)
             break;
 
-        //acpi_debug("field %c%c%c%c: size %d bits, at bit offset %d\n", field[0], field[1], field[2], field[3], field[4], current_offset);
-        acpi_nsnode_t *node = acpins_create_nsnode_or_die();
-        node->type = ACPI_NAMESPACE_FIELD;
+        //lai_debug("field %c%c%c%c: size %d bits, at bit offset %d\n", field[0], field[1], field[2], field[3], field[4], current_offset);
+        lai_nsnode_t *node = acpins_create_nsnode_or_die();
+        node->type = LAI_NAMESPACE_FIELD;
 
         name_size = acpins_resolve_path(parent, node->path, &field[0]);
         field += name_size;
         byte_count += name_size;
 
         // FIXME: This looks odd. Why do we insert a dot in the middle of the path?
-        /*node->path[acpi_strlen(parent->path)] = '.';*/
+        /*node->path[lai_strlen(parent->path)] = '.';*/
 
-        acpi_strcpy(node->field_opregion, opregion->path);
+        lai_strcpy(node->field_opregion, opregion->path);
 
         node->field_flags = field_flags;
         node->field_size = field[0];
@@ -399,17 +399,17 @@ size_t acpins_create_field(acpi_nsnode_t *parent, void *data)
 // Param:    void *data - pointer to AML code
 // Return:    size_t - total size in bytes for skipping
 
-size_t acpins_create_method(acpi_nsnode_t *parent, void *data)
+size_t acpins_create_method(lai_nsnode_t *parent, void *data)
 {
     uint8_t *method = (uint8_t*)data;
     method++;        // skip over METHOD_OP
 
     size_t size, pkgsize;
-    pkgsize = acpi_parse_pkgsize(method, &size);
+    pkgsize = lai_parse_pkgsize(method, &size);
     method += pkgsize;
 
     // create a namespace object for the method
-    acpi_nsnode_t *node = acpins_create_nsnode_or_die();
+    lai_nsnode_t *node = acpins_create_nsnode_or_die();
     size_t name_length = acpins_resolve_path(parent, node->path, method);
 
     // get the method's flags
@@ -417,18 +417,18 @@ size_t acpins_create_method(acpi_nsnode_t *parent, void *data)
     method += pkgsize + name_length + 1;
 
     // put the method in the namespace
-    node->type = ACPI_NAMESPACE_METHOD;
+    node->type = LAI_NAMESPACE_METHOD;
     node->method_flags = method[0];
     node->pointer = (void*)(method + 1);
     node->size = size - pkgsize - name_length - 1;
 
-    /*acpi_debug("control method %s, flags 0x%X (argc %d ", node->path, method[0], method[0] & METHOD_ARGC_MASK);
+    /*lai_debug("control method %s, flags 0x%X (argc %d ", node->path, method[0], method[0] & METHOD_ARGC_MASK);
     if(method[0] & METHOD_SERIALIZED)
-        acpi_debug("serialized");
+        lai_debug("serialized");
     else
-        acpi_debug("non-serialized");
+        lai_debug("non-serialized");
 
-    acpi_debug(")\n");*/
+    lai_debug(")\n");*/
 
     acpins_install_nsnode(node);
     return size + 1;
@@ -438,7 +438,7 @@ size_t acpins_create_method(acpi_nsnode_t *parent, void *data)
 // Param:    void *data - pointer to data
 // Return:    size_t - total size in bytes, for skipping
 
-size_t acpins_create_alias(acpi_nsnode_t *parent, void *data)
+size_t acpins_create_alias(lai_nsnode_t *parent, void *data)
 {
     size_t return_size = 1;
     uint8_t *alias = (uint8_t*)data;
@@ -446,8 +446,8 @@ size_t acpins_create_alias(acpi_nsnode_t *parent, void *data)
 
     size_t name_size;
 
-    acpi_nsnode_t *node = acpins_create_nsnode_or_die();
-    node->type = ACPI_NAMESPACE_ALIAS;
+    lai_nsnode_t *node = acpins_create_nsnode_or_die();
+    node->type = LAI_NAMESPACE_ALIAS;
     name_size = acpins_resolve_path(parent, node->alias, alias);
 
     return_size += name_size;
@@ -455,7 +455,7 @@ size_t acpins_create_alias(acpi_nsnode_t *parent, void *data)
 
     name_size = acpins_resolve_path(parent, node->path, alias);
 
-    //acpi_debug("alias %s for object %s\n", node->path, node->alias);
+    //lai_debug("alias %s for object %s\n", node->path, node->alias);
 
     acpins_install_nsnode(node);
     return_size += name_size;
@@ -466,20 +466,20 @@ size_t acpins_create_alias(acpi_nsnode_t *parent, void *data)
 // Param:    void *data - pointer to data
 // Return:    size_t - total size in bytes, for skipping
 
-size_t acpins_create_mutex(acpi_nsnode_t *parent, void *data)
+size_t acpins_create_mutex(lai_nsnode_t *parent, void *data)
 {
     size_t return_size = 2;
     uint8_t *mutex = (uint8_t*)data;
     mutex += 2;        // skip MUTEX_OP
 
-    acpi_nsnode_t *node = acpins_create_nsnode_or_die();
-    node->type = ACPI_NAMESPACE_MUTEX;
+    lai_nsnode_t *node = acpins_create_nsnode_or_die();
+    node->type = LAI_NAMESPACE_MUTEX;
     size_t name_size = acpins_resolve_path(parent, node->path, mutex);
 
     return_size += name_size;
     return_size++;
 
-    //acpi_debug("mutex object %s\n", node->path);
+    //lai_debug("mutex object %s\n", node->path);
 
     acpins_install_nsnode(node);
     return return_size;
@@ -489,69 +489,69 @@ size_t acpins_create_mutex(acpi_nsnode_t *parent, void *data)
 // Param:    void *data - pointer to indexfield data
 // Return:    size_t - total size of indexfield in bytes
 
-size_t acpins_create_indexfield(acpi_nsnode_t *parent, void *data)
+size_t acpins_create_indexfield(lai_nsnode_t *parent, void *data)
 {
     uint8_t *indexfield = (uint8_t*)data;
     indexfield += 2;        // skip INDEXFIELD_OP
 
     size_t pkgsize, size;
-    pkgsize = acpi_parse_pkgsize(indexfield, &size);
+    pkgsize = lai_parse_pkgsize(indexfield, &size);
 
     indexfield += pkgsize;
 
     // index and data
     char indexr[ACPI_MAX_NAME], datar[ACPI_MAX_NAME];
-    acpi_memset(indexr, 0, ACPI_MAX_NAME);
-    acpi_memset(datar, 0, ACPI_MAX_NAME);
+    lai_memset(indexr, 0, ACPI_MAX_NAME);
+    lai_memset(datar, 0, ACPI_MAX_NAME);
 
     indexfield += acpins_resolve_path(parent, indexr, indexfield);
     indexfield += acpins_resolve_path(parent, datar, indexfield);
 
     uint8_t flags = indexfield[0];
 
-    /*acpi_debug("IndexField index %s data %s, flags 0x%X (", indexr, datar, flags);
+    /*lai_debug("IndexField index %s data %s, flags 0x%X (", indexr, datar, flags);
     switch(flags & 0x0F)
     {
     case FIELD_ANY_ACCESS:
-        acpi_debug("any ");
+        lai_debug("any ");
         break;
     case FIELD_BYTE_ACCESS:
-        acpi_debug("byte ");
+        lai_debug("byte ");
         break;
     case FIELD_WORD_ACCESS:
-        acpi_debug("word ");
+        lai_debug("word ");
         break;
     case FIELD_DWORD_ACCESS:
-        acpi_debug("dword ");
+        lai_debug("dword ");
         break;
     case FIELD_QWORD_ACCESS:
-        acpi_debug("qword ");
+        lai_debug("qword ");
         break;
     default:
-        acpi_debug("undefined access size: assuming any, ");
+        lai_debug("undefined access size: assuming any, ");
         break;
     }
 
     if(flags & FIELD_LOCK)
-        acpi_debug("lock ");
+        lai_debug("lock ");
 
     switch((flags >> 5) & 0x0F)
     {
     case FIELD_PRESERVE:
-        acpi_debug("preserve");
+        lai_debug("preserve");
         break;
     case FIELD_WRITE_ONES:
-        acpi_debug("ones");
+        lai_debug("ones");
         break;
     case FIELD_WRITE_ZEROES:
-        acpi_debug("zeroes");
+        lai_debug("zeroes");
         break;
     default:
-        acpi_debug("undefined update type");
+        lai_debug("undefined update type");
         break;
     }
 
-    acpi_debug(")\n");*/
+    lai_debug(")\n");*/
 
     indexfield++;            // actual field list
     size_t byte_count = (size_t)((size_t)indexfield - (size_t)data);
@@ -567,29 +567,29 @@ size_t acpins_create_indexfield(acpi_nsnode_t *parent, void *data)
             indexfield++;
             byte_count++;
 
-            skip_size = acpi_parse_pkgsize(indexfield, &skip_bits);
+            skip_size = lai_parse_pkgsize(indexfield, &skip_bits);
             current_offset += skip_bits;
 
             indexfield += skip_size;
             byte_count += skip_size;
         }
 
-        //acpi_debug("indexfield %c%c%c%c: size %d bits, at bit offset %d\n", indexfield[0], indexfield[1], indexfield[2], indexfield[3], indexfield[4], current_offset);
-        acpi_nsnode_t *node = acpins_create_nsnode_or_die();
-        node->type = ACPI_NAMESPACE_INDEXFIELD;
+        //lai_debug("indexfield %c%c%c%c: size %d bits, at bit offset %d\n", indexfield[0], indexfield[1], indexfield[2], indexfield[3], indexfield[4], current_offset);
+        lai_nsnode_t *node = acpins_create_nsnode_or_die();
+        node->type = LAI_NAMESPACE_INDEXFIELD;
         // FIXME: This looks odd. Why don't we all acpins_resolve_path()?
 
-        /*acpi_memcpy(node->path, parent->path, acpi_strlen(parent->path));
-        node->path[acpi_strlen(parent->path)] = '.';
-        acpi_memcpy(node->path + acpi_strlen(parent->path) + 1, indexfield, 4);*/
+        /*lai_memcpy(node->path, parent->path, lai_strlen(parent->path));
+        node->path[lai_strlen(parent->path)] = '.';
+        lai_memcpy(node->path + lai_strlen(parent->path) + 1, indexfield, 4);*/
 
         name_size = acpins_resolve_path(parent, node->path, &indexfield[0]);
 
         indexfield += name_size;
         byte_count += name_size;
 
-        acpi_strcpy(node->indexfield_data, datar);
-        acpi_strcpy(node->indexfield_index, indexr);
+        lai_strcpy(node->indexfield_data, datar);
+        lai_strcpy(node->indexfield_index, indexr);
 
         node->indexfield_flags = flags;
         node->indexfield_size = indexfield[0];
@@ -609,23 +609,23 @@ size_t acpins_create_indexfield(acpi_nsnode_t *parent, void *data)
 // Param:    void *data - pointer to data
 // Return:    size_t - total size in bytes, for skipping
 
-size_t acpins_create_processor(acpi_nsnode_t *parent, void *data)
+size_t acpins_create_processor(lai_nsnode_t *parent, void *data)
 {
     uint8_t *processor = (uint8_t*)data;
     processor += 2;            // skip over PROCESSOR_OP
 
     size_t pkgsize, size;
-    pkgsize = acpi_parse_pkgsize(processor, &size);
+    pkgsize = lai_parse_pkgsize(processor, &size);
     processor += pkgsize;
 
-    acpi_nsnode_t *node = acpins_create_nsnode_or_die();
-    node->type = ACPI_NAMESPACE_PROCESSOR;
+    lai_nsnode_t *node = acpins_create_nsnode_or_die();
+    node->type = LAI_NAMESPACE_PROCESSOR;
     size_t name_size = acpins_resolve_path(parent, node->path, processor);
     processor += name_size;
 
     node->cpu_id = processor[0];
 
-    //acpi_debug("processor %s ACPI ID %d\n", node->path, node->cpu_id);
+    //lai_debug("processor %s ACPI ID %d\n", node->path, node->cpu_id);
 
     acpins_install_nsnode(node);
 
@@ -636,14 +636,14 @@ size_t acpins_create_processor(acpi_nsnode_t *parent, void *data)
 // Param:    void *data - pointer to data
 // Return:    size_t - total size in bytes, for skipping
 
-size_t acpins_create_bytefield(acpi_nsnode_t *parent, void *data)
+size_t acpins_create_bytefield(lai_nsnode_t *parent, void *data)
 {
     uint8_t *bytefield = (uint8_t*)data;
     bytefield++;        // skip BYTEFIELD_OP
     size_t return_size = 1;
 
-    acpi_nsnode_t *node = acpins_create_nsnode_or_die();
-    node->type = ACPI_NAMESPACE_BUFFER_FIELD;
+    lai_nsnode_t *node = acpins_create_nsnode_or_die();
+    node->type = LAI_NAMESPACE_BUFFER_FIELD;
 
     // buffer name
     size_t name_size;
@@ -654,7 +654,7 @@ size_t acpins_create_bytefield(acpi_nsnode_t *parent, void *data)
 
     size_t integer_size;
     uint64_t integer;
-    integer_size = acpi_eval_integer(bytefield, &integer);
+    integer_size = lai_eval_integer(bytefield, &integer);
 
     node->buffer_offset = integer * 8;
     node->buffer_size = 8;
@@ -673,14 +673,14 @@ size_t acpins_create_bytefield(acpi_nsnode_t *parent, void *data)
 // Param:    void *data - pointer to data
 // Return:    size_t - total size in bytes, for skipping
 
-size_t acpins_create_wordfield(acpi_nsnode_t *parent, void *data)
+size_t acpins_create_wordfield(lai_nsnode_t *parent, void *data)
 {
     uint8_t *wordfield = (uint8_t*)data;
     wordfield++;        // skip WORDFIELD_OP
     size_t return_size = 1;
 
-    acpi_nsnode_t *node = acpins_create_nsnode_or_die();
-    node->type = ACPI_NAMESPACE_BUFFER_FIELD;
+    lai_nsnode_t *node = acpins_create_nsnode_or_die();
+    node->type = LAI_NAMESPACE_BUFFER_FIELD;
 
     // buffer name
     size_t name_size;
@@ -691,7 +691,7 @@ size_t acpins_create_wordfield(acpi_nsnode_t *parent, void *data)
 
     size_t integer_size;
     uint64_t integer;
-    integer_size = acpi_eval_integer(wordfield, &integer);
+    integer_size = lai_eval_integer(wordfield, &integer);
 
     node->buffer_offset = integer * 8;
     node->buffer_size = 16;    // bits
@@ -701,7 +701,7 @@ size_t acpins_create_wordfield(acpi_nsnode_t *parent, void *data)
 
     name_size = acpins_resolve_path(parent, node->path, wordfield);
 
-    //acpi_debug("field %s for buffer %s, offset %d size %d bits\n", node->path, node->buffer, node->buffer_offset, node->buffer_size);
+    //lai_debug("field %s for buffer %s, offset %d size %d bits\n", node->path, node->buffer, node->buffer_offset, node->buffer_size);
 
     acpins_install_nsnode(node);
     return_size += name_size;
@@ -712,14 +712,14 @@ size_t acpins_create_wordfield(acpi_nsnode_t *parent, void *data)
 // Param:    void *data - pointer to data
 // Return:    size_t - total size in bytes, for skipping
 
-size_t acpins_create_dwordfield(acpi_nsnode_t *parent, void *data)
+size_t acpins_create_dwordfield(lai_nsnode_t *parent, void *data)
 {
     uint8_t *dwordfield = (uint8_t*)data;
     dwordfield++;        // skip DWORDFIELD_OP
     size_t return_size = 1;
 
-    acpi_nsnode_t *node = acpins_create_nsnode_or_die();
-    node->type = ACPI_NAMESPACE_BUFFER_FIELD;
+    lai_nsnode_t *node = acpins_create_nsnode_or_die();
+    node->type = LAI_NAMESPACE_BUFFER_FIELD;
 
     // buffer name
     size_t name_size;
@@ -730,7 +730,7 @@ size_t acpins_create_dwordfield(acpi_nsnode_t *parent, void *data)
 
     size_t integer_size;
     uint64_t integer;
-    integer_size = acpi_eval_integer(dwordfield, &integer);
+    integer_size = lai_eval_integer(dwordfield, &integer);
 
     node->buffer_offset = integer * 8;
     node->buffer_size = 32;
@@ -749,14 +749,14 @@ size_t acpins_create_dwordfield(acpi_nsnode_t *parent, void *data)
 // Param:    void *data - pointer to data
 // Return:    size_t - total size in bytes, for skipping
 
-size_t acpins_create_qwordfield(acpi_nsnode_t *parent, void *data)
+size_t acpins_create_qwordfield(lai_nsnode_t *parent, void *data)
 {
     uint8_t *qwordfield = (uint8_t*)data;
     qwordfield++;        // skip QWORDFIELD_OP
     size_t return_size = 1;
 
-    acpi_nsnode_t *node = acpins_create_nsnode_or_die();
-    node->type = ACPI_NAMESPACE_BUFFER_FIELD;
+    lai_nsnode_t *node = acpins_create_nsnode_or_die();
+    node->type = LAI_NAMESPACE_BUFFER_FIELD;
 
     // buffer name
     size_t name_size;
@@ -767,7 +767,7 @@ size_t acpins_create_qwordfield(acpi_nsnode_t *parent, void *data)
 
     size_t integer_size;
     uint64_t integer;
-    integer_size = acpi_eval_integer(qwordfield, &integer);
+    integer_size = lai_eval_integer(qwordfield, &integer);
 
     node->buffer_offset = integer * 8;
     node->buffer_size = 64;
@@ -784,19 +784,19 @@ size_t acpins_create_qwordfield(acpi_nsnode_t *parent, void *data)
 
 // acpins_resolve(): Returns a namespace object from its path
 // Param:    char *path - 4-char object name or full path
-// Return:    acpi_nsnode_t * - pointer to namespace object, NULL on error
+// Return:    lai_nsnode_t * - pointer to namespace object, NULL on error
 
-acpi_nsnode_t *acpins_resolve(char *path)
+lai_nsnode_t *acpins_resolve(char *path)
 {
     size_t i = 0;
 
     if(path[0] == ROOT_CHAR)        // full path?
     {
         // yep, search for the absolute path
-        while(i < acpi_ns_size)
+        while(i < lai_ns_size)
         {
-            if(acpi_strcmp(acpi_namespace[i]->path, path) == 0)
-                return acpi_namespace[i];
+            if(lai_strcmp(lai_namespace[i]->path, path) == 0)
+                return lai_namespace[i];
 
             else
                 i++;
@@ -805,10 +805,10 @@ acpi_nsnode_t *acpins_resolve(char *path)
         return NULL;
     } else            // 4-char name here
     {
-        while(i < acpi_ns_size)
+        while(i < lai_ns_size)
         {
-            if(acpi_memcmp(acpi_namespace[i]->path + acpi_strlen(acpi_namespace[i]->path) - 4, path, 4) == 0)
-                return acpi_namespace[i];
+            if(lai_memcmp(lai_namespace[i]->path + lai_strlen(lai_namespace[i]->path) - 4, path, 4) == 0)
+                return lai_namespace[i];
 
             else
                 i++;
@@ -820,18 +820,18 @@ acpi_nsnode_t *acpins_resolve(char *path)
 
 // acpins_get_device(): Returns a device by its index
 // Param:    size_t index - index
-// Return:    acpi_nsnode_t * - device handle, NULL on error
+// Return:    lai_nsnode_t * - device handle, NULL on error
 
-acpi_nsnode_t *acpins_get_device(size_t index)
+lai_nsnode_t *acpins_get_device(size_t index)
 {
     size_t i = 0, j = 0;
-    while(j < acpi_ns_size)
+    while(j < lai_ns_size)
     {
-        if(acpi_namespace[j]->type == ACPI_NAMESPACE_DEVICE)
+        if(lai_namespace[j]->type == LAI_NAMESPACE_DEVICE)
             i++;
 
         if(i > index)
-            return acpi_namespace[j];
+            return lai_namespace[j];
 
         j++;
     }
@@ -841,38 +841,38 @@ acpi_nsnode_t *acpins_get_device(size_t index)
 
 // acpins_get_deviceid(): Returns a device by its index and its ID
 // Param:    size_t index - index
-// Param:    acpi_object_t *id - device ID
-// Return:    acpi_nsnode_t * - device handle, NULL on error
+// Param:    lai_object_t *id - device ID
+// Return:    lai_nsnode_t * - device handle, NULL on error
 
-acpi_nsnode_t *acpins_get_deviceid(size_t index, acpi_object_t *id)
+lai_nsnode_t *acpins_get_deviceid(size_t index, lai_object_t *id)
 {
     size_t i = 0, j = 0;
 
-    acpi_nsnode_t *handle;
+    lai_nsnode_t *handle;
     char path[ACPI_MAX_NAME];
-    acpi_object_t device_id = {0};
+    lai_object_t device_id = {0};
 
     handle = acpins_get_device(j);
     while(handle != NULL)
     {
         // read the ID of the device
-        acpi_strcpy(path, handle->path);
-        acpi_strcpy(path + acpi_strlen(path), "._HID");    // hardware ID
-        acpi_memset(&device_id, 0, sizeof(acpi_object_t));
-        if(acpi_eval(&device_id, path) != 0)
+        lai_strcpy(path, handle->path);
+        lai_strcpy(path + lai_strlen(path), "._HID");    // hardware ID
+        lai_memset(&device_id, 0, sizeof(lai_object_t));
+        if(lai_eval(&device_id, path) != 0)
         {
-            acpi_strcpy(path + acpi_strlen(path) - 5, "._CID");    // compatible ID
-            acpi_memset(&device_id, 0, sizeof(acpi_object_t));
-            acpi_eval(&device_id, path);
+            lai_strcpy(path + lai_strlen(path) - 5, "._CID");    // compatible ID
+            lai_memset(&device_id, 0, sizeof(lai_object_t));
+            lai_eval(&device_id, path);
         }
 
-        if(device_id.type == ACPI_INTEGER && id->type == ACPI_INTEGER)
+        if(device_id.type == LAI_INTEGER && id->type == LAI_INTEGER)
         {
             if(device_id.integer == id->integer)
                 i++;
-        } else if(device_id.type == ACPI_STRING && id->type == ACPI_STRING)
+        } else if(device_id.type == LAI_STRING && id->type == LAI_STRING)
         {
-            if(acpi_strcmp(device_id.string, id->string) == 0)
+            if(lai_strcmp(device_id.string, id->string) == 0)
                 i++;
         }
 
@@ -889,18 +889,18 @@ acpi_nsnode_t *acpins_get_deviceid(size_t index, acpi_object_t *id)
 // acpins_enum(): Enumerates children of an ACPI namespace node
 // Param:   char *parent - parent to enumerate
 // Param:   size_t index - child index
-// Return:  acpi_nsnode_t * - child node, NULL if non-existant
+// Return:  lai_nsnode_t * - child node, NULL if non-existant
 
-acpi_nsnode_t *acpins_enum(char *parent, size_t index)
+lai_nsnode_t *acpins_enum(char *parent, size_t index)
 {
     index++;
-    size_t parent_size = acpi_strlen(parent);
-    for(size_t i = 0; i < acpi_ns_size; i++)
+    size_t parent_size = lai_strlen(parent);
+    for(size_t i = 0; i < lai_ns_size; i++)
     {
-        if(!acpi_memcmp(parent, acpi_namespace[i]->path, parent_size))
+        if(!lai_memcmp(parent, lai_namespace[i]->path, parent_size))
         {
             if(!index)
-                return acpi_namespace[i];
+                return lai_namespace[i];
             else
                 index--;
         }

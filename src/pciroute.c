@@ -16,45 +16,45 @@
 
 #define PCI_PNP_ID        "PNP0A03"
 
-// acpi_pci_route(): Resolves PCI IRQ routing for a specific device
+// lai_pci_route(): Resolves PCI IRQ routing for a specific device
 // Param:    acpi_resource_t *dest - destination buffer
 // Param:    uint8_t bus - PCI bus
 // Param:    uint8_t slot - PCI slot
 // Param:    uint8_t function - PCI function
 // Return:    int - 0 on success
 
-int acpi_pci_route(acpi_resource_t *dest, uint8_t bus, uint8_t slot, uint8_t function)
+int lai_pci_route(acpi_resource_t *dest, uint8_t bus, uint8_t slot, uint8_t function)
 {
-    //acpi_debug("attempt to resolve PCI IRQ for device %X:%X:%X\n", bus, slot, function);
+    //lai_debug("attempt to resolve PCI IRQ for device %X:%X:%X\n", bus, slot, function);
 
     // determine the interrupt pin
-    uint8_t pin = (uint8_t)(acpi_pci_read(bus, slot, function, 0x3C) >> 8);
+    uint8_t pin = (uint8_t)(lai_pci_read(bus, slot, function, 0x3C) >> 8);
     if(pin == 0 || pin > 4)
         return 1;
 
     pin--;        // because PCI numbers the pins from 1, but ACPI numbers them from 0
 
     // find the PCI bus in the namespace
-    acpi_object_t bus_number = {0};
-    acpi_object_t pnp_id = {0};
+    lai_object_t bus_number = {0};
+    lai_object_t pnp_id = {0};
 
-    acpi_eisaid(&pnp_id, PCI_PNP_ID);
+    lai_eisaid(&pnp_id, PCI_PNP_ID);
 
     size_t index = 0;
-    acpi_nsnode_t *handle = acpins_get_deviceid(index, &pnp_id);
+    lai_nsnode_t *handle = acpins_get_deviceid(index, &pnp_id);
     char path[ACPI_MAX_NAME];
     int status;
 
     while(handle != NULL)
     {
-        acpi_strcpy(path, handle->path);
-        acpi_strcpy(path + acpi_strlen(path), "._BBN");    // _BBN: Base bus number
+        lai_strcpy(path, handle->path);
+        lai_strcpy(path + lai_strlen(path), "._BBN");    // _BBN: Base bus number
 
-        status = acpi_eval(&bus_number, path);
+        status = lai_eval(&bus_number, path);
         if(status != 0)
         {
             // when _BBN is not present, we assume bus 0
-            bus_number.type = ACPI_INTEGER;
+            bus_number.type = LAI_INTEGER;
             bus_number.integer = 0;
         }
 
@@ -69,12 +69,12 @@ int acpi_pci_route(acpi_resource_t *dest, uint8_t bus, uint8_t slot, uint8_t fun
         return 1;
 
     // read the PCI routing table
-    acpi_strcpy(path, handle->path);
-    acpi_strcpy(path + acpi_strlen(path), "._PRT");    // _PRT: PCI Routing Table
+    lai_strcpy(path, handle->path);
+    lai_strcpy(path + lai_strlen(path), "._PRT");    // _PRT: PCI Routing Table
 
-    acpi_object_t prt = {0};
-    acpi_object_t prt_package = {0};
-    acpi_object_t prt_entry = {0};
+    lai_object_t prt = {0};
+    lai_object_t prt_package = {0};
+    lai_object_t prt_entry = {0};
 
     /* _PRT is a package of packages. Each package within the PRT is in the following format:
        0: Integer:    Address of device. Low WORD = function, high WORD = slot
@@ -85,7 +85,7 @@ int acpi_pci_route(acpi_resource_t *dest, uint8_t bus, uint8_t slot, uint8_t fun
         of the specified device which contains the PCI interrupt. If offset 2 is an
         integer, this field is the ACPI GSI of this PCI IRQ. */
 
-    status = acpi_eval(&prt, path);
+    status = lai_eval(&prt, path);
 
     if(status != 0)
         return 1;
@@ -95,19 +95,19 @@ int acpi_pci_route(acpi_resource_t *dest, uint8_t bus, uint8_t slot, uint8_t fun
     while(1)
     {
         // read the _PRT package
-        status = acpi_eval_package(&prt, i, &prt_package);
+        status = lai_eval_package(&prt, i, &prt_package);
         if(status != 0)
             return 1;
 
-        if(prt_package.type != ACPI_PACKAGE)
+        if(prt_package.type != LAI_PACKAGE)
             return 1;
 
         // read the device address
-        status = acpi_eval_package(&prt_package, 0, &prt_entry);
+        status = lai_eval_package(&prt_package, 0, &prt_entry);
         if(status != 0)
             return 1;
 
-        if(prt_entry.type != ACPI_INTEGER)
+        if(prt_entry.type != LAI_INTEGER)
             return 1;
 
         // is this the device we want?
@@ -116,11 +116,11 @@ int acpi_pci_route(acpi_resource_t *dest, uint8_t bus, uint8_t slot, uint8_t fun
             if((prt_entry.integer & 0xFFFF) == 0xFFFF || (prt_entry.integer & 0xFFFF) == function)
             {
                 // is this the interrupt pin we want?
-                status = acpi_eval_package(&prt_package, 1, &prt_entry);
+                status = lai_eval_package(&prt_package, 1, &prt_entry);
                 if(status != 0)
                     return 1;
 
-                if(prt_entry.type != ACPI_INTEGER)
+                if(prt_entry.type != LAI_INTEGER)
                     return 1;
 
                 if(prt_entry.integer == pin)
@@ -135,17 +135,17 @@ int acpi_pci_route(acpi_resource_t *dest, uint8_t bus, uint8_t slot, uint8_t fun
 resolve_pin:
     // here we've found what we need
     // is it a link device or a GSI?
-    status = acpi_eval_package(&prt_package, 2, &prt_entry);
+    status = lai_eval_package(&prt_package, 2, &prt_entry);
     if(status != 0)
         return 1;
 
     acpi_resource_t *res;
     size_t res_count;
 
-    if(prt_entry.type == ACPI_INTEGER)
+    if(prt_entry.type == LAI_INTEGER)
     {
         // GSI
-        status = acpi_eval_package(&prt_package, 3, &prt_entry);
+        status = lai_eval_package(&prt_package, 3, &prt_entry);
         if(status != 0)
             return 1;
 
@@ -153,16 +153,16 @@ resolve_pin:
         dest->base = prt_entry.integer;
         dest->irq_flags = ACPI_IRQ_LEVEL | ACPI_IRQ_ACTIVE_HIGH | ACPI_IRQ_SHARED;
 
-        acpi_debug("PCI device %02X:%02X:%02X is using IRQ %d\n", bus, slot, function, (int)dest->base);
+        lai_debug("PCI device %02X:%02X:%02X is using IRQ %d\n", bus, slot, function, (int)dest->base);
         return 0;
-    } else if(prt_entry.type == ACPI_HANDLE)
+    } else if(prt_entry.type == LAI_HANDLE)
     {
         // PCI Interrupt Link Device
-        acpi_debug("PCI interrupt link is %s\n", prt_entry.handle->path);
+        lai_debug("PCI interrupt link is %s\n", prt_entry.handle->path);
 
         // read the resource template of the device
-        res = acpi_calloc(sizeof(acpi_resource_t), ACPI_MAX_RESOURCES);
-        res_count = acpi_read_resource(prt_entry.handle, res);
+        res = lai_calloc(sizeof(acpi_resource_t), ACPI_MAX_RESOURCES);
+        res_count = lai_read_resource(prt_entry.handle, res);
 
         if(!res_count)
             return 1;
@@ -176,9 +176,9 @@ resolve_pin:
                 dest->base = res[i].base;
                 dest->irq_flags = res[i].irq_flags;
 
-                acpi_free(res);
+                lai_free(res);
 
-                acpi_debug("PCI device %02X:%02X:%02X is using IRQ %d\n", bus, slot, function, (int)dest->base);
+                lai_debug("PCI device %02X:%02X:%02X is using IRQ %d\n", bus, slot, function, (int)dest->base);
                 return 0;
             }
 

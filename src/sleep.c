@@ -10,15 +10,15 @@
 
 #include <lai/core.h>
 
-// acpi_enter_sleep(): Enters a sleeping state
+// lai_enter_sleep(): Enters a sleeping state
 // Param:    uint8_t state - 0-5 to correspond with states S0-S5
 // Return:    int - 0 on success
 
-int acpi_enter_sleep(uint8_t state)
+int lai_enter_sleep(uint8_t state)
 {
     if(state > 5)
     {
-        acpi_debug("undefined sleep state S%d\n", state);
+        lai_debug("undefined sleep state S%d\n", state);
         return 1;
     }
 
@@ -26,79 +26,79 @@ int acpi_enter_sleep(uint8_t state)
     sleep_object[2] = state + '0';
 
     // get sleeping package
-    acpi_nsnode_t *handle = acpins_resolve((char*)sleep_object);
+    lai_nsnode_t *handle = acpins_resolve((char*)sleep_object);
     if(!handle)
     {
-        acpi_debug("sleep state S%d is not supported.\n", state);
+        lai_debug("sleep state S%d is not supported.\n", state);
         return 1;
     }
 
-    acpi_object_t package = {0};
-    acpi_object_t slp_typa = {0};
-    acpi_object_t slp_typb = {0};
+    lai_object_t package = {0};
+    lai_object_t slp_typa = {0};
+    lai_object_t slp_typb = {0};
     int eval_status;
-    eval_status = acpi_eval(&package, handle->path);
+    eval_status = lai_eval(&package, handle->path);
     if(eval_status != 0)
     {
-        acpi_debug("sleep state S%d is not supported.\n", state);
+        lai_debug("sleep state S%d is not supported.\n", state);
         return 1;
     }
 
-    acpi_debug("entering sleep state S%d...\n", state);
+    lai_debug("entering sleep state S%d...\n", state);
 
     // ACPI spec says we should call _PTS() and _GTS() before actually sleeping
     // Who knows, it might do some required firmware-specific stuff
-    acpi_state_t acpi_state;
+    lai_state_t acpi_state;
     handle = acpins_resolve("_PTS");
 
     if(handle)
     {
-        acpi_init_state(&acpi_state);
+        lai_init_state(&acpi_state);
 
         // pass the sleeping type as an argument
-        acpi_arg(&acpi_state, 0)->type = ACPI_INTEGER;
-        acpi_arg(&acpi_state, 0)->integer = (uint64_t)state & 0xFF;
+        lai_arg(&acpi_state, 0)->type = LAI_INTEGER;
+        lai_arg(&acpi_state, 0)->integer = (uint64_t)state & 0xFF;
 
-        acpi_debug("execute _PTS(%d)\n", state);
-        acpi_exec_method(handle, &acpi_state);
-        acpi_finalize_state(&acpi_state);
+        lai_debug("execute _PTS(%d)\n", state);
+        lai_exec_method(handle, &acpi_state);
+        lai_finalize_state(&acpi_state);
     }
 
     handle = acpins_resolve("_GTS");
 
     if(handle)
     {
-        acpi_init_state(&acpi_state);
+        lai_init_state(&acpi_state);
 
         // pass the sleeping type as an argument
-        acpi_arg(&acpi_state, 0)->type = ACPI_INTEGER;
-        acpi_arg(&acpi_state, 0)->integer = (uint64_t)state & 0xFF;
+        lai_arg(&acpi_state, 0)->type = LAI_INTEGER;
+        lai_arg(&acpi_state, 0)->integer = (uint64_t)state & 0xFF;
 
-        acpi_debug("execute _GTS(%d)\n", state);
-        acpi_exec_method(handle, &acpi_state);
-        acpi_finalize_state(&acpi_state);
+        lai_debug("execute _GTS(%d)\n", state);
+        lai_exec_method(handle, &acpi_state);
+        lai_finalize_state(&acpi_state);
     }
 
-    acpi_eval_package(&package, 0, &slp_typa);
-    acpi_eval_package(&package, 1, &slp_typb);
+    lai_eval_package(&package, 0, &slp_typa);
+    lai_eval_package(&package, 1, &slp_typb);
 
     // and go to sleep
     uint16_t data;
-    data = acpi_inw(acpi_fadt->pm1a_control_block);
+    data = lai_inw(lai_fadt->pm1a_control_block);
     data &= 0xE3FF;
     data |= (slp_typa.integer << 10) | ACPI_SLEEP;
-    acpi_outw(acpi_fadt->pm1a_control_block, data);
+    lai_outw(lai_fadt->pm1a_control_block, data);
 
-    if(acpi_fadt->pm1b_control_block != 0)
+    if(lai_fadt->pm1b_control_block != 0)
     {
-        data = acpi_inw(acpi_fadt->pm1b_control_block);
+        data = lai_inw(lai_fadt->pm1b_control_block);
         data &= 0xE3FF;
         data |= (slp_typb.integer << 10) | ACPI_SLEEP;
-        acpi_outw(acpi_fadt->pm1b_control_block, data);
+        lai_outw(lai_fadt->pm1b_control_block, data);
     }
 
     /* poll the wake status */
-    while(!(acpi_last_event & ACPI_WAKE));
+    while(!(lai_last_event & ACPI_WAKE));
 
     return 0;
 }

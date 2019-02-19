@@ -14,7 +14,7 @@
 #define LAI_ENSURE(cond) \
     do { \
         if(!(cond)) \
-            acpi_panic("assertion failed: " #cond " at " \
+            lai_panic("assertion failed: " #cond " at " \
                        __FILE__ ":" LAI_EXPAND_STRINGIFY(__LINE__) "\n"); \
     } while(0)
 
@@ -25,44 +25,44 @@
 #define ACPI_GAS_IO            1
 #define ACPI_GAS_PCI            2
 
-#define ACPI_NAMESPACE_NAME        1
-#define ACPI_NAMESPACE_ALIAS        2
-#define ACPI_NAMESPACE_SCOPE        3
-#define ACPI_NAMESPACE_FIELD        4
-#define ACPI_NAMESPACE_METHOD        5
-#define ACPI_NAMESPACE_DEVICE        6
-#define ACPI_NAMESPACE_INDEXFIELD    7
-#define ACPI_NAMESPACE_MUTEX        8
-#define ACPI_NAMESPACE_PROCESSOR    9
-#define ACPI_NAMESPACE_BUFFER_FIELD    10
-#define ACPI_NAMESPACE_THERMALZONE    11
+#define LAI_NAMESPACE_NAME        1
+#define LAI_NAMESPACE_ALIAS        2
+#define LAI_NAMESPACE_SCOPE        3
+#define LAI_NAMESPACE_FIELD        4
+#define LAI_NAMESPACE_METHOD        5
+#define LAI_NAMESPACE_DEVICE        6
+#define LAI_NAMESPACE_INDEXFIELD    7
+#define LAI_NAMESPACE_MUTEX        8
+#define LAI_NAMESPACE_PROCESSOR    9
+#define LAI_NAMESPACE_BUFFER_FIELD    10
+#define LAI_NAMESPACE_THERMALZONE    11
 
 // ----------------------------------------------------------------------------
 // Data types defined by AML.
 // ----------------------------------------------------------------------------
 // Value types: integer, string, buffer, package.
-#define ACPI_INTEGER            1
-#define ACPI_STRING             2
-#define ACPI_BUFFER             3
-#define ACPI_PACKAGE            4
+#define LAI_INTEGER            1
+#define LAI_STRING             2
+#define LAI_BUFFER             3
+#define LAI_PACKAGE            4
 // Handle type: this is used to represent device (and other) namespace nodes.
-#define ACPI_HANDLE             5
+#define LAI_HANDLE             5
 // Reference types: obtained from RefOp() or Index().
-#define ACPI_STRING_INDEX       6
-#define ACPI_BUFFER_INDEX       7
-#define ACPI_PACKAGE_INDEX      8
+#define LAI_STRING_INDEX       6
+#define LAI_BUFFER_INDEX       7
+#define LAI_PACKAGE_INDEX      8
 // ----------------------------------------------------------------------------
 // Internal data types of the interpreter.
 // ----------------------------------------------------------------------------
 // Name types: unresolved names and names of certain objects.
-#define ACPI_NULL_NAME          9
-#define ACPI_UNRESOLVED_NAME   10
-#define ACPI_ARG_NAME          11
-#define ACPI_LOCAL_NAME        12
+#define LAI_NULL_NAME          9
+#define LAI_UNRESOLVED_NAME   10
+#define LAI_ARG_NAME          11
+#define LAI_LOCAL_NAME        12
 // Reference types: references to object storage.
-#define ACPI_STRING_REFERENCE  13
-#define ACPI_BUFFER_REFERENCE  14
-#define ACPI_PACKAGE_REFERENCE 15
+#define LAI_STRING_REFERENCE  13
+#define LAI_BUFFER_REFERENCE  14
+#define LAI_PACKAGE_REFERENCE 15
 
 // Device _STA object
 #define ACPI_STA_PRESENT        0x01
@@ -211,25 +211,25 @@ typedef struct acpi_aml_t        // AML tables, DSDT and SSDT
     uint8_t data[];
 }__attribute__((packed)) acpi_aml_t;
 
-typedef struct acpi_object_t
+typedef struct lai_object_t
 {
     int type;
     uint64_t integer;        // for Name()
     char *string;            // for Name()
 
     int package_size;        // for Package(), size in entries
-    struct acpi_object_t *package;    // for Package(), actual entries
+    struct lai_object_t *package;    // for Package(), actual entries
 
     size_t buffer_size;        // for Buffer(), size in bytes
     void *buffer;            // for Buffer(), actual bytes
 
     char name[ACPI_MAX_NAME];    // for Name References
-    struct acpi_nsnode_t *handle;
+    struct lai_nsnode_t *handle;
 
     int index;
-} acpi_object_t;
+} lai_object_t;
 
-typedef struct acpi_nsnode_t
+typedef struct lai_nsnode_t
 {
     char path[ACPI_MAX_NAME];    // full path of object
     int type;
@@ -237,7 +237,7 @@ typedef struct acpi_nsnode_t
     size_t size;            // valid for scopes, methods, etc.
 
     char alias[ACPI_MAX_NAME];    // for Alias() only
-    acpi_object_t object;        // for Name()
+    lai_object_t object;        // for Name()
 
     uint8_t op_address_space;    // for OpRegions only
     uint64_t op_base;        // for OpRegions only
@@ -250,7 +250,7 @@ typedef struct acpi_nsnode_t
 
     uint8_t method_flags;        // for Methods only, includes ARG_COUNT in lowest three bits
     // Allows the OS to override methods. Mainly useful for _OSI, _OS and _REV.
-    int (*method_override)(acpi_object_t *args, acpi_object_t *result);
+    int (*method_override)(lai_object_t *args, lai_object_t *result);
 
     uint64_t indexfield_offset;    // for IndexFields, in bits
     char indexfield_index[ACPI_MAX_NAME];    // for IndexFields
@@ -258,22 +258,14 @@ typedef struct acpi_nsnode_t
     uint8_t indexfield_flags;    // for IndexFields
     uint8_t indexfield_size;    // for IndexFields
 
-    acpi_lock_t mutex;        // for Mutex
+    lai_lock_t mutex;        // for Mutex
 
     uint8_t cpu_id;            // for Processor
 
     char buffer[ACPI_MAX_NAME];        // for Buffer field
     uint64_t buffer_offset;        // for Buffer field, in bits
     uint64_t buffer_size;        // for Buffer field, in bits
-} acpi_nsnode_t;
-
-typedef struct acpi_condition_t
-{
-    acpi_object_t predicate;
-    size_t predicate_size;
-    size_t pkgsize;
-    size_t end;
-} acpi_condition_t;
+} lai_nsnode_t;
 
 #define LAI_POPULATE_CONTEXT_STACKITEM 1
 #define LAI_METHOD_CONTEXT_STACKITEM 2
@@ -281,16 +273,16 @@ typedef struct acpi_condition_t
 #define LAI_COND_STACKITEM 4
 #define LAI_PKG_INITIALIZER_STACKITEM 5
 #define LAI_OP_STACKITEM 6
-// This implements acpi_eval_operand(). // TODO: Eventually remove
-// acpi_eval_operand() by moving all parsing functionality into acpi_exec_run().
+// This implements lai_eval_operand(). // TODO: Eventually remove
+// lai_eval_operand() by moving all parsing functionality into lai_exec_run().
 #define LAI_EVALOPERAND_STACKITEM 10
 
-typedef struct acpi_stackitem_ {
+typedef struct lai_stackitem_ {
     int kind;
     int opstack_frame;
     union {
         struct {
-            acpi_nsnode_t *ctx_handle;
+            lai_nsnode_t *ctx_handle;
             int ctx_limit;
         };
         struct {
@@ -312,34 +304,34 @@ typedef struct acpi_stackitem_ {
             uint8_t op_result_mode;
         };
     };
-} acpi_stackitem_t;
+} lai_stackitem_t;
 
-typedef struct acpi_state_t
+typedef struct lai_state_t
 {
     int pc;
     int limit;
-    acpi_object_t retvalue;
-    acpi_object_t arg[7];
-    acpi_object_t local[8];
+    lai_object_t retvalue;
+    lai_object_t arg[7];
+    lai_object_t local[8];
 
     // Stack to track the current execution state.
     int stack_ptr;
     int opstack_ptr;
-    acpi_stackitem_t stack[16];
-    acpi_object_t opstack[16];
+    lai_stackitem_t stack[16];
+    lai_object_t opstack[16];
     int context_ptr; // Index of the last CONTEXT_STACKITEM.
-} acpi_state_t;
+} lai_state_t;
 
-void acpi_init_state(acpi_state_t *);
-void acpi_finalize_state(acpi_state_t *);
+void lai_init_state(lai_state_t *);
+void lai_finalize_state(lai_state_t *);
 
 __attribute__((always_inline))
-inline acpi_object_t *acpi_retvalue(acpi_state_t *state) {
+inline lai_object_t *lai_retvalue(lai_state_t *state) {
     return &state->retvalue;
 }
 
 __attribute__((always_inline))
-inline acpi_object_t *acpi_arg(acpi_state_t *state, int n) {
+inline lai_object_t *lai_arg(lai_state_t *state, int n) {
     return &state->arg[n];
 }
 
@@ -374,77 +366,76 @@ typedef struct acpi_large_irq_t
     uint32_t irq;
 }__attribute__((packed)) acpi_large_irq_t;
 
-acpi_fadt_t *acpi_fadt;
-acpi_aml_t *acpi_dsdt;
-size_t acpi_ns_size;
-volatile uint16_t acpi_last_event;
+acpi_fadt_t *lai_fadt;
+acpi_aml_t *lai_dsdt;
+size_t lai_ns_size;
+volatile uint16_t lai_last_event;
 
 // OS-specific functions
-void *acpi_scan(char *, size_t);
-void *acpi_memcpy(void *, const void *, size_t);
-void *acpi_memmove(void *, const void *, size_t);
-void *acpi_malloc(size_t);
-void *acpi_calloc(size_t, size_t);
-void *acpi_realloc(void *, size_t);
-void acpi_free(void *);
-void *acpi_map(size_t, size_t);
-char *acpi_strcpy(char *, const char *);
-size_t acpi_strlen(const char *);
-void *acpi_memset(void *, int, size_t);
-int acpi_strcmp(const char *, const char *);
-int acpi_memcmp(const char *, const char *, size_t);
-void acpi_outb(uint16_t, uint8_t);
-void acpi_outw(uint16_t, uint16_t);
-void acpi_outd(uint16_t, uint32_t);
-void acpi_pci_write(uint8_t, uint8_t, uint8_t, uint16_t, uint32_t);
-uint32_t acpi_pci_read(uint8_t, uint8_t, uint8_t, uint16_t);
-uint8_t acpi_inb(uint16_t);
-uint16_t acpi_inw(uint16_t);
-uint32_t acpi_ind(uint16_t);
-void acpi_sleep(uint64_t);
+void *lai_scan(char *, size_t);
+void *lai_memcpy(void *, const void *, size_t);
+void *lai_memmove(void *, const void *, size_t);
+void *lai_malloc(size_t);
+void *lai_calloc(size_t, size_t);
+void *lai_realloc(void *, size_t);
+void lai_free(void *);
+void *lai_map(size_t, size_t);
+char *lai_strcpy(char *, const char *);
+size_t lai_strlen(const char *);
+void *lai_memset(void *, int, size_t);
+int lai_strcmp(const char *, const char *);
+int lai_memcmp(const char *, const char *, size_t);
+void lai_outb(uint16_t, uint8_t);
+void lai_outw(uint16_t, uint16_t);
+void lai_outd(uint16_t, uint32_t);
+void lai_pci_write(uint8_t, uint8_t, uint8_t, uint16_t, uint32_t);
+uint32_t lai_pci_read(uint8_t, uint8_t, uint8_t, uint16_t);
+uint8_t lai_inb(uint16_t);
+uint16_t lai_inw(uint16_t);
+uint32_t lai_ind(uint16_t);
+void lai_sleep(uint64_t);
 
 // The remaining of these functions are OS independent!
 // ACPI namespace functions
-size_t acpins_resolve_path(acpi_nsnode_t *, char *, uint8_t *);
-void acpi_create_namespace(void *);
-int acpi_is_name(char);
-size_t acpi_eval_integer(uint8_t *, uint64_t *);
-size_t acpi_parse_pkgsize(uint8_t *, size_t *);
-int acpi_eval_package(acpi_object_t *, size_t, acpi_object_t *);
-acpi_nsnode_t *acpins_resolve(char *);
-acpi_nsnode_t *acpins_get_device(size_t);
-acpi_nsnode_t *acpins_get_deviceid(size_t, acpi_object_t *);
-acpi_nsnode_t *acpins_enum(char *, size_t);
-void acpi_eisaid(acpi_object_t *, char *);
-size_t acpi_read_resource(acpi_nsnode_t *, acpi_resource_t *);
+size_t acpins_resolve_path(lai_nsnode_t *, char *, uint8_t *);
+void lai_create_namespace(void *);
+int lai_is_name(char);
+size_t lai_eval_integer(uint8_t *, uint64_t *);
+size_t lai_parse_pkgsize(uint8_t *, size_t *);
+int lai_eval_package(lai_object_t *, size_t, lai_object_t *);
+lai_nsnode_t *acpins_resolve(char *);
+lai_nsnode_t *acpins_get_device(size_t);
+lai_nsnode_t *acpins_get_deviceid(size_t, lai_object_t *);
+lai_nsnode_t *acpins_enum(char *, size_t);
+void lai_eisaid(lai_object_t *, char *);
+size_t lai_read_resource(lai_nsnode_t *, acpi_resource_t *);
 
 // ACPI Control Methods
-void acpi_eval_operand(acpi_object_t *, acpi_state_t *, uint8_t *);
-int acpi_eval(acpi_object_t *, char *);
-void acpi_free_object(acpi_object_t *);
-void acpi_move_object(acpi_object_t *, acpi_object_t *);
-void acpi_copy_object(acpi_object_t *, acpi_object_t *);
-acpi_nsnode_t *acpi_exec_resolve(char *);
-int acpi_populate(acpi_nsnode_t *, void *, size_t, acpi_state_t *);
-int acpi_exec_method(acpi_nsnode_t *, acpi_state_t *);
-void acpi_read_opregion(acpi_object_t *, acpi_nsnode_t *);
-void acpi_write_opregion(acpi_nsnode_t *, acpi_object_t *);
-void acpi_exec_name(void *, acpi_nsnode_t *, acpi_state_t *);
-void acpi_exec_sleep(void *, acpi_state_t *);
-uint16_t acpi_bswap16(uint16_t);
-uint32_t acpi_bswap32(uint32_t);
-uint8_t acpi_char_to_hex(char);
-void acpi_write_buffer(acpi_nsnode_t *, acpi_object_t *);
-void acpi_exec_bytefield(void *, acpi_nsnode_t *, acpi_state_t *);
-void acpi_exec_wordfield(void *, acpi_nsnode_t *, acpi_state_t *);
-void acpi_exec_dwordfield(void *, acpi_nsnode_t *, acpi_state_t *);
+void lai_eval_operand(lai_object_t *, lai_state_t *, uint8_t *);
+int lai_eval(lai_object_t *, char *);
+void lai_free_object(lai_object_t *);
+void lai_move_object(lai_object_t *, lai_object_t *);
+void lai_copy_object(lai_object_t *, lai_object_t *);
+lai_nsnode_t *lai_exec_resolve(char *);
+int lai_populate(lai_nsnode_t *, void *, size_t, lai_state_t *);
+int lai_exec_method(lai_nsnode_t *, lai_state_t *);
+void lai_read_opregion(lai_object_t *, lai_nsnode_t *);
+void lai_write_opregion(lai_nsnode_t *, lai_object_t *);
+void lai_exec_name(void *, lai_nsnode_t *, lai_state_t *);
+void lai_exec_sleep(void *, lai_state_t *);
+uint16_t lai_bswap16(uint16_t);
+uint32_t lai_bswap32(uint32_t);
+uint8_t lai_char_to_hex(char);
+void lai_write_buffer(lai_nsnode_t *, lai_object_t *);
+void lai_exec_bytefield(void *, lai_nsnode_t *, lai_state_t *);
+void lai_exec_wordfield(void *, lai_nsnode_t *, lai_state_t *);
+void lai_exec_dwordfield(void *, lai_nsnode_t *, lai_state_t *);
 
 // Generic Functions
-int acpi_enable(uint32_t);
-int acpi_disable();
-uint16_t acpi_read_event();
-void acpi_set_event(uint16_t);
-int acpi_enter_sleep(uint8_t);
-int acpi_pci_route(acpi_resource_t *, uint8_t, uint8_t, uint8_t);
-
+int lai_enable_acpi(uint32_t);
+int lai_disable_acpi();
+uint16_t lai_read_event();
+void lai_set_event(uint16_t);
+int lai_enter_sleep(uint8_t);
+int lai_pci_route(acpi_resource_t *, uint8_t, uint8_t, uint8_t);
 

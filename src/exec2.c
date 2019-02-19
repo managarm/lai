@@ -19,21 +19,21 @@
    DefToDecimalString | DefToHexString | DefToInteger | DefToString |
    DefWait | DefXOr | UserTermObj */
 
-// acpi_exec_resolve(): Resolves a name during control method execution
+// lai_exec_resolve(): Resolves a name during control method execution
 // Param:    char *path - 4-char object name or full path
-// Return:    acpi_nsnode_t * - pointer to namespace object, NULL on error
+// Return:    lai_nsnode_t * - pointer to namespace object, NULL on error
 
-acpi_nsnode_t *acpi_exec_resolve(char *path)
+lai_nsnode_t *lai_exec_resolve(char *path)
 {
-    acpi_nsnode_t *object;
+    lai_nsnode_t *object;
     object = acpins_resolve(path);
 
-    if(acpi_strlen(path) == 4)
+    if(lai_strlen(path) == 4)
         return acpins_resolve(path);
 
-    while(!object && acpi_strlen(path) > 6)
+    while(!object && lai_strlen(path) > 6)
     {
-        acpi_memmove(path + acpi_strlen(path) - 9, path + acpi_strlen(path) - 4, 5);
+        lai_memmove(path + lai_strlen(path) - 9, path + lai_strlen(path) - 4, 5);
         object = acpins_resolve(path);
         if(object != NULL)
             goto resolve_alias;
@@ -44,7 +44,7 @@ acpi_nsnode_t *acpi_exec_resolve(char *path)
 
 resolve_alias:
     // resolve Aliases too
-    while(object->type == ACPI_NAMESPACE_ALIAS)
+    while(object->type == LAI_NAMESPACE_ALIAS)
     {
         object = acpins_resolve(object->alias);
         if(!object)
@@ -54,301 +54,301 @@ resolve_alias:
     return object;
 }
 
-// acpi_free_package(): Frees a package object and all its children
-// Param:   acpi_object_t *object
+// lai_free_package(): Frees a package object and all its children
+// Param:   lai_object_t *object
 // Return:  Nothing
 
-static void acpi_free_package(acpi_object_t *object)
+static void lai_free_package(lai_object_t *object)
 {
     for(int i = 0; i < object->package_size; i++)
-        acpi_free_object(&object->package[i]);
-    acpi_free(object->package);
+        lai_free_object(&object->package[i]);
+    lai_free(object->package);
 }
 
-void acpi_free_object(acpi_object_t *object)
+void lai_free_object(lai_object_t *object)
 {
-    if(object->type == ACPI_BUFFER)
-        acpi_free(object->buffer);
-    else if(object->type == ACPI_PACKAGE)
-        acpi_free_package(object);
+    if(object->type == LAI_BUFFER)
+        lai_free(object->buffer);
+    else if(object->type == LAI_PACKAGE)
+        lai_free_package(object);
 
-    acpi_memset(object, 0, sizeof(acpi_object_t));
+    lai_memset(object, 0, sizeof(lai_object_t));
 }
 
-// Helper function for acpi_move_object() and acpi_copy_object().
-void acpi_swap_object(acpi_object_t *first, acpi_object_t *second) {
-    acpi_object_t temp = *first;
+// Helper function for lai_move_object() and lai_copy_object().
+void lai_swap_object(lai_object_t *first, lai_object_t *second) {
+    lai_object_t temp = *first;
     *first = *second;
     *second = temp;
 }
 
-// acpi_move_object(): Moves an object: instead of making a deep copy,
+// lai_move_object(): Moves an object: instead of making a deep copy,
 //                     the pointers are exchanged and the source object is reset to zero.
-// Param & Return: See acpi_copy_object().
+// Param & Return: See lai_copy_object().
 
-void acpi_move_object(acpi_object_t *destination, acpi_object_t *source)
+void lai_move_object(lai_object_t *destination, lai_object_t *source)
 {
     // Move-by-swap idiom. This handles move-to-self operations correctly.
-    acpi_object_t temp = {0};
-    acpi_swap_object(&temp, source);
-    acpi_swap_object(&temp, destination);
-    acpi_free_object(&temp);
+    lai_object_t temp = {0};
+    lai_swap_object(&temp, source);
+    lai_swap_object(&temp, destination);
+    lai_free_object(&temp);
 }
 
-// acpi_clone_buffer(): Clones a buffer object
-// Param:    acpi_object_t *destination - destination
-// Param:    acpi_object_t *source - source
+// lai_clone_buffer(): Clones a buffer object
+// Param:    lai_object_t *destination - destination
+// Param:    lai_object_t *source - source
 // Return:   Nothing
 
-static void acpi_clone_buffer(acpi_object_t *destination, acpi_object_t *source)
+static void lai_clone_buffer(lai_object_t *destination, lai_object_t *source)
 {
-    destination->type = ACPI_BUFFER;
+    destination->type = LAI_BUFFER;
     destination->buffer_size = source->buffer_size;
-    destination->buffer = acpi_malloc(source->buffer_size);
+    destination->buffer = lai_malloc(source->buffer_size);
     if(!destination->buffer)
-        acpi_panic("unable to allocate memory for buffer object.\n");
+        lai_panic("unable to allocate memory for buffer object.\n");
 
-    acpi_memcpy(destination->buffer, source->buffer, source->buffer_size);
+    lai_memcpy(destination->buffer, source->buffer, source->buffer_size);
 }
 
-// acpi_clone_string(): Clones a string object
-// Param:    acpi_object_t *destination - destination
-// Param:    acpi_object_t *source - source
+// lai_clone_string(): Clones a string object
+// Param:    lai_object_t *destination - destination
+// Param:    lai_object_t *source - source
 // Return:   Nothing
 
-static void acpi_clone_string(acpi_object_t *destination, acpi_object_t *source)
+static void lai_clone_string(lai_object_t *destination, lai_object_t *source)
 {
-    destination->type = ACPI_STRING;
-    destination->string = acpi_malloc(acpi_strlen(source->string) + 1);
+    destination->type = LAI_STRING;
+    destination->string = lai_malloc(lai_strlen(source->string) + 1);
     if(!destination->string)
-        acpi_panic("unable to allocate memory for string object.\n");
+        lai_panic("unable to allocate memory for string object.\n");
 
-    acpi_strcpy(destination->string, source->string);
+    lai_strcpy(destination->string, source->string);
 }
 
-// acpi_clone_package(): Clones a package object
-// Param:    acpi_object_t *destination - destination
-// Param:    acpi_object_t *source - source
+// lai_clone_package(): Clones a package object
+// Param:    lai_object_t *destination - destination
+// Param:    lai_object_t *source - source
 // Return:   Nothing
 
-static void acpi_clone_package(acpi_object_t *destination, acpi_object_t *source)
+static void lai_clone_package(lai_object_t *destination, lai_object_t *source)
 {
-    destination->type = ACPI_PACKAGE;
+    destination->type = LAI_PACKAGE;
     destination->package_size = source->package_size;
-    destination->package = acpi_calloc(source->package_size, sizeof(acpi_object_t));
+    destination->package = lai_calloc(source->package_size, sizeof(lai_object_t));
     if(!destination->package)
-        acpi_panic("unable to allocate memory for package object.\n");
+        lai_panic("unable to allocate memory for package object.\n");
 
     for(int i = 0; i < source->package_size; i++)
-        acpi_copy_object(&destination->package[i], &source->package[i]);
+        lai_copy_object(&destination->package[i], &source->package[i]);
 }
 
-// acpi_copy_object(): Copies an object
-// Param:    acpi_object_t *destination - destination
-// Param:    acpi_object_t *source - source
+// lai_copy_object(): Copies an object
+// Param:    lai_object_t *destination - destination
+// Param:    lai_object_t *source - source
 // Return:   Nothing
 
-void acpi_copy_object(acpi_object_t *destination, acpi_object_t *source)
+void lai_copy_object(lai_object_t *destination, lai_object_t *source)
 {
     // First, clone into a temporary object.
-    acpi_object_t temp;
-    if(source->type == ACPI_STRING)
-        acpi_clone_string(&temp, source);
-    else if(source->type == ACPI_BUFFER)
-        acpi_clone_buffer(&temp, source);
-    else if(source->type == ACPI_PACKAGE)
-        acpi_clone_package(&temp, source);
+    lai_object_t temp;
+    if(source->type == LAI_STRING)
+        lai_clone_string(&temp, source);
+    else if(source->type == LAI_BUFFER)
+        lai_clone_buffer(&temp, source);
+    else if(source->type == LAI_PACKAGE)
+        lai_clone_package(&temp, source);
     else
         temp = *source;
 
     // Afterwards, swap to the destination. This handles copy-to-self correctly.
-    acpi_swap_object(destination, &temp);
-    acpi_free_object(&temp);
+    lai_swap_object(destination, &temp);
+    lai_free_object(&temp);
 }
 
-// acpi_alias_copy(): Creates a reference to the storage of an object.
+// lai_alias_copy(): Creates a reference to the storage of an object.
 
-void acpi_alias_object(acpi_object_t *alias, acpi_object_t *object)
+void lai_alias_object(lai_object_t *alias, lai_object_t *object)
 {
-    if(object->type == ACPI_STRING)
+    if(object->type == LAI_STRING)
     {
-        alias->type = ACPI_STRING_REFERENCE;
+        alias->type = LAI_STRING_REFERENCE;
         alias->string = object->string;
-    }else if(object->type == ACPI_BUFFER)
+    }else if(object->type == LAI_BUFFER)
     {
-        alias->type = ACPI_BUFFER_REFERENCE;
+        alias->type = LAI_BUFFER_REFERENCE;
         alias->buffer_size = object->buffer_size;
         alias->buffer = object->buffer;
-    }else if(object->type == ACPI_PACKAGE)
+    }else if(object->type == LAI_PACKAGE)
     {
-        alias->type = ACPI_PACKAGE_REFERENCE;
+        alias->type = LAI_PACKAGE_REFERENCE;
         alias->package_size = object->package_size;
         alias->package = object->package;
     }else
-        acpi_panic("object type %d is not valid for acpi_alias_object()\n", object->type);
+        lai_panic("object type %d is not valid for lai_alias_object()\n", object->type);
 }
 
-void acpi_load_ns(acpi_nsnode_t *source, acpi_object_t *object)
+void lai_load_ns(lai_nsnode_t *source, lai_object_t *object)
 {
-    if(source->type == ACPI_NAMESPACE_NAME)
-        acpi_copy_object(object, &source->object);
-    else if(source->type == ACPI_NAMESPACE_FIELD || source->type == ACPI_NAMESPACE_INDEXFIELD)
+    if(source->type == LAI_NAMESPACE_NAME)
+        lai_copy_object(object, &source->object);
+    else if(source->type == LAI_NAMESPACE_FIELD || source->type == LAI_NAMESPACE_INDEXFIELD)
         // It's an Operation Region field; perform IO in that region.
-        acpi_read_opregion(object, source);
-    else if(source->type == ACPI_NAMESPACE_DEVICE)
+        lai_read_opregion(object, source);
+    else if(source->type == LAI_NAMESPACE_DEVICE)
     {
-        object->type = ACPI_HANDLE;
+        object->type = LAI_HANDLE;
         object->handle = source;
     }else
-        acpi_panic("unexpected type %d of named object in acpi_load_ns()\n", source->type);
+        lai_panic("unexpected type %d of named object in lai_load_ns()\n", source->type);
 }
 
-void acpi_store_ns(acpi_nsnode_t *target, acpi_object_t *object)
+void lai_store_ns(lai_nsnode_t *target, lai_object_t *object)
 {
-    if(target->type == ACPI_NAMESPACE_NAME)
-        acpi_copy_object(&target->object, object);
-    else if(target->type == ACPI_NAMESPACE_FIELD || target->type == ACPI_NAMESPACE_INDEXFIELD)
+    if(target->type == LAI_NAMESPACE_NAME)
+        lai_copy_object(&target->object, object);
+    else if(target->type == LAI_NAMESPACE_FIELD || target->type == LAI_NAMESPACE_INDEXFIELD)
     {
-        acpi_write_opregion(target, object);
-    }else if(target->type == ACPI_NAMESPACE_BUFFER_FIELD)
+        lai_write_opregion(target, object);
+    }else if(target->type == LAI_NAMESPACE_BUFFER_FIELD)
     {
-        acpi_write_buffer(target, object);
+        lai_write_buffer(target, object);
     }else
-        acpi_panic("unexpected type %d of named object in acpi_store_ns()\n", target->type);
+        lai_panic("unexpected type %d of named object in lai_store_ns()\n", target->type);
 }
 
-void acpi_alias_operand(acpi_state_t *state, acpi_object_t *object, acpi_object_t *ref) {
-    acpi_nsnode_t *node;
+void lai_alias_operand(lai_state_t *state, lai_object_t *object, lai_object_t *ref) {
+    lai_nsnode_t *node;
     switch(object->type)
     {
-    case ACPI_ARG_NAME:
-        acpi_alias_object(ref, &state->arg[object->index]);
+    case LAI_ARG_NAME:
+        lai_alias_object(ref, &state->arg[object->index]);
         break;
-    case ACPI_LOCAL_NAME:
-        acpi_alias_object(ref, &state->local[object->index]);
+    case LAI_LOCAL_NAME:
+        lai_alias_object(ref, &state->local[object->index]);
         break;
-    case ACPI_UNRESOLVED_NAME:
-        node = acpi_exec_resolve(object->name);
+    case LAI_UNRESOLVED_NAME:
+        node = lai_exec_resolve(object->name);
         if(!node)
-            acpi_panic("node %s not found.\n", object->name);
+            lai_panic("node %s not found.\n", object->name);
 
-        if(node->type == ACPI_NAMESPACE_NAME)
-            acpi_alias_object(ref, &node->object);
+        if(node->type == LAI_NAMESPACE_NAME)
+            lai_alias_object(ref, &node->object);
         else
-            acpi_panic("node %s type %d is not valid for acpi_alias_operand()\n", node->path, node->type);
+            lai_panic("node %s type %d is not valid for lai_alias_operand()\n", node->path, node->type);
 
         break;
     default:
-        acpi_panic("object type %d is not valid for acpi_alias_operand()\n", object->type);
+        lai_panic("object type %d is not valid for lai_alias_operand()\n", object->type);
     }
 }
 
-// acpi_load_operand(): Load an object from a reference.
+// lai_load_operand(): Load an object from a reference.
 
-void acpi_load_operand(acpi_state_t *state, acpi_object_t *source, acpi_object_t *object)
+void lai_load_operand(lai_state_t *state, lai_object_t *source, lai_object_t *object)
 {
     switch(source->type)
     {
-    case ACPI_INTEGER:
-    case ACPI_BUFFER:
-    case ACPI_STRING:
-    case ACPI_PACKAGE:
+    case LAI_INTEGER:
+    case LAI_BUFFER:
+    case LAI_STRING:
+    case LAI_PACKAGE:
     {
         // Anonymous objects are just returned as-is.
-        acpi_copy_object(object, source);
+        lai_copy_object(object, source);
         break;
     }
-    case ACPI_STRING_INDEX:
-    case ACPI_BUFFER_INDEX:
-    case ACPI_PACKAGE_INDEX:
+    case LAI_STRING_INDEX:
+    case LAI_BUFFER_INDEX:
+    case LAI_PACKAGE_INDEX:
     {
         // Indices are resolved for stores, but returned as-is for loads.
-        acpi_copy_object(object, source);
+        lai_copy_object(object, source);
         break;
     }
-    case ACPI_UNRESOLVED_NAME:
+    case LAI_UNRESOLVED_NAME:
     {
-        acpi_nsnode_t *handle = acpi_exec_resolve(source->name);
+        lai_nsnode_t *handle = lai_exec_resolve(source->name);
         if(!handle)
-            acpi_panic("undefined reference %s\n", source->name);
-        acpi_load_ns(handle, object);
+            lai_panic("undefined reference %s\n", source->name);
+        lai_load_ns(handle, object);
         break;
     }
-    case ACPI_ARG_NAME:
-        acpi_copy_object(object, &state->arg[source->index]);
+    case LAI_ARG_NAME:
+        lai_copy_object(object, &state->arg[source->index]);
         break;
-    case ACPI_LOCAL_NAME:
-        acpi_copy_object(object, &state->local[source->index]);
+    case LAI_LOCAL_NAME:
+        lai_copy_object(object, &state->local[source->index]);
         break;
     default:
-        acpi_panic("object type %d is not valid for acpi_load_operand()\n", source->type);
+        lai_panic("object type %d is not valid for lai_load_operand()\n", source->type);
     }
 }
 
-// acpi_store_operand(): Stores a copy of the object to a reference.
+// lai_store_operand(): Stores a copy of the object to a reference.
 
-void acpi_store_operand(acpi_state_t *state, acpi_object_t *target, acpi_object_t *object)
+void lai_store_operand(lai_state_t *state, lai_object_t *target, lai_object_t *object)
 {
     switch(target->type)
     {
-    case ACPI_NULL_NAME:
+    case LAI_NULL_NAME:
         // Stores to the null target are ignored.
         break;
-    case ACPI_STRING_INDEX:
+    case LAI_STRING_INDEX:
         target->string[target->integer] = object->integer;
         break;
-    case ACPI_BUFFER_INDEX:
+    case LAI_BUFFER_INDEX:
     {
         uint8_t *window = target->buffer;
         window[target->integer] = object->integer;
         break;
     }
-    case ACPI_PACKAGE_INDEX:
-        acpi_copy_object(&target->package[target->integer], object);
+    case LAI_PACKAGE_INDEX:
+        lai_copy_object(&target->package[target->integer], object);
         break;
-    case ACPI_UNRESOLVED_NAME:
+    case LAI_UNRESOLVED_NAME:
     {
-        acpi_nsnode_t *handle = acpi_exec_resolve(target->name);
+        lai_nsnode_t *handle = lai_exec_resolve(target->name);
         if(!handle)
-            acpi_panic("undefined reference %s\n", target->name);
-        acpi_store_ns(handle, object);
+            lai_panic("undefined reference %s\n", target->name);
+        lai_store_ns(handle, object);
         break;
     }
-    case ACPI_ARG_NAME:
-        acpi_copy_object(&state->arg[target->index], object);
+    case LAI_ARG_NAME:
+        lai_copy_object(&state->arg[target->index], object);
         break;
-    case ACPI_LOCAL_NAME:
-        acpi_copy_object(&state->local[target->index], object);
+    case LAI_LOCAL_NAME:
+        lai_copy_object(&state->local[target->index], object);
         break;
 /*
     // TODO: Re-implement the Debug object.
-        if(source->type == ACPI_INTEGER)
-            acpi_debug("Debug(): integer(%ld)\n", source->integer);
-        else if(source->type == ACPI_STRING)
-            acpi_debug("Debug(): string(\"%s\")\n", source->string);
-        else if(source->type == ACPI_BUFFER)
+        if(source->type == LAI_INTEGER)
+            lai_debug("Debug(): integer(%ld)\n", source->integer);
+        else if(source->type == LAI_STRING)
+            lai_debug("Debug(): string(\"%s\")\n", source->string);
+        else if(source->type == LAI_BUFFER)
             // TODO: Print in hex and respect size.
-            acpi_debug("Debug(): buffer(\"%s\")\n", source->buffer);
+            lai_debug("Debug(): buffer(\"%s\")\n", source->buffer);
         else
-            acpi_debug("Debug(): type %d\n", source->type);
+            lai_debug("Debug(): type %d\n", source->type);
 */
     default:
-        acpi_panic("object type %d is not valid for acpi_store_operand()\n", target->type);
+        lai_panic("object type %d is not valid for lai_store_operand()\n", target->type);
     }
 }
 
-// acpi_write_buffer(): Writes to a Buffer Field
-// Param:    acpi_nsnode_t *handle - handle of buffer field
-// Param:    acpi_object_t *source - object to write
+// lai_write_buffer(): Writes to a Buffer Field
+// Param:    lai_nsnode_t *handle - handle of buffer field
+// Param:    lai_object_t *source - object to write
 // Return:    Nothing
 
-void acpi_write_buffer(acpi_nsnode_t *handle, acpi_object_t *source)
+void lai_write_buffer(lai_nsnode_t *handle, lai_object_t *source)
 {
-    acpi_nsnode_t *buffer_handle;
+    lai_nsnode_t *buffer_handle;
     buffer_handle = acpins_resolve(handle->buffer);
 
     if(!buffer_handle)
-        acpi_debug("undefined reference %s\n", handle->buffer);
+        lai_debug("undefined reference %s\n", handle->buffer);
 
     uint64_t value = source->integer;
 

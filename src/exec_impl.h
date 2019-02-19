@@ -23,11 +23,11 @@
 #define LAI_EXEC_MODE 3
 #define LAI_TARGET_MODE 4
 
-void acpi_load_ns(acpi_nsnode_t *, acpi_object_t *);
-void acpi_store_ns(acpi_nsnode_t *, acpi_object_t *);
+void lai_load_ns(lai_nsnode_t *, lai_object_t *);
+void lai_store_ns(lai_nsnode_t *, lai_object_t *);
 
-void acpi_alias_operand(acpi_state_t *, acpi_object_t *, acpi_object_t *);
+void lai_alias_operand(lai_state_t *, lai_object_t *, lai_object_t *);
 
-void acpi_load_operand(acpi_state_t *, acpi_object_t *, acpi_object_t *);
-void acpi_store_operand(acpi_state_t *, acpi_object_t *, acpi_object_t *);
+void lai_load_operand(lai_state_t *, lai_object_t *, lai_object_t *);
+void lai_store_operand(lai_state_t *, lai_object_t *, lai_object_t *);
 

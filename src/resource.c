@@ -24,19 +24,19 @@
 #define ACPI_LARGE_FIXED_MEM32        0x86
 #define ACPI_LARGE_IRQ            0x89
 
-// acpi_read_resource(): Reads a device's resource settings
-// Param:    acpi_nsnode_t *device - device handle
+// lai_read_resource(): Reads a device's resource settings
+// Param:    lai_nsnode_t *device - device handle
 // Param:    acpi_resource_t *dest - destination array
 // Return:    size_t - count of entries successfully read
 
-size_t acpi_read_resource(acpi_nsnode_t *device, acpi_resource_t *dest)
+size_t lai_read_resource(lai_nsnode_t *device, acpi_resource_t *dest)
 {
     char crs[ACPI_MAX_NAME];
-    acpi_strcpy(crs, device->path);
-    acpi_strcpy(crs + acpi_strlen(crs), "._CRS");    // _CRS: current resource settings
+    lai_strcpy(crs, device->path);
+    lai_strcpy(crs + lai_strlen(crs), "._CRS");    // _CRS: current resource settings
 
-    acpi_object_t buffer = {0};
-    int status = acpi_eval(&buffer, crs);
+    lai_object_t buffer = {0};
+    int status = lai_eval(&buffer, crs);
     if(status != 0)
         return 0;
 
@@ -95,7 +95,7 @@ size_t acpi_read_resource(acpi_nsnode_t *device, acpi_resource_t *dest)
                 break;
 
             default:
-                acpi_debug("acpi warning: undefined small resource, byte 0 is %02X, ignoring...\n", data[0]);
+                lai_debug("acpi warning: undefined small resource, byte 0 is %02X, ignoring...\n", data[0]);
                 return 0;
             }
         } else
@@ -118,7 +118,7 @@ size_t acpi_read_resource(acpi_nsnode_t *device, acpi_resource_t *dest)
                 break;
 
             default:
-                acpi_debug("acpi warning: undefined large resource, byte 0 is %02X, ignoring...\n", data[0]);
+                lai_debug("acpi warning: undefined large resource, byte 0 is %02X, ignoring...\n", data[0]);
                 return 0;
             }
         }
