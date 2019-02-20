@@ -14,7 +14,7 @@
 
 int lai_is_name(char character)
 {
-    if((character >= '0' && character <= 'Z') || character == '_' || character == ROOT_CHAR || character == PARENT_CHAR || character == MULTI_PREFIX || character == DUAL_PREFIX)
+    if((character >= '0' && character <= '9') || (character >= 'A' && character <= 'Z') || character == '_' || character == ROOT_CHAR || character == PARENT_CHAR || character == MULTI_PREFIX || character == DUAL_PREFIX)
         return 1;
 
     else

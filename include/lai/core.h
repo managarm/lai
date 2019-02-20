@@ -251,7 +251,7 @@ typedef struct lai_nsnode_t
     uint64_t op_length;        // for OpRegions only
 
     uint64_t field_offset;        // for Fields only, in bits
-    uint8_t field_size;        // for Fields only, in bits
+    size_t field_size;        // for Fields only, in bits
     uint8_t field_flags;        // for Fields only
     char field_opregion[ACPI_MAX_NAME];    // for Fields only
 

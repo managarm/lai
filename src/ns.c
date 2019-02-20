@@ -11,7 +11,7 @@
 #include "ns_impl.h"
 
 #define CODE_WINDOW            131072
-#define NAMESPACE_WINDOW       2048
+#define NAMESPACE_WINDOW       8192
 
 int lai_do_osi_method(lai_object_t *args, lai_object_t *result);
 int lai_do_os_method(lai_object_t *args, lai_object_t *result);
@@ -274,7 +274,7 @@ size_t acpins_create_field(lai_nsnode_t *parent, void *data)
 
     name_size = acpins_resolve_path(parent, opregion_name, field);
 
-    opregion = acpins_resolve(opregion_name);
+    opregion = lai_exec_resolve(opregion_name);
     if(!opregion)
     {
         lai_debug("error parsing field for non-existant OpRegion %s, ignoring...\n", opregion_name);
@@ -338,10 +338,11 @@ size_t acpins_create_field(lai_nsnode_t *parent, void *data)
 
     uint64_t current_offset = 0;
     size_t skip_size, skip_bits;
+    size_t field_size;
 
     while(byte_count < size)
     {
-        while(field[0] == 0)        // skipping?
+        if(field[0] == 0)        // ReservedField
         {
             field++;
             byte_count++;
@@ -351,18 +352,32 @@ size_t acpins_create_field(lai_nsnode_t *parent, void *data)
 
             field += skip_size;
             byte_count += skip_size;
+
+            continue;
         }
 
-        while(field[0] == 1)        // access field, unimplemented
+        if(field[0] == 1)       // AccessField
         {
+            field_flags = field[1];
+
             field += 3;
             byte_count += 3;
+
+            continue;
         }
 
-        if(!lai_is_name(field[0]))
+        if(field[0] == 2)       // ConnectField
         {
+            lai_warn("field for OpRegion %s: ConnectField unimplemented.\n", opregion->path);
+
             field++;
             byte_count++;
+
+            while(!lai_is_name(field[0]))
+            {
+                field++;
+                byte_count++;
+            }
         }
 
         if(byte_count >= size)
@@ -381,15 +396,16 @@ size_t acpins_create_field(lai_nsnode_t *parent, void *data)
 
         lai_strcpy(node->field_opregion, opregion->path);
 
+        field_size = lai_parse_pkgsize(&field[0], &node->field_size);
+
         node->field_flags = field_flags;
-        node->field_size = field[0];
         node->field_offset = current_offset;
 
-        current_offset += (uint64_t)(field[0]);
+        current_offset += (uint64_t)node->field_size;
         acpins_install_nsnode(node);
 
-        field++;
-        byte_count++;
+        field += field_size;
+        byte_count += field_size;
     }
 
     return size + 2;
