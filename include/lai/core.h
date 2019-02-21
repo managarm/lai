@@ -6,7 +6,14 @@
 
 #pragma once
 
-#include <lai_system.h>
+#include <stddef.h>
+#include <stdint.h>
+
+#define LAI_DEBUG_LOG 1
+#define LAI_WARN_LOG 2
+
+#define lai_debug(...) lai_log(LAI_DEBUG_LOG, __VA_ARGS__)
+#define lai_warn(...) lai_log(LAI_WARN_LOG, __VA_ARGS__)
 
 #define LAI_STRINGIFY(x) #x
 #define LAI_EXPAND_STRINGIFY(x) LAI_STRINGIFY(x)
@@ -258,7 +265,8 @@ typedef struct lai_nsnode_t
     uint8_t indexfield_flags;    // for IndexFields
     uint8_t indexfield_size;    // for IndexFields
 
-    lai_lock_t mutex;        // for Mutex
+    // TODO: Find a good mechanism for locks.
+    //lai_lock_t mutex;        // for Mutex
 
     uint8_t cpu_id;            // for Processor
 
@@ -372,6 +380,8 @@ size_t lai_ns_size;
 volatile uint16_t lai_last_event;
 
 // OS-specific functions
+void lai_log(int, const char *, ...);
+__attribute__((noreturn)) void lai_panic(const char *, ...);
 void *lai_scan(char *, size_t);
 void *lai_memcpy(void *, const void *, size_t);
 void *lai_memmove(void *, const void *, size_t);
@@ -384,7 +394,7 @@ char *lai_strcpy(char *, const char *);
 size_t lai_strlen(const char *);
 void *lai_memset(void *, int, size_t);
 int lai_strcmp(const char *, const char *);
-int lai_memcmp(const char *, const char *, size_t);
+int lai_memcmp(const void *, const void *, size_t);
 void lai_outb(uint16_t, uint8_t);
 void lai_outw(uint16_t, uint16_t);
 void lai_outd(uint16_t, uint32_t);
