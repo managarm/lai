@@ -106,14 +106,34 @@ int lai_enable_acpi(uint32_t mode)
     return 0;
 }
 
+static int evaluate_sta(lai_nsnode_t *node)
+{
+    // If _STA not present, assume 0x0F as ACPI spec says.
+    int sta = 0x0F;
+
+    char path[ACPI_MAX_NAME];
+    lai_strcpy(path, node->path);
+    lai_strcpy(path + lai_strlen(path), "._STA");
+
+    lai_nsnode_t *handle = acpins_resolve(path);
+    if(handle)
+    {
+        lai_state_t state;
+        lai_init_state(&state);
+        if(lai_eval_node(handle, &state))
+            lai_panic("could not evaluate _STA\n");
+        sta = lai_retvalue(&state)->integer;
+        lai_finalize_state(&state);
+    }
+
+    return sta;
+}
+
 static void lai_init_children(char *parent)
 {
     lai_nsnode_t *node;
-    lai_object_t object = {0};
     lai_nsnode_t *handle;
-    lai_state_t state;
     char path[ACPI_MAX_NAME];
-    int status;
 
     for(size_t i = 0; i < lai_ns_size; i++)
     {
@@ -122,19 +142,10 @@ static void lai_init_children(char *parent)
 
         if(node->type == LAI_NAMESPACE_DEVICE)
         {
-            lai_strcpy(path, node->path);
-            lai_strcpy(path + lai_strlen(path), "._STA");
-
-            status = lai_eval(&object, path);
-            if(status)
-            {
-                /* _STA not present, so assume 0x0F as ACPI spec says */
-                object.type = LAI_INTEGER;
-                object.integer = 0x0F;
-            }
+            int sta = evaluate_sta(node);
 
             /* if device is present, evaluate its _INI */
-            if(object.integer & ACPI_STA_PRESENT)
+            if(sta & ACPI_STA_PRESENT)
             {
                 lai_strcpy(path, node->path);
                 lai_strcpy(path + lai_strlen(path), "._INI");
@@ -142,6 +153,7 @@ static void lai_init_children(char *parent)
 
                 if(handle)
                 {
+                    lai_state_t state;
                     lai_init_state(&state);
                     if(!lai_exec_method(handle, &state))
                         lai_debug("evaluated %s\n", path);
@@ -150,11 +162,8 @@ static void lai_init_children(char *parent)
             }
 
             /* if functional and/or present, enumerate the children */
-            if(object.integer & ACPI_STA_PRESENT ||
-                object.integer & ACPI_STA_FUNCTION)
-            {
+            if(sta & ACPI_STA_PRESENT || sta & ACPI_STA_FUNCTION)
                 lai_init_children(node->path);
-            }
         }
     }
 }

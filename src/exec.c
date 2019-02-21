@@ -1326,6 +1326,32 @@ int lai_exec_method(lai_nsnode_t *method, lai_state_t *state)
     return 0;
 }
 
+// lai_eval_node(): Evaluates a named AML object.
+// Param:    lai_nsnode_t *handle - node to evaluate
+// Param:    lai_state_t *state - execution engine state
+// Return:   int - 0 on success
+
+int lai_eval_node(lai_nsnode_t *handle, lai_state_t *state)
+{
+    while(handle->type == LAI_NAMESPACE_ALIAS)
+    {
+        handle = acpins_resolve(handle->alias);
+        if(!handle)
+            return 1;
+    }
+
+    if(handle->type == LAI_NAMESPACE_NAME)
+    {
+        lai_copy_object(&state->retvalue, &handle->object);
+        return 0;
+    }else if(handle->type == LAI_NAMESPACE_METHOD)
+    {
+        return lai_exec_method(handle, state);
+    }
+
+    return 1;
+}
+
 // Evaluates an AML expression recursively.
 // TODO: Eventually, we want to remove this function. However, this requires refactoring
 //       lai_exec_run() to avoid all kinds of recursion.
