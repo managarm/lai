@@ -13,13 +13,15 @@
 #define LAI_WARN_LOG 2
 
 // OS-specific functions.
-void laihost_log(int, const char *, ...);
-__attribute__((noreturn)) void laihost_panic(const char *, ...);
-void *laihost_scan(char *, size_t);
 void *laihost_malloc(size_t);
 void *laihost_calloc(size_t, size_t);
 void *laihost_realloc(void *, size_t);
 void laihost_free(void *);
+
+void laihost_log(int, const char *, ...);
+__attribute__((noreturn)) void laihost_panic(const char *, ...);
+
+__attribute__((weak)) void *laihost_scan(char *, size_t);
 __attribute__((weak)) void *laihost_map(size_t, size_t);
 __attribute__((weak)) void laihost_outb(uint16_t, uint8_t);
 __attribute__((weak)) void laihost_outw(uint16_t, uint16_t);
