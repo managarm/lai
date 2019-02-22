@@ -11,11 +11,14 @@
 
 #include <lai/host.h>
 
+// Even in freestanding environments, GCC requires memcpy(), memmove(), memset()
+// and memcmp() to be present. Thus, we just use them directly.
+void *memcpy(void *, const void *, size_t);
+void *memmove(void *, const void *, size_t);
+void *memset(void *, int, size_t);
+int memcmp(const void *, const void *, size_t);
+
 // LAI's libc-like functions.
-void *lai_memcpy(void *, const void *, size_t);
-void *lai_memmove(void *, const void *, size_t);
-void *lai_memset(void *, int, size_t);
-int lai_memcmp(const void *, const void *, size_t);
 size_t lai_strlen(const char *);
 char *lai_strcpy(char *, const char *);
 int lai_strcmp(const char *, const char *);

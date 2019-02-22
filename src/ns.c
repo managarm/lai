@@ -35,7 +35,7 @@ lai_nsnode_t *acpins_create_nsnode()
     lai_nsnode_t *node = laihost_malloc(sizeof(lai_nsnode_t));
     if(!node)
         return NULL;
-    lai_memset(node, 0, sizeof(lai_nsnode_t));
+    memset(node, 0, sizeof(lai_nsnode_t));
     return node;
 }
 
@@ -80,7 +80,7 @@ size_t acpins_resolve_path(lai_nsnode_t *context, char *fullpath, uint8_t *path)
     size_t multi_count = 0;
     size_t current_count = 0;
 
-    lai_memset(fullpath, 0, ACPI_MAX_NAME);
+    memset(fullpath, 0, ACPI_MAX_NAME);
 
     if(path[0] == ROOT_CHAR)
     {
@@ -112,16 +112,16 @@ start:
 
         name_size++;
         fullpath[lai_strlen(fullpath) - 5] = 0;
-        lai_memset(fullpath + lai_strlen(fullpath), 0, 32);
+        memset(fullpath + lai_strlen(fullpath), 0, 32);
     }
 
     if(path[0] == DUAL_PREFIX)
     {
         name_size += 9;
         path++;
-        lai_memcpy(fullpath + lai_strlen(fullpath), path, 4);
+        memcpy(fullpath + lai_strlen(fullpath), path, 4);
         fullpath[lai_strlen(fullpath)] = '.';
-        lai_memcpy(fullpath + lai_strlen(fullpath), path + 4, 4);
+        memcpy(fullpath + lai_strlen(fullpath), path + 4, 4);
     } else if(path[0] == MULTI_PREFIX)
     {
         // skip MULTI_PREFIX and name count
@@ -136,7 +136,7 @@ start:
         while(current_count < multi_count)
         {
             name_size += 4;
-            lai_memcpy(fullpath + lai_strlen(fullpath), path, 4);
+            memcpy(fullpath + lai_strlen(fullpath), path, 4);
             path += 4;
             current_count++;
             if(current_count >= multi_count)
@@ -147,7 +147,7 @@ start:
     } else
     {
         name_size += 4;
-        lai_memcpy(fullpath + lai_strlen(fullpath), path, 4);
+        memcpy(fullpath + lai_strlen(fullpath), path, 4);
     }
 
     return name_size;
@@ -244,7 +244,7 @@ void acpins_load_table(void *ptr)
     }
 
     // copy the actual AML code
-    lai_memcpy(lai_acpins_code + lai_acpins_size, table->data, table->header.length - sizeof(acpi_header_t));
+    memcpy(lai_acpins_code + lai_acpins_size, table->data, table->header.length - sizeof(acpi_header_t));
     lai_acpins_size += (table->header.length - sizeof(acpi_header_t));
 
     lai_debug("loaded AML table '%c%c%c%c', total %d bytes of AML code.\n", table->header.signature[0], table->header.signature[1], table->header.signature[2], table->header.signature[3], lai_acpins_size);
@@ -517,8 +517,8 @@ size_t acpins_create_indexfield(lai_nsnode_t *parent, void *data)
 
     // index and data
     char indexr[ACPI_MAX_NAME], datar[ACPI_MAX_NAME];
-    lai_memset(indexr, 0, ACPI_MAX_NAME);
-    lai_memset(datar, 0, ACPI_MAX_NAME);
+    memset(indexr, 0, ACPI_MAX_NAME);
+    memset(datar, 0, ACPI_MAX_NAME);
 
     indexfield += acpins_resolve_path(parent, indexr, indexfield);
     indexfield += acpins_resolve_path(parent, datar, indexfield);
@@ -595,9 +595,9 @@ size_t acpins_create_indexfield(lai_nsnode_t *parent, void *data)
         node->type = LAI_NAMESPACE_INDEXFIELD;
         // FIXME: This looks odd. Why don't we all acpins_resolve_path()?
 
-        /*lai_memcpy(node->path, parent->path, lai_strlen(parent->path));
+        /*memcpy(node->path, parent->path, lai_strlen(parent->path));
         node->path[lai_strlen(parent->path)] = '.';
-        lai_memcpy(node->path + lai_strlen(parent->path) + 1, indexfield, 4);*/
+        memcpy(node->path + lai_strlen(parent->path) + 1, indexfield, 4);*/
 
         name_size = acpins_resolve_path(parent, node->path, &indexfield[0]);
 
@@ -823,7 +823,7 @@ lai_nsnode_t *acpins_resolve(char *path)
     {
         while(i < lai_ns_size)
         {
-            if(lai_memcmp(lai_namespace[i]->path + lai_strlen(lai_namespace[i]->path) - 4, path, 4) == 0)
+            if(memcmp(lai_namespace[i]->path + lai_strlen(lai_namespace[i]->path) - 4, path, 4) == 0)
                 return lai_namespace[i];
 
             else
@@ -874,11 +874,11 @@ lai_nsnode_t *acpins_get_deviceid(size_t index, lai_object_t *id)
         // read the ID of the device
         lai_strcpy(path, handle->path);
         lai_strcpy(path + lai_strlen(path), "._HID");    // hardware ID
-        lai_memset(&device_id, 0, sizeof(lai_object_t));
+        memset(&device_id, 0, sizeof(lai_object_t));
         if(lai_eval(&device_id, path) != 0)
         {
             lai_strcpy(path + lai_strlen(path) - 5, "._CID");    // compatible ID
-            lai_memset(&device_id, 0, sizeof(lai_object_t));
+            memset(&device_id, 0, sizeof(lai_object_t));
             lai_eval(&device_id, path);
         }
 
@@ -913,7 +913,7 @@ lai_nsnode_t *acpins_enum(char *parent, size_t index)
     size_t parent_size = lai_strlen(parent);
     for(size_t i = 0; i < lai_ns_size; i++)
     {
-        if(!lai_memcmp(parent, lai_namespace[i]->path, parent_size))
+        if(!memcmp(parent, lai_namespace[i]->path, parent_size))
         {
             if(!index)
                 return lai_namespace[i];

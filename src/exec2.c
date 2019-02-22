@@ -33,7 +33,7 @@ lai_nsnode_t *lai_exec_resolve(char *path)
 
     while(!object && lai_strlen(path) > 6)
     {
-        lai_memmove(path + lai_strlen(path) - 9, path + lai_strlen(path) - 4, 5);
+        memmove(path + lai_strlen(path) - 9, path + lai_strlen(path) - 4, 5);
         object = acpins_resolve(path);
         if(object != NULL)
             goto resolve_alias;
@@ -72,7 +72,7 @@ void lai_free_object(lai_object_t *object)
     else if(object->type == LAI_PACKAGE)
         laihost_free_package(object);
 
-    lai_memset(object, 0, sizeof(lai_object_t));
+    memset(object, 0, sizeof(lai_object_t));
 }
 
 // Helper function for lai_move_object() and lai_copy_object().
@@ -108,7 +108,7 @@ static void lai_clone_buffer(lai_object_t *destination, lai_object_t *source)
     if(!destination->buffer)
         lai_panic("unable to allocate memory for buffer object.\n");
 
-    lai_memcpy(destination->buffer, source->buffer, source->buffer_size);
+    memcpy(destination->buffer, source->buffer, source->buffer_size);
 }
 
 // lai_clone_string(): Clones a string object

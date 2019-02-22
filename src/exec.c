@@ -23,7 +23,7 @@ void lai_eval_operand(lai_object_t *destination, lai_state_t *state, uint8_t *co
 // Param: lai_nsnode_t *method - identifies the control method
 
 void lai_init_state(lai_state_t *state) {
-    lai_memset(state, 0, sizeof(lai_state_t));
+    memset(state, 0, sizeof(lai_state_t));
     state->stack_ptr = -1;
     state->context_ptr = -1;
 }
@@ -48,7 +48,7 @@ static lai_object_t *lai_exec_push_opstack_or_die(lai_state_t *state) {
     if(state->opstack_ptr == 16)
         lai_panic("operand stack overflow\n");
     lai_object_t *object = &state->opstack[state->opstack_ptr];
-    lai_memset(object, 0, sizeof(lai_object_t));
+    memset(object, 0, sizeof(lai_object_t));
     state->opstack_ptr++;
     return object;
 }
@@ -772,7 +772,7 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state)
                 lai_object_t *opstack_res = lai_exec_push_opstack_or_die(state);
                 opstack_res->type = LAI_STRING;
                 opstack_res->string = laihost_malloc(n + 1);
-                lai_memcpy(opstack_res->string, method + state->pc, n);
+                memcpy(opstack_res->string, method + state->pc, n);
                 opstack_res->string[n] = 0;
             }else
                 LAI_ENSURE(exec_result_mode == LAI_EXEC_MODE);
@@ -798,14 +798,14 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state)
             result.buffer = laihost_malloc(buffer_size.integer);
             if(!result.buffer)
                 lai_panic("failed to allocate memory for AML buffer");
-            lai_memset(result.buffer, 0, buffer_size.integer);
+            memset(result.buffer, 0, buffer_size.integer);
 
             int initial_size = (opcode_pc + encoded_size + 1) - state->pc;
             if(initial_size < 0)
                 lai_panic("buffer initializer has negative size\n");
             if(initial_size > result.buffer_size)
                 lai_panic("buffer initializer overflows buffer\n");
-            lai_memcpy(result.buffer, method + state->pc, initial_size);
+            memcpy(result.buffer, method + state->pc, initial_size);
             state->pc += initial_size;
 
             if(exec_result_mode == LAI_DATA_MODE || exec_result_mode == LAI_OBJECT_MODE)
