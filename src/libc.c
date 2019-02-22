@@ -6,6 +6,39 @@
 
 #include <lai/core.h>
 
+void lai_debug(const char *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    if(laihost_log)
+        laihost_log(LAI_DEBUG_LOG, fmt, args);
+    va_end(args);
+}
+
+void lai_warn(const char *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    if(laihost_log)
+        laihost_log(LAI_WARN_LOG, fmt, args);
+    va_end(args);
+}
+
+void lai_panic(const char *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    if(laihost_panic)
+        laihost_panic(fmt, args);
+    else
+    {
+        // If the panic function is undefined, try to log the error and abort.
+        if(laihost_log)
+            laihost_log(LAI_WARN_LOG, fmt, args);
+        __builtin_trap();
+    }
+}
+
 void *lai_calloc(size_t count, size_t item_size) {
     size_t size = count * item_size;
     void *p = laihost_malloc(size);
