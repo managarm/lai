@@ -16,6 +16,9 @@
 
 int lai_enter_sleep(uint8_t state)
 {
+    if(!laihost_inw || !laihost_outw)
+        lai_panic("lai_enter_sleep() requires port I/O\n");
+
     if(state > 5)
     {
         lai_debug("undefined sleep state S%d\n", state);

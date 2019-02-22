@@ -119,15 +119,21 @@ void lai_read_field(lai_object_t *destination, lai_nsnode_t *field)
         switch(field->field_flags & 0x0F)
         {
         case FIELD_BYTE_ACCESS:
+            if(!laihost_inb)
+                lai_panic("host does not provide port I/O functions\n");
             value = (uint64_t)laihost_inb(opregion->op_base + offset) >> bit_offset;
             //lai_debug("read 0x%X from I/O port 0x%X, field %s\n", (uint8_t)value, opregion->op_base + offset, field->path);
             break;
         case FIELD_WORD_ACCESS:
+            if(!laihost_inw)
+                lai_panic("host does not provide port I/O functions\n");
             value = (uint64_t)laihost_inw(opregion->op_base + offset) >> bit_offset;
             //lai_debug("read 0x%X from I/O port 0x%X, field %s\n", (uint16_t)value, opregion->op_base + offset, field->path);
             break;
         case FIELD_DWORD_ACCESS:
         case FIELD_ANY_ACCESS:
+            if(!laihost_ind)
+                lai_panic("host does not provide port I/O functions\n");
             value = (uint64_t)laihost_ind(opregion->op_base + offset) >> bit_offset;
             //lai_debug("read 0x%X from I/O port 0x%X, field %s\n", (uint32_t)value, opregion->op_base + offset, field->path);
             break;
@@ -137,6 +143,8 @@ void lai_read_field(lai_object_t *destination, lai_nsnode_t *field)
     } else if(opregion->op_address_space == OPREGION_MEMORY)
     {
         // Memory-mapped I/O
+        if(!laihost_map)
+            lai_panic("host does not provide memory mapping functions\n");
         mmio = laihost_map(opregion->op_base + offset, 8);
         uint8_t *mmio_byte;
         uint16_t *mmio_word;
@@ -195,7 +203,12 @@ void lai_read_field(lai_object_t *destination, lai_nsnode_t *field)
             address_number.type = 0;
         }
 
-        value = laihost_pci_read((uint8_t)bus_number.integer, (uint8_t)(address_number.integer >> 16) & 0xFF, (uint8_t)(address_number.integer & 0xFF), (offset & 0xFFFC) + opregion->op_base);
+        if(!laihost_pci_read)
+            lai_panic("host does not provide PCI access functions\n");
+        value = laihost_pci_read((uint8_t)bus_number.integer,
+                                 (uint8_t)(address_number.integer >> 16) & 0xFF,
+                                 (uint8_t)(address_number.integer & 0xFF),
+                                 (offset & 0xFFFC) + opregion->op_base);
 
         //lai_debug("read 0x%X from PCI config 0x%X, %X:%X:%X\n", value, (uint16_t)(offset & 0xFFFC) + opregion->op_base, (uint8_t)bus_number.integer, (uint8_t)(address_number.integer >> 16) & 0xFF, (uint8_t)address_number.integer & 0xFF);
         value >>= bit_offset;
@@ -278,13 +291,19 @@ void lai_write_field(lai_nsnode_t *field, lai_object_t *source)
         switch(field->field_flags & 0x0F)
         {
         case FIELD_BYTE_ACCESS:
+            if(!laihost_inb)
+                lai_panic("host does not provide port I/O functions\n");
             value = (uint64_t)laihost_inb(opregion->op_base + offset);
             break;
         case FIELD_WORD_ACCESS:
+            if(!laihost_inw)
+                lai_panic("host does not provide port I/O functions\n");
             value = (uint64_t)laihost_inw(opregion->op_base + offset);
             break;
         case FIELD_DWORD_ACCESS:
         case FIELD_ANY_ACCESS:
+            if(!laihost_ind)
+                lai_panic("host does not provide port I/O functions\n");
             value = (uint64_t)laihost_ind(opregion->op_base + offset);
             break;
         default:
@@ -293,6 +312,8 @@ void lai_write_field(lai_nsnode_t *field, lai_object_t *source)
     } else if(opregion->op_address_space == OPREGION_MEMORY)
     {
         // Memory-mapped I/O
+        if(!laihost_map)
+            lai_panic("host does not provide memory mapping functions\n");
         mmio = laihost_map(opregion->op_base + offset, 8);
         uint8_t *mmio_byte;
         uint16_t *mmio_word;
@@ -347,7 +368,12 @@ void lai_write_field(lai_nsnode_t *field, lai_object_t *source)
             address_number.type = 0;
         }
 
-        value = laihost_pci_read((uint8_t)bus_number.integer, (uint8_t)(address_number.integer >> 16) & 0xFF, (uint8_t)(address_number.integer & 0xFF), (offset & 0xFFFC) + opregion->op_base);
+        if(!laihost_pci_read)
+            lai_panic("host does not provide PCI access functions\n");
+        value = laihost_pci_read((uint8_t)bus_number.integer,
+                                 (uint8_t)(address_number.integer >> 16) & 0xFF,
+                                 (uint8_t)(address_number.integer & 0xFF),
+                                 (offset & 0xFFFC) + opregion->op_base);
     } else
     {
         lai_panic("undefined opregion address space: %d\n", opregion->op_address_space);
@@ -398,6 +424,8 @@ void lai_write_field(lai_nsnode_t *field, lai_object_t *source)
     } else if(opregion->op_address_space == OPREGION_MEMORY)
     {
         // Memory-mapped I/O
+        if(!laihost_map)
+            lai_panic("host does not provide memory mapping functions\n");
         mmio = laihost_map(opregion->op_base + offset, 8);
         uint8_t *mmio_byte;
         uint16_t *mmio_word;
@@ -432,7 +460,12 @@ void lai_write_field(lai_nsnode_t *field, lai_object_t *source)
         }
     } else if(opregion->op_address_space == OPREGION_PCI)
     {
-        laihost_pci_write((uint8_t)bus_number.integer, (uint8_t)(address_number.integer >> 16) & 0xFF, (uint8_t)(address_number.integer & 0xFF), (offset & 0xFFFC) + opregion->op_base, (uint32_t)value);
+        if(!laihost_pci_write)
+            lai_panic("host does not provide PCI access functions\n");
+        laihost_pci_write((uint8_t)bus_number.integer,
+                          (uint8_t)(address_number.integer >> 16) & 0xFF,
+                          (uint8_t)(address_number.integer & 0xFF),
+                          (offset & 0xFFFC) + opregion->op_base, (uint32_t)value);
     } else
     {
         lai_panic("undefined opregion address space: %d\n", opregion->op_address_space);

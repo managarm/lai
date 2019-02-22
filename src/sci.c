@@ -17,6 +17,9 @@ volatile uint16_t lai_last_event = 0;
 
 uint16_t lai_read_event()
 {
+    if(!laihost_inw || !laihost_outw)
+        lai_panic("lai_read_event() requires port I/O\n");
+
     uint16_t a = 0, b = 0;
     if(lai_fadt->pm1a_event_block)
     {
@@ -39,6 +42,9 @@ uint16_t lai_read_event()
 
 void lai_set_event(uint16_t value)
 {
+    if(!laihost_inw || !laihost_outw)
+        lai_panic("lai_set_event() requires port I/O\n");
+
     uint16_t a = lai_fadt->pm1a_event_block + (lai_fadt->pm1_event_length / 2);
     uint16_t b = lai_fadt->pm1b_event_block + (lai_fadt->pm1_event_length / 2);
 
@@ -60,6 +66,9 @@ int lai_enable_acpi(uint32_t mode)
     lai_nsnode_t *handle;
     lai_state_t state;
     lai_debug("attempt to enable ACPI...\n");
+
+    if(!laihost_inw || !laihost_outb)
+        lai_panic("lai_enable_acpi() requires port I/O\n");
 
     /* first run \._SB_._INI */
     handle = acpins_resolve("\\._SB_._INI");
