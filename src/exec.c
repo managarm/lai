@@ -1388,6 +1388,8 @@ void lai_exec_sleep(void *code, lai_state_t *state)
     if(!time.integer)
         time.integer = 1;
 
+    if(!laihost_sleep)
+        lai_panic("host does not provide timer functions required by Sleep()\n");
     laihost_sleep(time.integer);
 }
 

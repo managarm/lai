@@ -69,6 +69,8 @@ int lai_enable_acpi(uint32_t mode)
 
     if(!laihost_inw || !laihost_outb)
         lai_panic("lai_enable_acpi() requires port I/O\n");
+    if(!laihost_sleep)
+        lai_panic("host does not provide timer functions required by lai_enable_acpi()\n");
 
     /* first run \._SB_._INI */
     handle = acpins_resolve("\\._SB_._INI");
