@@ -123,10 +123,10 @@ int lai_eval_package(lai_object_t *package, size_t index, lai_object_t *destinat
 int lai_eval(lai_object_t *destination, char *path)
 {
     lai_nsnode_t *handle;
-    char *path_copy = lai_malloc(lai_strlen(path) + 1);
+    char *path_copy = laihost_malloc(lai_strlen(path) + 1);
     lai_strcpy(path_copy, path);
     handle = lai_exec_resolve(path_copy);
-    lai_free(path_copy);
+    laihost_free(path_copy);
     if(!handle)
         return 1;
 

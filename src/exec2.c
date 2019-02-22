@@ -54,23 +54,23 @@ resolve_alias:
     return object;
 }
 
-// lai_free_package(): Frees a package object and all its children
+// laihost_free_package(): Frees a package object and all its children
 // Param:   lai_object_t *object
 // Return:  Nothing
 
-static void lai_free_package(lai_object_t *object)
+static void laihost_free_package(lai_object_t *object)
 {
     for(int i = 0; i < object->package_size; i++)
         lai_free_object(&object->package[i]);
-    lai_free(object->package);
+    laihost_free(object->package);
 }
 
 void lai_free_object(lai_object_t *object)
 {
     if(object->type == LAI_BUFFER)
-        lai_free(object->buffer);
+        laihost_free(object->buffer);
     else if(object->type == LAI_PACKAGE)
-        lai_free_package(object);
+        laihost_free_package(object);
 
     lai_memset(object, 0, sizeof(lai_object_t));
 }
@@ -104,7 +104,7 @@ static void lai_clone_buffer(lai_object_t *destination, lai_object_t *source)
 {
     destination->type = LAI_BUFFER;
     destination->buffer_size = source->buffer_size;
-    destination->buffer = lai_malloc(source->buffer_size);
+    destination->buffer = laihost_malloc(source->buffer_size);
     if(!destination->buffer)
         lai_panic("unable to allocate memory for buffer object.\n");
 
@@ -119,7 +119,7 @@ static void lai_clone_buffer(lai_object_t *destination, lai_object_t *source)
 static void lai_clone_string(lai_object_t *destination, lai_object_t *source)
 {
     destination->type = LAI_STRING;
-    destination->string = lai_malloc(lai_strlen(source->string) + 1);
+    destination->string = laihost_malloc(lai_strlen(source->string) + 1);
     if(!destination->string)
         lai_panic("unable to allocate memory for string object.\n");
 
@@ -135,7 +135,7 @@ static void lai_clone_package(lai_object_t *destination, lai_object_t *source)
 {
     destination->type = LAI_PACKAGE;
     destination->package_size = source->package_size;
-    destination->package = lai_calloc(source->package_size, sizeof(lai_object_t));
+    destination->package = laihost_calloc(source->package_size, sizeof(lai_object_t));
     if(!destination->package)
         lai_panic("unable to allocate memory for package object.\n");
 

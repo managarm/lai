@@ -32,7 +32,7 @@ void acpins_load_table(void *);
 // Helper function to allocate a lai_nsnode_t.
 lai_nsnode_t *acpins_create_nsnode()
 {
-    lai_nsnode_t *node = lai_malloc(sizeof(lai_nsnode_t));
+    lai_nsnode_t *node = laihost_malloc(sizeof(lai_nsnode_t));
     if(!node)
         return NULL;
     lai_memset(node, 0, sizeof(lai_nsnode_t));
@@ -58,7 +58,7 @@ void acpins_install_nsnode(lai_nsnode_t *node)
         if(!new_capacity)
             new_capacity = NAMESPACE_WINDOW;
         lai_nsnode_t **new_array;
-        new_array = lai_realloc(lai_namespace, sizeof(lai_nsnode_t *) * new_capacity);
+        new_array = laihost_realloc(lai_namespace, sizeof(lai_nsnode_t *) * new_capacity);
         if(!new_array)
             lai_panic("could not reallocate namespace table\n");
         lai_namespace = new_array;
@@ -159,17 +159,17 @@ start:
 
 void lai_create_namespace(void *dsdt)
 {
-    lai_namespace = lai_calloc(sizeof(lai_nsnode_t *), lai_ns_capacity);
+    lai_namespace = laihost_calloc(sizeof(lai_nsnode_t *), lai_ns_capacity);
     if(!lai_namespace)
         lai_panic("unable to allocate memory.\n");
 
-    lai_acpins_code = lai_malloc(CODE_WINDOW);
+    lai_acpins_code = laihost_malloc(CODE_WINDOW);
     lai_acpins_allocation = CODE_WINDOW;
 
     //acpins_load_table(aml_test);    // custom AML table just for testing
 
     // we need the FADT
-    lai_fadt = lai_scan("FACP", 0);
+    lai_fadt = laihost_scan("FACP", 0);
     if(!lai_fadt)
     {
         lai_panic("unable to find ACPI FADT.\n");
@@ -180,23 +180,23 @@ void lai_create_namespace(void *dsdt)
 
     // load all SSDTs
     size_t index = 0;
-    acpi_aml_t *ssdt = lai_scan("SSDT", index);
+    acpi_aml_t *ssdt = laihost_scan("SSDT", index);
     while(ssdt != NULL)
     {
         acpins_load_table(ssdt);
         index++;
-        ssdt = lai_scan("SSDT", index);
+        ssdt = laihost_scan("SSDT", index);
     }
 
     // the PSDT is treated the same way as the SSDT
     // scan for PSDTs too for compatibility with some ACPI 1.0 PCs
     index = 0;
-    acpi_aml_t *psdt = lai_scan("PSDT", index);
+    acpi_aml_t *psdt = laihost_scan("PSDT", index);
     while(psdt != NULL)
     {
         acpins_load_table(psdt);
         index++;
-        psdt = lai_scan("PSDT", index);
+        psdt = laihost_scan("PSDT", index);
     }
 
     // create the OS-defined objects first
@@ -240,7 +240,7 @@ void acpins_load_table(void *ptr)
     while(lai_acpins_size + table->header.length >= lai_acpins_allocation)
     {
         lai_acpins_allocation += CODE_WINDOW;
-        lai_acpins_code = lai_realloc(lai_acpins_code, lai_acpins_allocation);
+        lai_acpins_code = laihost_realloc(lai_acpins_code, lai_acpins_allocation);
     }
 
     // copy the actual AML code

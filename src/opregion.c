@@ -119,16 +119,16 @@ void lai_read_field(lai_object_t *destination, lai_nsnode_t *field)
         switch(field->field_flags & 0x0F)
         {
         case FIELD_BYTE_ACCESS:
-            value = (uint64_t)lai_inb(opregion->op_base + offset) >> bit_offset;
+            value = (uint64_t)laihost_inb(opregion->op_base + offset) >> bit_offset;
             //lai_debug("read 0x%X from I/O port 0x%X, field %s\n", (uint8_t)value, opregion->op_base + offset, field->path);
             break;
         case FIELD_WORD_ACCESS:
-            value = (uint64_t)lai_inw(opregion->op_base + offset) >> bit_offset;
+            value = (uint64_t)laihost_inw(opregion->op_base + offset) >> bit_offset;
             //lai_debug("read 0x%X from I/O port 0x%X, field %s\n", (uint16_t)value, opregion->op_base + offset, field->path);
             break;
         case FIELD_DWORD_ACCESS:
         case FIELD_ANY_ACCESS:
-            value = (uint64_t)lai_ind(opregion->op_base + offset) >> bit_offset;
+            value = (uint64_t)laihost_ind(opregion->op_base + offset) >> bit_offset;
             //lai_debug("read 0x%X from I/O port 0x%X, field %s\n", (uint32_t)value, opregion->op_base + offset, field->path);
             break;
         default:
@@ -137,7 +137,7 @@ void lai_read_field(lai_object_t *destination, lai_nsnode_t *field)
     } else if(opregion->op_address_space == OPREGION_MEMORY)
     {
         // Memory-mapped I/O
-        mmio = lai_map(opregion->op_base + offset, 8);
+        mmio = laihost_map(opregion->op_base + offset, 8);
         uint8_t *mmio_byte;
         uint16_t *mmio_word;
         uint32_t *mmio_dword;
@@ -195,7 +195,7 @@ void lai_read_field(lai_object_t *destination, lai_nsnode_t *field)
             address_number.type = 0;
         }
 
-        value = lai_pci_read((uint8_t)bus_number.integer, (uint8_t)(address_number.integer >> 16) & 0xFF, (uint8_t)(address_number.integer & 0xFF), (offset & 0xFFFC) + opregion->op_base);
+        value = laihost_pci_read((uint8_t)bus_number.integer, (uint8_t)(address_number.integer >> 16) & 0xFF, (uint8_t)(address_number.integer & 0xFF), (offset & 0xFFFC) + opregion->op_base);
 
         //lai_debug("read 0x%X from PCI config 0x%X, %X:%X:%X\n", value, (uint16_t)(offset & 0xFFFC) + opregion->op_base, (uint8_t)bus_number.integer, (uint8_t)(address_number.integer >> 16) & 0xFF, (uint8_t)address_number.integer & 0xFF);
         value >>= bit_offset;
@@ -278,14 +278,14 @@ void lai_write_field(lai_nsnode_t *field, lai_object_t *source)
         switch(field->field_flags & 0x0F)
         {
         case FIELD_BYTE_ACCESS:
-            value = (uint64_t)lai_inb(opregion->op_base + offset);
+            value = (uint64_t)laihost_inb(opregion->op_base + offset);
             break;
         case FIELD_WORD_ACCESS:
-            value = (uint64_t)lai_inw(opregion->op_base + offset);
+            value = (uint64_t)laihost_inw(opregion->op_base + offset);
             break;
         case FIELD_DWORD_ACCESS:
         case FIELD_ANY_ACCESS:
-            value = (uint64_t)lai_ind(opregion->op_base + offset);
+            value = (uint64_t)laihost_ind(opregion->op_base + offset);
             break;
         default:
             lai_panic("undefined field flags 0x%02X: %s\n", field->field_flags, field->path);
@@ -293,7 +293,7 @@ void lai_write_field(lai_nsnode_t *field, lai_object_t *source)
     } else if(opregion->op_address_space == OPREGION_MEMORY)
     {
         // Memory-mapped I/O
-        mmio = lai_map(opregion->op_base + offset, 8);
+        mmio = laihost_map(opregion->op_base + offset, 8);
         uint8_t *mmio_byte;
         uint16_t *mmio_word;
         uint32_t *mmio_dword;
@@ -347,7 +347,7 @@ void lai_write_field(lai_nsnode_t *field, lai_object_t *source)
             address_number.type = 0;
         }
 
-        value = lai_pci_read((uint8_t)bus_number.integer, (uint8_t)(address_number.integer >> 16) & 0xFF, (uint8_t)(address_number.integer & 0xFF), (offset & 0xFFFC) + opregion->op_base);
+        value = laihost_pci_read((uint8_t)bus_number.integer, (uint8_t)(address_number.integer >> 16) & 0xFF, (uint8_t)(address_number.integer & 0xFF), (offset & 0xFFFC) + opregion->op_base);
     } else
     {
         lai_panic("undefined opregion address space: %d\n", opregion->op_address_space);
@@ -376,16 +376,16 @@ void lai_write_field(lai_nsnode_t *field, lai_object_t *source)
         switch(field->field_flags & 0x0F)
         {
         case FIELD_BYTE_ACCESS:
-            lai_outb(opregion->op_base + offset, (uint8_t)value);
+            laihost_outb(opregion->op_base + offset, (uint8_t)value);
             //lai_debug("wrote 0x%X to I/O port 0x%X\n", (uint8_t)value, opregion->op_base + offset);
             break;
         case FIELD_WORD_ACCESS:
-            lai_outw(opregion->op_base + offset, (uint16_t)value);
+            laihost_outw(opregion->op_base + offset, (uint16_t)value);
             //lai_debug("wrote 0x%X to I/O port 0x%X\n", (uint16_t)value, opregion->op_base + offset);
             break;
         case FIELD_DWORD_ACCESS:
         case FIELD_ANY_ACCESS:
-            lai_outd(opregion->op_base + offset, (uint32_t)value);
+            laihost_outd(opregion->op_base + offset, (uint32_t)value);
             //lai_debug("wrote 0x%X to I/O port 0x%X\n", (uint32_t)value, opregion->op_base + offset);
             break;
         default:
@@ -393,12 +393,12 @@ void lai_write_field(lai_nsnode_t *field, lai_object_t *source)
         }
 
         // iowait() equivalent
-        lai_outb(0x80, 0x00);
-        lai_outb(0x80, 0x00);
+        laihost_outb(0x80, 0x00);
+        laihost_outb(0x80, 0x00);
     } else if(opregion->op_address_space == OPREGION_MEMORY)
     {
         // Memory-mapped I/O
-        mmio = lai_map(opregion->op_base + offset, 8);
+        mmio = laihost_map(opregion->op_base + offset, 8);
         uint8_t *mmio_byte;
         uint16_t *mmio_word;
         uint32_t *mmio_dword;
@@ -432,7 +432,7 @@ void lai_write_field(lai_nsnode_t *field, lai_object_t *source)
         }
     } else if(opregion->op_address_space == OPREGION_PCI)
     {
-        lai_pci_write((uint8_t)bus_number.integer, (uint8_t)(address_number.integer >> 16) & 0xFF, (uint8_t)(address_number.integer & 0xFF), (offset & 0xFFFC) + opregion->op_base, (uint32_t)value);
+        laihost_pci_write((uint8_t)bus_number.integer, (uint8_t)(address_number.integer >> 16) & 0xFF, (uint8_t)(address_number.integer & 0xFF), (offset & 0xFFFC) + opregion->op_base, (uint32_t)value);
     } else
     {
         lai_panic("undefined opregion address space: %d\n", opregion->op_address_space);

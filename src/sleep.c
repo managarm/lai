@@ -84,17 +84,17 @@ int lai_enter_sleep(uint8_t state)
 
     // and go to sleep
     uint16_t data;
-    data = lai_inw(lai_fadt->pm1a_control_block);
+    data = laihost_inw(lai_fadt->pm1a_control_block);
     data &= 0xE3FF;
     data |= (slp_typa.integer << 10) | ACPI_SLEEP;
-    lai_outw(lai_fadt->pm1a_control_block, data);
+    laihost_outw(lai_fadt->pm1a_control_block, data);
 
     if(lai_fadt->pm1b_control_block != 0)
     {
-        data = lai_inw(lai_fadt->pm1b_control_block);
+        data = laihost_inw(lai_fadt->pm1b_control_block);
         data &= 0xE3FF;
         data |= (slp_typb.integer << 10) | ACPI_SLEEP;
-        lai_outw(lai_fadt->pm1b_control_block, data);
+        laihost_outw(lai_fadt->pm1b_control_block, data);
     }
 
     /* poll the wake status */

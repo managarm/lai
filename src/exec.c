@@ -771,7 +771,7 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state)
             {
                 lai_object_t *opstack_res = lai_exec_push_opstack_or_die(state);
                 opstack_res->type = LAI_STRING;
-                opstack_res->string = lai_malloc(n + 1);
+                opstack_res->string = laihost_malloc(n + 1);
                 lai_memcpy(opstack_res->string, method + state->pc, n);
                 opstack_res->string[n] = 0;
             }else
@@ -795,7 +795,7 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state)
             lai_object_t result = {0};
             result.type = LAI_BUFFER;
             result.buffer_size = buffer_size.integer;
-            result.buffer = lai_malloc(buffer_size.integer);
+            result.buffer = laihost_malloc(buffer_size.integer);
             if(!result.buffer)
                 lai_panic("failed to allocate memory for AML buffer");
             lai_memset(result.buffer, 0, buffer_size.integer);
@@ -839,7 +839,7 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state)
 
             lai_object_t *opstack_pkg = lai_exec_push_opstack_or_die(state);
             opstack_pkg->type = LAI_PACKAGE;
-            opstack_pkg->package = lai_calloc(num_ents, sizeof(lai_object_t));
+            opstack_pkg->package = laihost_calloc(num_ents, sizeof(lai_object_t));
             opstack_pkg->package_size = num_ents;
             break;
         }
@@ -1388,7 +1388,7 @@ void lai_exec_sleep(void *code, lai_state_t *state)
     if(!time.integer)
         time.integer = 1;
 
-    lai_sleep(time.integer);
+    laihost_sleep(time.integer);
 }
 
 

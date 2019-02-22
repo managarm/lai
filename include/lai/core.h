@@ -20,8 +20,10 @@ size_t lai_strlen(const char *);
 char *lai_strcpy(char *, const char *);
 int lai_strcmp(const char *, const char *);
 
-#define lai_debug(...) lai_log(LAI_DEBUG_LOG, __VA_ARGS__)
-#define lai_warn(...) lai_log(LAI_WARN_LOG, __VA_ARGS__)
+#define lai_debug(...) laihost_log(LAI_DEBUG_LOG, __VA_ARGS__)
+#define lai_warn(...) laihost_log(LAI_WARN_LOG, __VA_ARGS__)
+
+#define lai_panic(...) laihost_panic(__VA_ARGS__)
 
 #define LAI_STRINGIFY(x) #x
 #define LAI_EXPAND_STRINGIFY(x) LAI_STRINGIFY(x)

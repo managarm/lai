@@ -20,14 +20,14 @@ uint16_t lai_read_event()
     uint16_t a = 0, b = 0;
     if(lai_fadt->pm1a_event_block)
     {
-        a = lai_inw(lai_fadt->pm1a_event_block);
-        lai_outw(lai_fadt->pm1a_event_block, a);
+        a = laihost_inw(lai_fadt->pm1a_event_block);
+        laihost_outw(lai_fadt->pm1a_event_block, a);
     }
 
     if(lai_fadt->pm1b_event_block)
     {
-        b = lai_inw(lai_fadt->pm1b_event_block);
-        lai_outw(lai_fadt->pm1b_event_block, b);
+        b = laihost_inw(lai_fadt->pm1b_event_block);
+        laihost_outw(lai_fadt->pm1b_event_block, b);
     }
 
     lai_last_event = a | b;
@@ -43,10 +43,10 @@ void lai_set_event(uint16_t value)
     uint16_t b = lai_fadt->pm1b_event_block + (lai_fadt->pm1_event_length / 2);
 
     if(lai_fadt->pm1a_event_block)
-        lai_outw(a, value);
+        laihost_outw(a, value);
 
     if(lai_fadt->pm1b_event_block)
-        lai_outw(b, value);
+        laihost_outw(b, value);
 
     lai_debug("wrote event register value 0x%04X\n", value);
 }
@@ -87,15 +87,15 @@ int lai_enable_acpi(uint32_t mode)
     }
 
     /* enable ACPI SCI */
-    lai_outb(lai_fadt->smi_command_port, lai_fadt->acpi_enable);
-    lai_sleep(10);
+    laihost_outb(lai_fadt->smi_command_port, lai_fadt->acpi_enable);
+    laihost_sleep(10);
 
     for(int i = 0; i < 100; i++)
     {
-        if(lai_inw(lai_fadt->pm1a_control_block) & ACPI_ENABLED)
+        if(laihost_inw(lai_fadt->pm1a_control_block) & ACPI_ENABLED)
             break;
 
-        lai_sleep(10);
+        laihost_sleep(10);
     }
 
     /* set FADT event fields */

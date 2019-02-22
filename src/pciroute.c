@@ -28,7 +28,7 @@ int lai_pci_route(acpi_resource_t *dest, uint8_t bus, uint8_t slot, uint8_t func
     //lai_debug("attempt to resolve PCI IRQ for device %X:%X:%X\n", bus, slot, function);
 
     // determine the interrupt pin
-    uint8_t pin = (uint8_t)(lai_pci_read(bus, slot, function, 0x3C) >> 8);
+    uint8_t pin = (uint8_t)(laihost_pci_read(bus, slot, function, 0x3C) >> 8);
     if(pin == 0 || pin > 4)
         return 1;
 
@@ -161,7 +161,7 @@ resolve_pin:
         lai_debug("PCI interrupt link is %s\n", prt_entry.handle->path);
 
         // read the resource template of the device
-        res = lai_calloc(sizeof(acpi_resource_t), ACPI_MAX_RESOURCES);
+        res = laihost_calloc(sizeof(acpi_resource_t), ACPI_MAX_RESOURCES);
         res_count = lai_read_resource(prt_entry.handle, res);
 
         if(!res_count)
@@ -176,7 +176,7 @@ resolve_pin:
                 dest->base = res[i].base;
                 dest->irq_flags = res[i].irq_flags;
 
-                lai_free(res);
+                laihost_free(res);
 
                 lai_debug("PCI device %02X:%02X:%02X is using IRQ %d\n", bus, slot, function, (int)dest->base);
                 return 0;
