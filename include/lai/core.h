@@ -19,6 +19,7 @@ void *memset(void *, int, size_t);
 int memcmp(const void *, const void *, size_t);
 
 // LAI's libc-like functions.
+void *lai_calloc(size_t, size_t);
 size_t lai_strlen(const char *);
 char *lai_strcpy(char *, const char *);
 int lai_strcmp(const char *, const char *);

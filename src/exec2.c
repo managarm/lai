@@ -135,7 +135,7 @@ static void lai_clone_package(lai_object_t *destination, lai_object_t *source)
 {
     destination->type = LAI_PACKAGE;
     destination->package_size = source->package_size;
-    destination->package = laihost_calloc(source->package_size, sizeof(lai_object_t));
+    destination->package = lai_calloc(source->package_size, sizeof(lai_object_t));
     if(!destination->package)
         lai_panic("unable to allocate memory for package object.\n");
 

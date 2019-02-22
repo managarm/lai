@@ -161,8 +161,8 @@ void lai_create_namespace(void *dsdt)
 {
     if(!laihost_scan)
         lai_panic("lai_create_namespace() needs table management functions\n");
-
-    lai_namespace = laihost_calloc(sizeof(lai_nsnode_t *), lai_ns_capacity);
+    
+    lai_namespace = lai_calloc(sizeof(lai_nsnode_t *), lai_ns_capacity);
     if(!lai_namespace)
         lai_panic("unable to allocate memory.\n");
 

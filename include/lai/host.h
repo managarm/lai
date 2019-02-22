@@ -14,7 +14,6 @@
 
 // OS-specific functions.
 void *laihost_malloc(size_t);
-void *laihost_calloc(size_t, size_t);
 void *laihost_realloc(void *, size_t);
 void laihost_free(void *);
 

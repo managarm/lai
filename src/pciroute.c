@@ -161,7 +161,7 @@ resolve_pin:
         lai_debug("PCI interrupt link is %s\n", prt_entry.handle->path);
 
         // read the resource template of the device
-        res = laihost_calloc(sizeof(acpi_resource_t), ACPI_MAX_RESOURCES);
+        res = lai_calloc(sizeof(acpi_resource_t), ACPI_MAX_RESOURCES);
         res_count = lai_read_resource(prt_entry.handle, res);
 
         if(!res_count)

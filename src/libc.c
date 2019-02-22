@@ -6,6 +6,14 @@
 
 #include <lai/core.h>
 
+void *lai_calloc(size_t count, size_t item_size) {
+    size_t size = count * item_size;
+    void *p = laihost_malloc(size);
+    if(p)
+        memset(p, 0, size);
+    return p;
+}
+
 size_t lai_strlen(const char *s) {
     size_t len = 0;
     for(size_t i = 0; s[i]; i++)

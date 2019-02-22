@@ -839,7 +839,7 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state)
 
             lai_object_t *opstack_pkg = lai_exec_push_opstack_or_die(state);
             opstack_pkg->type = LAI_PACKAGE;
-            opstack_pkg->package = laihost_calloc(num_ents, sizeof(lai_object_t));
+            opstack_pkg->package = lai_calloc(num_ents, sizeof(lai_object_t));
             opstack_pkg->package_size = num_ents;
             break;
         }
