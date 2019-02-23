@@ -1121,6 +1121,18 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state)
             break;
         }
 
+        case (EXTOP_PREFIX << 8) | DEBUG_OP:
+        {
+            if(exec_result_mode == LAI_OBJECT_MODE
+                    || exec_result_mode == LAI_TARGET_MODE)
+            {
+                lai_object_t *result = lai_exec_push_opstack_or_die(state);
+                result->type = LAI_DEBUG_NAME;
+            }
+            state->pc += 2;
+            break;
+        }
+
         case STORE_OP:
         case NOT_OP:
         {

@@ -320,18 +320,17 @@ void lai_store_operand(lai_state_t *state, lai_object_t *target, lai_object_t *o
     case LAI_LOCAL_NAME:
         lai_copy_object(&state->local[target->index], object);
         break;
-/*
-    // TODO: Re-implement the Debug object.
-        if(source->type == LAI_INTEGER)
-            lai_debug("Debug(): integer(%ld)\n", source->integer);
-        else if(source->type == LAI_STRING)
-            lai_debug("Debug(): string(\"%s\")\n", source->string);
-        else if(source->type == LAI_BUFFER)
+    case LAI_DEBUG_NAME:
+        if(object->type == LAI_INTEGER)
+            lai_debug("Debug(): integer(%ld)\n", object->integer);
+        else if(object->type == LAI_STRING)
+            lai_debug("Debug(): string(\"%s\")\n", object->string);
+        else if(object->type == LAI_BUFFER)
             // TODO: Print in hex and respect size.
-            lai_debug("Debug(): buffer(\"%s\")\n", source->buffer);
+            lai_debug("Debug(): buffer(\"%s\")\n", object->buffer);
         else
-            lai_debug("Debug(): type %d\n", source->type);
-*/
+            lai_debug("Debug(): type %d\n", object->type);
+        break;
     default:
         lai_panic("object type %d is not valid for lai_store_operand()\n", target->type);
     }

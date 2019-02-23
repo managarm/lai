@@ -80,10 +80,11 @@ int lai_strcmp(const char *, const char *);
 #define LAI_UNRESOLVED_NAME   10
 #define LAI_ARG_NAME          11
 #define LAI_LOCAL_NAME        12
+#define LAI_DEBUG_NAME        13
 // Reference types: references to object storage.
-#define LAI_STRING_REFERENCE  13
-#define LAI_BUFFER_REFERENCE  14
-#define LAI_PACKAGE_REFERENCE 15
+#define LAI_STRING_REFERENCE  14
+#define LAI_BUFFER_REFERENCE  15
+#define LAI_PACKAGE_REFERENCE 16
 
 // Device _STA object
 #define ACPI_STA_PRESENT        0x01
