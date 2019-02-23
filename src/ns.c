@@ -25,7 +25,7 @@ extern char aml_test[];
 
 lai_nsnode_t **lai_namespace;
 size_t lai_ns_size = 0;
-size_t lai_ns_capacity = NAMESPACE_WINDOW;
+size_t lai_ns_capacity = 0;
 
 void acpins_load_table(void *);
 
@@ -162,7 +162,7 @@ void lai_create_namespace(void *dsdt)
     if(!laihost_scan)
         lai_panic("lai_create_namespace() needs table management functions\n");
     
-    lai_namespace = lai_calloc(sizeof(lai_nsnode_t *), lai_ns_capacity);
+    lai_namespace = lai_calloc(sizeof(lai_nsnode_t *), NAMESPACE_WINDOW);
     if(!lai_namespace)
         lai_panic("unable to allocate memory.\n");
 
