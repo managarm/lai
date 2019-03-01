@@ -9,6 +9,7 @@
  * for basic system enumeration as well as PCI IRQ routing. */
 
 #include <lai/core.h>
+#include "libc.h"
 
 #define ACPI_SMALL_IRQ            0x04
 #define ACPI_SMALL_DMA            0x05

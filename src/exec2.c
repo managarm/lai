@@ -5,6 +5,11 @@
  */
 
 #include <lai/core.h>
+#include "libc.h"
+#include "opregion.h"
+#include "exec_impl.h"
+
+void lai_write_buffer(lai_nsnode_t *, lai_object_t *);
 
 /* ACPI Control Method Execution */
 /* Type2Opcode := DefAcquire | DefAdd | DefAnd | DefBuffer | DefConcat |

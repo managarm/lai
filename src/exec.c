@@ -8,6 +8,7 @@
 #include "aml_opcodes.h"
 #include "exec_impl.h"
 #include "ns_impl.h"
+#include "libc.h"
 
 static int debug_opcodes = 0;
 

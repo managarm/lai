@@ -1,4 +1,3 @@
-
 /*
  * Lux ACPI Implementation
  * Copyright (C) 2018-2019 by Omar Muhamed
@@ -7,6 +6,12 @@
 #include <lai/core.h>
 #include "aml_opcodes.h"
 #include "ns_impl.h"
+#include "libc.h"
+#include "exec_impl.h"
+
+uint32_t bswap32(uint32_t);
+uint16_t bswap16(uint16_t);
+uint8_t char_to_hex(char);
 
 // lai_is_name(): Evaluates a name character
 // Param:    char character - character from name
@@ -14,7 +19,13 @@
 
 int lai_is_name(char character)
 {
-    if((character >= '0' && character <= '9') || (character >= 'A' && character <= 'Z') || character == '_' || character == ROOT_CHAR || character == PARENT_CHAR || character == MULTI_PREFIX || character == DUAL_PREFIX)
+    if((character >= '0' && character <= '9')
+        || (character >= 'A' && character <= 'Z')
+        || character == '_'
+        || character == ROOT_CHAR
+        || character == PARENT_CHAR
+        || character == MULTI_PREFIX
+        || character == DUAL_PREFIX)
         return 1;
 
     else
@@ -160,7 +171,7 @@ int lai_eval(lai_object_t *destination, char *path)
 // Param:    uint16_t word - WORD
 // Return:    uint16_t - switched value
 
-uint16_t lai_bswap16(uint16_t word)
+uint16_t bswap16(uint16_t word)
 {
     return (uint16_t)((word >> 8) & 0xFF) | ((word << 8) & 0xFF00);
 }
@@ -169,7 +180,7 @@ uint16_t lai_bswap16(uint16_t word)
 // Param:    uint32_t dword - DWORD
 // Return:    uint32 - switched value
 
-uint32_t lai_bswap32(uint32_t dword)
+uint32_t bswap32(uint32_t dword)
 {
     return (uint32_t)((dword>>24) & 0xFF) | ((dword<<8) & 0xFF0000) | ((dword>>8)&0xFF00) | ((dword<<24)&0xFF000000);
 }
@@ -178,7 +189,7 @@ uint32_t lai_bswap32(uint32_t dword)
 // Param:    char character - ASCII hex char
 // Return:    uint8_t - hex value
 
-uint8_t lai_char_to_hex(char character)
+uint8_t char_to_hex(char character)
 {
     if(character <= '9')
         return character - '0';
@@ -219,6 +230,5 @@ void lai_eisaid(lai_object_t *object, char *id)
 
     out = lai_bswap32(out);
     object->integer = (uint64_t)out & 0xFFFFFFFF;
-
 }
 

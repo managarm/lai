@@ -9,6 +9,7 @@
  * need NVS and other things I still need to research */
 
 #include <lai/core.h>
+#include "libc.h"
 
 // lai_enter_sleep(): Enters a sleeping state
 // Param:    uint8_t state - 0-5 to correspond with states S0-S5

@@ -9,6 +9,8 @@
 #include <lai/core.h>
 #include "aml_opcodes.h"
 #include "ns_impl.h"
+#include "exec_impl.h"
+#include "libc.h"
 
 #define CODE_WINDOW            131072
 #define NAMESPACE_WINDOW       8192
@@ -161,7 +163,7 @@ void lai_create_namespace(void *dsdt)
 {
     if(!laihost_scan)
         lai_panic("lai_create_namespace() needs table management functions\n");
-    
+
     lai_namespace = lai_calloc(sizeof(lai_nsnode_t *), NAMESPACE_WINDOW);
     if(!lai_namespace)
         lai_panic("unable to allocate memory.\n");

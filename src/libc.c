@@ -5,6 +5,7 @@
  */
 
 #include <lai/core.h>
+#include "libc.h"
 
 void lai_debug(const char *fmt, ...)
 {

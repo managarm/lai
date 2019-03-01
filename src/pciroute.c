@@ -13,6 +13,7 @@
    the four PCI pins should be used: LNKA, LNKB, LNKC and LNKD. */
 
 #include <lai/core.h>
+#include "libc.h"
 
 #define PCI_PNP_ID        "PNP0A03"
 

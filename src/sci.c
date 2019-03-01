@@ -7,6 +7,8 @@
 /* System Control Interrupt Initialization */
 
 #include <lai/core.h>
+#include "libc.h"
+#include "exec_impl.h"
 
 static void lai_init_children(char *);
 

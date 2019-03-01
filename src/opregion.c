@@ -12,6 +12,8 @@
 
 #include <lai/core.h>
 #include "aml_opcodes.h"
+#include "libc.h"
+#include "opregion.h"
 
 void lai_read_field(lai_object_t *, lai_nsnode_t *);
 void lai_write_field(lai_nsnode_t *, lai_object_t *);

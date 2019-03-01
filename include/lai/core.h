@@ -11,23 +11,12 @@
 
 #include <lai/host.h>
 
-// Essential LAI utility functions.
-void lai_debug(const char *, ...);
-void lai_warn(const char *, ...);
-__attribute__((noreturn)) void lai_panic(const char *, ...);
-
 // Even in freestanding environments, GCC requires memcpy(), memmove(), memset()
 // and memcmp() to be present. Thus, we just use them directly.
 void *memcpy(void *, const void *, size_t);
 void *memmove(void *, const void *, size_t);
 void *memset(void *, int, size_t);
 int memcmp(const void *, const void *, size_t);
-
-// LAI's libc-like functions.
-void *lai_calloc(size_t, size_t);
-size_t lai_strlen(const char *);
-char *lai_strcpy(char *, const char *);
-int lai_strcmp(const char *, const char *);
 
 #define LAI_STRINGIFY(x) #x
 #define LAI_EXPAND_STRINGIFY(x) LAI_STRINGIFY(x)
@@ -412,24 +401,7 @@ size_t lai_read_resource(lai_nsnode_t *, acpi_resource_t *);
 // ACPI Control Methods
 void lai_eval_operand(lai_object_t *, lai_state_t *, uint8_t *);
 int lai_eval(lai_object_t *, char *);
-void lai_free_object(lai_object_t *);
-void lai_move_object(lai_object_t *, lai_object_t *);
-void lai_copy_object(lai_object_t *, lai_object_t *);
-lai_nsnode_t *lai_exec_resolve(char *);
 int lai_populate(lai_nsnode_t *, void *, size_t, lai_state_t *);
-int lai_exec_method(lai_nsnode_t *, lai_state_t *);
-int lai_eval_node(lai_nsnode_t *, lai_state_t *);
-void lai_read_opregion(lai_object_t *, lai_nsnode_t *);
-void lai_write_opregion(lai_nsnode_t *, lai_object_t *);
-void lai_exec_name(void *, lai_nsnode_t *, lai_state_t *);
-void lai_exec_sleep(void *, lai_state_t *);
-uint16_t lai_bswap16(uint16_t);
-uint32_t lai_bswap32(uint32_t);
-uint8_t lai_char_to_hex(char);
-void lai_write_buffer(lai_nsnode_t *, lai_object_t *);
-void lai_exec_bytefield(void *, lai_nsnode_t *, lai_state_t *);
-void lai_exec_wordfield(void *, lai_nsnode_t *, lai_state_t *);
-void lai_exec_dwordfield(void *, lai_nsnode_t *, lai_state_t *);
 
 // Generic Functions
 int lai_enable_acpi(uint32_t);
@@ -438,4 +410,3 @@ uint16_t lai_read_event();
 void lai_set_event(uint16_t);
 int lai_enter_sleep(uint8_t);
 int lai_pci_route(acpi_resource_t *, uint8_t, uint8_t, uint8_t);
-
