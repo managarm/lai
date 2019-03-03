@@ -9,6 +9,7 @@
 #include "exec_impl.h"
 #include "ns_impl.h"
 #include "libc.h"
+#include "eval.h"
 
 static int debug_opcodes = 0;
 
@@ -631,7 +632,7 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state)
         if(lai_is_name(method[state->pc])) {
             lai_object_t unresolved = {0};
             unresolved.type = LAI_UNRESOLVED_NAME;
-            state->pc += acpins_resolve_path(ctx_handle, unresolved.name, method + state->pc);
+            state->pc += lai_resolve_path(ctx_handle, unresolved.name, method + state->pc);
 
             if(exec_result_mode == LAI_DATA_MODE || exec_result_mode == LAI_TARGET_MODE)
             {
@@ -982,12 +983,12 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state)
             size_t encoded_size;
             state->pc += lai_parse_pkgsize(method + state->pc, &encoded_size);
             char name[ACPI_MAX_NAME];
-            state->pc += acpins_resolve_path(ctx_handle, name, method + state->pc);
+            state->pc += lai_resolve_path(ctx_handle, name, method + state->pc);
 
-            lai_nsnode_t *node = acpins_create_nsnode_or_die();
+            lai_nsnode_t *node = lai_create_nsnode_or_die();
             node->type = LAI_NAMESPACE_SCOPE;
             lai_strcpy(node->path, name);
-            acpins_install_nsnode(node);
+            lai_install_nsnode(node);
 
             lai_stackitem_t *item = lai_exec_push_stack_or_die(state);
             item->kind = LAI_POPULATE_CONTEXT_STACKITEM;
@@ -1003,12 +1004,12 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state)
             size_t encoded_size;
             state->pc += lai_parse_pkgsize(method + state->pc, &encoded_size);
             char name[ACPI_MAX_NAME];
-            state->pc += acpins_resolve_path(ctx_handle, name, method + state->pc);
+            state->pc += lai_resolve_path(ctx_handle, name, method + state->pc);
 
-            lai_nsnode_t *node = acpins_create_nsnode_or_die();
+            lai_nsnode_t *node = lai_create_nsnode_or_die();
             node->type = LAI_NAMESPACE_DEVICE;
             lai_strcpy(node->path, name);
-            acpins_install_nsnode(node);
+            lai_install_nsnode(node);
 
             lai_stackitem_t *item = lai_exec_push_stack_or_die(state);
             item->kind = LAI_POPULATE_CONTEXT_STACKITEM;
@@ -1018,7 +1019,7 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state)
             break;
         }
         case (EXTOP_PREFIX << 8) | PROCESSOR:
-            state->pc += acpins_create_processor(ctx_handle, method + state->pc);
+            state->pc += lai_create_processor(ctx_handle, method + state->pc);
             break;
         case (EXTOP_PREFIX << 8) | THERMALZONE:
         {
@@ -1027,12 +1028,12 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state)
             size_t encoded_size;
             state->pc += lai_parse_pkgsize(method + state->pc, &encoded_size);
             char name[ACPI_MAX_NAME];
-            state->pc += acpins_resolve_path(ctx_handle, name, method + state->pc);
+            state->pc += lai_resolve_path(ctx_handle, name, method + state->pc);
 
-            lai_nsnode_t *node = acpins_create_nsnode_or_die();
+            lai_nsnode_t *node = lai_create_nsnode_or_die();
             node->type = LAI_NAMESPACE_THERMALZONE;
             lai_strcpy(node->path, name);
-            acpins_install_nsnode(node);
+            lai_install_nsnode(node);
 
             lai_stackitem_t *item = lai_exec_push_stack_or_die(state);
             item->kind = LAI_POPULATE_CONTEXT_STACKITEM;
@@ -1044,19 +1045,19 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state)
 
         // Leafs in the ACPI namespace.
         case METHOD_OP:
-            state->pc += acpins_create_method(ctx_handle, method + state->pc);
+            state->pc += lai_create_method(ctx_handle, method + state->pc);
             break;
         case ALIAS_OP:
-            state->pc += acpins_create_alias(ctx_handle, method + state->pc);
+            state->pc += lai_create_alias(ctx_handle, method + state->pc);
             break;
         case (EXTOP_PREFIX << 8) | MUTEX:
-            state->pc += acpins_create_mutex(ctx_handle, method + state->pc);
+            state->pc += lai_create_mutex(ctx_handle, method + state->pc);
             break;
         case (EXTOP_PREFIX << 8) | OPREGION:
         {
             state->pc += 2;
             char name[ACPI_MAX_NAME];
-            state->pc += acpins_resolve_path(ctx_handle, name, method + state->pc);
+            state->pc += lai_resolve_path(ctx_handle, name, method + state->pc);
 
             // First byte identifies the address space (memory, I/O ports, PCI, etc.).
             int address_space = method[state->pc];
@@ -1068,19 +1069,19 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state)
             lai_eval_operand(&disp, state, method);
             lai_eval_operand(&length, state, method);
 
-            lai_nsnode_t *node = acpins_create_nsnode_or_die();
+            lai_nsnode_t *node = lai_create_nsnode_or_die();
             lai_strcpy(node->path, name);
             node->op_address_space = address_space;
             node->op_base = disp.integer;
             node->op_length = length.integer;
-            acpins_install_nsnode(node);
+            lai_install_nsnode(node);
             break;
         }
         case (EXTOP_PREFIX << 8) | FIELD:
-            state->pc += acpins_create_field(ctx_handle, method + state->pc);
+            state->pc += lai_create_field(ctx_handle, method + state->pc);
             break;
         case (EXTOP_PREFIX << 8) | INDEXFIELD:
-            state->pc += acpins_create_indexfield(ctx_handle, method + state->pc);
+            state->pc += lai_create_indexfield(ctx_handle, method + state->pc);
             break;
 
         case ARG0_OP:
@@ -1348,7 +1349,7 @@ int lai_eval_node(lai_nsnode_t *handle, lai_state_t *state)
 {
     while(handle->type == LAI_NAMESPACE_ALIAS)
     {
-        handle = acpins_resolve(handle->alias);
+        handle = lai_resolve(handle->alias);
         if(!handle)
             return 1;
     }

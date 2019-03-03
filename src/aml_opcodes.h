@@ -112,7 +112,3 @@
 // Methods
 #define METHOD_ARGC_MASK		0x07
 #define METHOD_SERIALIZED		0x08
-
-
-
-

@@ -11,6 +11,7 @@
 #include "ns_impl.h"
 #include "exec_impl.h"
 #include "libc.h"
+#include "eval.h"
 
 #define CODE_WINDOW            131072
 #define NAMESPACE_WINDOW       8192
@@ -29,11 +30,10 @@ lai_nsnode_t **lai_namespace;
 size_t lai_ns_size = 0;
 size_t lai_ns_capacity = 0;
 
-void acpins_load_table(void *);
+void lai_load_table(void *);
 
 // Helper function to allocate a lai_nsnode_t.
-lai_nsnode_t *acpins_create_nsnode()
-{
+lai_nsnode_t *lai_create_nsnode(void) {
     lai_nsnode_t *node = laihost_malloc(sizeof(lai_nsnode_t));
     if(!node)
         return NULL;
@@ -42,16 +42,15 @@ lai_nsnode_t *acpins_create_nsnode()
 }
 
 // Helper function to allocate a lai_nsnode_t.
-lai_nsnode_t *acpins_create_nsnode_or_die()
-{
-    lai_nsnode_t *node = acpins_create_nsnode();
+lai_nsnode_t *lai_create_nsnode_or_die(void) {
+    lai_nsnode_t *node = lai_create_nsnode();
     if(!node)
         lai_panic("could not allocate new namespace node\n");
     return node;
 }
 
 // Installs the nsnode to the namespace.
-void acpins_install_nsnode(lai_nsnode_t *node)
+void lai_install_nsnode(lai_nsnode_t *node)
 {
     // Classical doubling strategy to grow the namespace table.
     if(lai_ns_size == lai_ns_capacity)
@@ -76,7 +75,7 @@ void acpins_install_nsnode(lai_nsnode_t *node)
 // Param:    uint8_t *path - path to resolve
 // Return:    size_t - size of path data parsed in AML
 
-size_t acpins_resolve_path(lai_nsnode_t *context, char *fullpath, uint8_t *path)
+size_t lai_resolve_path(lai_nsnode_t *context, char *fullpath, uint8_t *path)
 {
     size_t name_size = 0;
     size_t multi_count = 0;
@@ -181,14 +180,14 @@ void lai_create_namespace(void *dsdt)
     }
 
     // load the DSDT
-    acpins_load_table(dsdt);
+    lai_load_table(dsdt);
 
     // load all SSDTs
     size_t index = 0;
     acpi_aml_t *ssdt = laihost_scan("SSDT", index);
     while(ssdt != NULL)
     {
-        acpins_load_table(ssdt);
+        lai_load_table(ssdt);
         index++;
         ssdt = laihost_scan("SSDT", index);
     }
@@ -199,32 +198,32 @@ void lai_create_namespace(void *dsdt)
     acpi_aml_t *psdt = laihost_scan("PSDT", index);
     while(psdt != NULL)
     {
-        acpins_load_table(psdt);
+        lai_load_table(psdt);
         index++;
         psdt = laihost_scan("PSDT", index);
     }
 
     // create the OS-defined objects first
-    lai_nsnode_t *osi_node = acpins_create_nsnode_or_die();
+    lai_nsnode_t *osi_node = lai_create_nsnode_or_die();
     osi_node->type = LAI_NAMESPACE_METHOD;
     lai_strcpy(osi_node->path, "\\._OSI");
     osi_node->method_flags = 0x01;
     osi_node->method_override = &lai_do_osi_method;
-    acpins_install_nsnode(osi_node);
+    lai_install_nsnode(osi_node);
 
-    lai_nsnode_t *os_node = acpins_create_nsnode_or_die();
+    lai_nsnode_t *os_node = lai_create_nsnode_or_die();
     os_node->type = LAI_NAMESPACE_METHOD;
     lai_strcpy(os_node->path, "\\._OS_");
     os_node->method_flags = 0x00;
     os_node->method_override = &lai_do_os_method;
-    acpins_install_nsnode(os_node);
+    lai_install_nsnode(os_node);
 
-    lai_nsnode_t *rev_node = acpins_create_nsnode_or_die();
+    lai_nsnode_t *rev_node = lai_create_nsnode_or_die();
     rev_node->type = LAI_NAMESPACE_METHOD;
     lai_strcpy(rev_node->path, "\\._REV");
     rev_node->method_flags = 0x00;
     rev_node->method_override = &lai_do_rev_method;
-    acpins_install_nsnode(rev_node);
+    lai_install_nsnode(rev_node);
 
     // Create the namespace with all the objects.
     lai_state_t state;
@@ -239,7 +238,7 @@ void lai_create_namespace(void *dsdt)
 // Param:    void *ptr - pointer to table
 // Return:    Nothing
 
-void acpins_load_table(void *ptr)
+void lai_load_table(void *ptr)
 {
     acpi_aml_t *table = (acpi_aml_t*)ptr;
     while(lai_acpins_size + table->header.length >= lai_acpins_allocation)
@@ -261,7 +260,7 @@ void acpins_load_table(void *ptr)
 // Param:    void *data - pointer to field data
 // Return:    size_t - total size of field in bytes
 
-size_t acpins_create_field(lai_nsnode_t *parent, void *data)
+size_t lai_create_field(lai_nsnode_t *parent, void *data)
 {
     uint8_t *field = (uint8_t*)data;
     field += 2;        // skip opcode
@@ -277,7 +276,7 @@ size_t acpins_create_field(lai_nsnode_t *parent, void *data)
     char opregion_name[ACPI_MAX_NAME];
     size_t name_size = 0;
 
-    name_size = acpins_resolve_path(parent, opregion_name, field);
+    name_size = lai_resolve_path(parent, opregion_name, field);
 
     opregion = lai_exec_resolve(opregion_name);
     if(!opregion)
@@ -389,10 +388,10 @@ size_t acpins_create_field(lai_nsnode_t *parent, void *data)
             break;
 
         //lai_debug("field %c%c%c%c: size %d bits, at bit offset %d\n", field[0], field[1], field[2], field[3], field[4], current_offset);
-        lai_nsnode_t *node = acpins_create_nsnode_or_die();
+        lai_nsnode_t *node = lai_create_nsnode_or_die();
         node->type = LAI_NAMESPACE_FIELD;
 
-        name_size = acpins_resolve_path(parent, node->path, &field[0]);
+        name_size = lai_resolve_path(parent, node->path, &field[0]);
         field += name_size;
         byte_count += name_size;
 
@@ -407,7 +406,7 @@ size_t acpins_create_field(lai_nsnode_t *parent, void *data)
         node->field_offset = current_offset;
 
         current_offset += (uint64_t)node->field_size;
-        acpins_install_nsnode(node);
+        lai_install_nsnode(node);
 
         field += field_size;
         byte_count += field_size;
@@ -420,7 +419,7 @@ size_t acpins_create_field(lai_nsnode_t *parent, void *data)
 // Param:    void *data - pointer to AML code
 // Return:    size_t - total size in bytes for skipping
 
-size_t acpins_create_method(lai_nsnode_t *parent, void *data)
+size_t lai_create_method(lai_nsnode_t *parent, void *data)
 {
     uint8_t *method = (uint8_t*)data;
     method++;        // skip over METHOD_OP
@@ -430,8 +429,8 @@ size_t acpins_create_method(lai_nsnode_t *parent, void *data)
     method += pkgsize;
 
     // create a namespace object for the method
-    lai_nsnode_t *node = acpins_create_nsnode_or_die();
-    size_t name_length = acpins_resolve_path(parent, node->path, method);
+    lai_nsnode_t *node = lai_create_nsnode_or_die();
+    size_t name_length = lai_resolve_path(parent, node->path, method);
 
     // get the method's flags
     method = (uint8_t*)data;
@@ -451,7 +450,7 @@ size_t acpins_create_method(lai_nsnode_t *parent, void *data)
 
     lai_debug(")\n");*/
 
-    acpins_install_nsnode(node);
+    lai_install_nsnode(node);
     return size + 1;
 }
 
@@ -459,7 +458,7 @@ size_t acpins_create_method(lai_nsnode_t *parent, void *data)
 // Param:    void *data - pointer to data
 // Return:    size_t - total size in bytes, for skipping
 
-size_t acpins_create_alias(lai_nsnode_t *parent, void *data)
+size_t lai_create_alias(lai_nsnode_t *parent, void *data)
 {
     size_t return_size = 1;
     uint8_t *alias = (uint8_t*)data;
@@ -467,18 +466,18 @@ size_t acpins_create_alias(lai_nsnode_t *parent, void *data)
 
     size_t name_size;
 
-    lai_nsnode_t *node = acpins_create_nsnode_or_die();
+    lai_nsnode_t *node = lai_create_nsnode_or_die();
     node->type = LAI_NAMESPACE_ALIAS;
-    name_size = acpins_resolve_path(parent, node->alias, alias);
+    name_size = lai_resolve_path(parent, node->alias, alias);
 
     return_size += name_size;
     alias += name_size;
 
-    name_size = acpins_resolve_path(parent, node->path, alias);
+    name_size = lai_resolve_path(parent, node->path, alias);
 
     //lai_debug("alias %s for object %s\n", node->path, node->alias);
 
-    acpins_install_nsnode(node);
+    lai_install_nsnode(node);
     return_size += name_size;
     return return_size;
 }
@@ -487,22 +486,22 @@ size_t acpins_create_alias(lai_nsnode_t *parent, void *data)
 // Param:    void *data - pointer to data
 // Return:    size_t - total size in bytes, for skipping
 
-size_t acpins_create_mutex(lai_nsnode_t *parent, void *data)
+size_t lai_create_mutex(lai_nsnode_t *parent, void *data)
 {
     size_t return_size = 2;
     uint8_t *mutex = (uint8_t*)data;
     mutex += 2;        // skip MUTEX_OP
 
-    lai_nsnode_t *node = acpins_create_nsnode_or_die();
+    lai_nsnode_t *node = lai_create_nsnode_or_die();
     node->type = LAI_NAMESPACE_MUTEX;
-    size_t name_size = acpins_resolve_path(parent, node->path, mutex);
+    size_t name_size = lai_resolve_path(parent, node->path, mutex);
 
     return_size += name_size;
     return_size++;
 
     //lai_debug("mutex object %s\n", node->path);
 
-    acpins_install_nsnode(node);
+    lai_install_nsnode(node);
     return return_size;
 }
 
@@ -510,7 +509,7 @@ size_t acpins_create_mutex(lai_nsnode_t *parent, void *data)
 // Param:    void *data - pointer to indexfield data
 // Return:    size_t - total size of indexfield in bytes
 
-size_t acpins_create_indexfield(lai_nsnode_t *parent, void *data)
+size_t lai_create_indexfield(lai_nsnode_t *parent, void *data)
 {
     uint8_t *indexfield = (uint8_t*)data;
     indexfield += 2;        // skip INDEXFIELD_OP
@@ -525,8 +524,8 @@ size_t acpins_create_indexfield(lai_nsnode_t *parent, void *data)
     memset(indexr, 0, ACPI_MAX_NAME);
     memset(datar, 0, ACPI_MAX_NAME);
 
-    indexfield += acpins_resolve_path(parent, indexr, indexfield);
-    indexfield += acpins_resolve_path(parent, datar, indexfield);
+    indexfield += lai_resolve_path(parent, indexr, indexfield);
+    indexfield += lai_resolve_path(parent, datar, indexfield);
 
     uint8_t flags = indexfield[0];
 
@@ -596,7 +595,7 @@ size_t acpins_create_indexfield(lai_nsnode_t *parent, void *data)
         }
 
         //lai_debug("indexfield %c%c%c%c: size %d bits, at bit offset %d\n", indexfield[0], indexfield[1], indexfield[2], indexfield[3], indexfield[4], current_offset);
-        lai_nsnode_t *node = acpins_create_nsnode_or_die();
+        lai_nsnode_t *node = lai_create_nsnode_or_die();
         node->type = LAI_NAMESPACE_INDEXFIELD;
         // FIXME: This looks odd. Why don't we all acpins_resolve_path()?
 
@@ -604,7 +603,7 @@ size_t acpins_create_indexfield(lai_nsnode_t *parent, void *data)
         node->path[lai_strlen(parent->path)] = '.';
         memcpy(node->path + lai_strlen(parent->path) + 1, indexfield, 4);*/
 
-        name_size = acpins_resolve_path(parent, node->path, &indexfield[0]);
+        name_size = lai_resolve_path(parent, node->path, &indexfield[0]);
 
         indexfield += name_size;
         byte_count += name_size;
@@ -617,7 +616,7 @@ size_t acpins_create_indexfield(lai_nsnode_t *parent, void *data)
         node->indexfield_offset = current_offset;
 
         current_offset += (uint64_t)(indexfield[0]);
-        acpins_install_nsnode(node);
+        lai_install_nsnode(node);
 
         indexfield++;
         byte_count++;
@@ -630,7 +629,7 @@ size_t acpins_create_indexfield(lai_nsnode_t *parent, void *data)
 // Param:    void *data - pointer to data
 // Return:    size_t - total size in bytes, for skipping
 
-size_t acpins_create_processor(lai_nsnode_t *parent, void *data)
+size_t lai_create_processor(lai_nsnode_t *parent, void *data)
 {
     uint8_t *processor = (uint8_t*)data;
     processor += 2;            // skip over PROCESSOR_OP
@@ -639,16 +638,16 @@ size_t acpins_create_processor(lai_nsnode_t *parent, void *data)
     pkgsize = lai_parse_pkgsize(processor, &size);
     processor += pkgsize;
 
-    lai_nsnode_t *node = acpins_create_nsnode_or_die();
+    lai_nsnode_t *node = lai_create_nsnode_or_die();
     node->type = LAI_NAMESPACE_PROCESSOR;
-    size_t name_size = acpins_resolve_path(parent, node->path, processor);
+    size_t name_size = lai_resolve_path(parent, node->path, processor);
     processor += name_size;
 
     node->cpu_id = processor[0];
 
     //lai_debug("processor %s ACPI ID %d\n", node->path, node->cpu_id);
 
-    acpins_install_nsnode(node);
+    lai_install_nsnode(node);
 
     return size + 2;
 }
@@ -657,18 +656,18 @@ size_t acpins_create_processor(lai_nsnode_t *parent, void *data)
 // Param:    void *data - pointer to data
 // Return:    size_t - total size in bytes, for skipping
 
-size_t acpins_create_bytefield(lai_nsnode_t *parent, void *data)
+size_t lai_create_bytefield(lai_nsnode_t *parent, void *data)
 {
     uint8_t *bytefield = (uint8_t*)data;
     bytefield++;        // skip BYTEFIELD_OP
     size_t return_size = 1;
 
-    lai_nsnode_t *node = acpins_create_nsnode_or_die();
+    lai_nsnode_t *node = lai_create_nsnode_or_die();
     node->type = LAI_NAMESPACE_BUFFER_FIELD;
 
     // buffer name
     size_t name_size;
-    name_size = acpins_resolve_path(parent, node->buffer, bytefield);
+    name_size = lai_resolve_path(parent, node->buffer, bytefield);
 
     return_size += name_size;
     bytefield += name_size;
@@ -683,9 +682,9 @@ size_t acpins_create_bytefield(lai_nsnode_t *parent, void *data)
     return_size += integer_size;
     bytefield += integer_size;
 
-    name_size = acpins_resolve_path(parent, node->path, bytefield);
+    name_size = lai_resolve_path(parent, node->path, bytefield);
 
-    acpins_install_nsnode(node);
+    lai_install_nsnode(node);
     return_size += name_size;
     return return_size;
 }
@@ -694,18 +693,18 @@ size_t acpins_create_bytefield(lai_nsnode_t *parent, void *data)
 // Param:    void *data - pointer to data
 // Return:    size_t - total size in bytes, for skipping
 
-size_t acpins_create_wordfield(lai_nsnode_t *parent, void *data)
+size_t lai_create_wordfield(lai_nsnode_t *parent, void *data)
 {
     uint8_t *wordfield = (uint8_t*)data;
     wordfield++;        // skip WORDFIELD_OP
     size_t return_size = 1;
 
-    lai_nsnode_t *node = acpins_create_nsnode_or_die();
+    lai_nsnode_t *node = lai_create_nsnode_or_die();
     node->type = LAI_NAMESPACE_BUFFER_FIELD;
 
     // buffer name
     size_t name_size;
-    name_size = acpins_resolve_path(parent, node->buffer, wordfield);
+    name_size = lai_resolve_path(parent, node->buffer, wordfield);
 
     return_size += name_size;
     wordfield += name_size;
@@ -720,11 +719,11 @@ size_t acpins_create_wordfield(lai_nsnode_t *parent, void *data)
     return_size += integer_size;
     wordfield += integer_size;
 
-    name_size = acpins_resolve_path(parent, node->path, wordfield);
+    name_size = lai_resolve_path(parent, node->path, wordfield);
 
     //lai_debug("field %s for buffer %s, offset %d size %d bits\n", node->path, node->buffer, node->buffer_offset, node->buffer_size);
 
-    acpins_install_nsnode(node);
+    lai_install_nsnode(node);
     return_size += name_size;
     return return_size;
 }
@@ -733,18 +732,18 @@ size_t acpins_create_wordfield(lai_nsnode_t *parent, void *data)
 // Param:    void *data - pointer to data
 // Return:    size_t - total size in bytes, for skipping
 
-size_t acpins_create_dwordfield(lai_nsnode_t *parent, void *data)
+size_t lai_create_dwordfield(lai_nsnode_t *parent, void *data)
 {
     uint8_t *dwordfield = (uint8_t*)data;
     dwordfield++;        // skip DWORDFIELD_OP
     size_t return_size = 1;
 
-    lai_nsnode_t *node = acpins_create_nsnode_or_die();
+    lai_nsnode_t *node = lai_create_nsnode_or_die();
     node->type = LAI_NAMESPACE_BUFFER_FIELD;
 
     // buffer name
     size_t name_size;
-    name_size = acpins_resolve_path(parent, node->buffer, dwordfield);
+    name_size = lai_resolve_path(parent, node->buffer, dwordfield);
 
     return_size += name_size;
     dwordfield += name_size;
@@ -759,9 +758,9 @@ size_t acpins_create_dwordfield(lai_nsnode_t *parent, void *data)
     return_size += integer_size;
     dwordfield += integer_size;
 
-    name_size = acpins_resolve_path(parent, node->path, dwordfield);
+    name_size = lai_resolve_path(parent, node->path, dwordfield);
 
-    acpins_install_nsnode(node);
+    lai_install_nsnode(node);
     return_size += name_size;
     return return_size;
 }
@@ -770,18 +769,18 @@ size_t acpins_create_dwordfield(lai_nsnode_t *parent, void *data)
 // Param:    void *data - pointer to data
 // Return:    size_t - total size in bytes, for skipping
 
-size_t acpins_create_qwordfield(lai_nsnode_t *parent, void *data)
+size_t lai_create_qwordfield(lai_nsnode_t *parent, void *data)
 {
     uint8_t *qwordfield = (uint8_t*)data;
     qwordfield++;        // skip QWORDFIELD_OP
     size_t return_size = 1;
 
-    lai_nsnode_t *node = acpins_create_nsnode_or_die();
+    lai_nsnode_t *node = lai_create_nsnode_or_die();
     node->type = LAI_NAMESPACE_BUFFER_FIELD;
 
     // buffer name
     size_t name_size;
-    name_size = acpins_resolve_path(parent, node->buffer, qwordfield);
+    name_size = lai_resolve_path(parent, node->buffer, qwordfield);
 
     return_size += name_size;
     qwordfield += name_size;
@@ -796,9 +795,9 @@ size_t acpins_create_qwordfield(lai_nsnode_t *parent, void *data)
     return_size += integer_size;
     qwordfield += integer_size;
 
-    name_size = acpins_resolve_path(parent, node->path, qwordfield);
+    name_size = lai_resolve_path(parent, node->path, qwordfield);
 
-    acpins_install_nsnode(node);
+    lai_install_nsnode(node);
     return_size += name_size;
     return return_size;
 }
@@ -807,7 +806,7 @@ size_t acpins_create_qwordfield(lai_nsnode_t *parent, void *data)
 // Param:    char *path - 4-char object name or full path
 // Return:    lai_nsnode_t * - pointer to namespace object, NULL on error
 
-lai_nsnode_t *acpins_resolve(char *path)
+lai_nsnode_t *lai_resolve(char *path)
 {
     size_t i = 0;
 
@@ -843,7 +842,7 @@ lai_nsnode_t *acpins_resolve(char *path)
 // Param:    size_t index - index
 // Return:    lai_nsnode_t * - device handle, NULL on error
 
-lai_nsnode_t *acpins_get_device(size_t index)
+lai_nsnode_t *lai_get_device(size_t index)
 {
     size_t i = 0, j = 0;
     while(j < lai_ns_size)
@@ -865,7 +864,7 @@ lai_nsnode_t *acpins_get_device(size_t index)
 // Param:    lai_object_t *id - device ID
 // Return:    lai_nsnode_t * - device handle, NULL on error
 
-lai_nsnode_t *acpins_get_deviceid(size_t index, lai_object_t *id)
+lai_nsnode_t *lai_get_deviceid(size_t index, lai_object_t *id)
 {
     size_t i = 0, j = 0;
 
@@ -873,7 +872,7 @@ lai_nsnode_t *acpins_get_deviceid(size_t index, lai_object_t *id)
     char path[ACPI_MAX_NAME];
     lai_object_t device_id = {0};
 
-    handle = acpins_get_device(j);
+    handle = lai_get_device(j);
     while(handle != NULL)
     {
         // read the ID of the device
@@ -901,7 +900,7 @@ lai_nsnode_t *acpins_get_deviceid(size_t index, lai_object_t *id)
             return handle;
 
         j++;
-        handle = acpins_get_device(j);
+        handle = lai_get_device(j);
     }
 
     return NULL;
@@ -912,7 +911,7 @@ lai_nsnode_t *acpins_get_deviceid(size_t index, lai_object_t *id)
 // Param:   size_t index - child index
 // Return:  lai_nsnode_t * - child node, NULL if non-existant
 
-lai_nsnode_t *acpins_enum(char *parent, size_t index)
+lai_nsnode_t *lai_enum(char *parent, size_t index)
 {
     index++;
     size_t parent_size = lai_strlen(parent);
@@ -929,4 +928,3 @@ lai_nsnode_t *acpins_enum(char *parent, size_t index)
 
     return NULL;
 }
-

@@ -14,6 +14,7 @@
 
 #include <lai/core.h>
 #include "libc.h"
+#include "eval.h"
 
 #define PCI_PNP_ID        "PNP0A03"
 
@@ -42,7 +43,7 @@ int lai_pci_route(acpi_resource_t *dest, uint8_t bus, uint8_t slot, uint8_t func
     lai_eisaid(&pnp_id, PCI_PNP_ID);
 
     size_t index = 0;
-    lai_nsnode_t *handle = acpins_get_deviceid(index, &pnp_id);
+    lai_nsnode_t *handle = lai_get_deviceid(index, &pnp_id);
     char path[ACPI_MAX_NAME];
     int status;
 
@@ -63,7 +64,7 @@ int lai_pci_route(acpi_resource_t *dest, uint8_t bus, uint8_t slot, uint8_t func
             break;
 
         index++;
-        handle = acpins_get_deviceid(index, &pnp_id);
+        handle = lai_get_deviceid(index, &pnp_id);
     }
 
     if(handle == NULL)

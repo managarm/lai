@@ -8,6 +8,7 @@
 #include "ns_impl.h"
 #include "libc.h"
 #include "exec_impl.h"
+#include "eval.h"
 
 uint32_t bswap32(uint32_t);
 uint16_t bswap16(uint16_t);
@@ -143,7 +144,7 @@ int lai_eval(lai_object_t *destination, char *path)
 
     while(handle->type == LAI_NAMESPACE_ALIAS)
     {
-        handle = acpins_resolve(handle->alias);
+        handle = lai_resolve(handle->alias);
         if(!handle)
             return 1;
     }
@@ -223,12 +224,12 @@ void lai_eisaid(lai_object_t *object, char *id)
     out |= ((id[0] - 0x40) << 26);
     out |= ((id[1] - 0x40) << 21);
     out |= ((id[2] - 0x40) << 16);
-    out |= lai_char_to_hex(id[3]) << 12;
-    out |= lai_char_to_hex(id[4]) << 8;
-    out |= lai_char_to_hex(id[5]) << 4;
-    out |= lai_char_to_hex(id[6]);
+    out |= char_to_hex(id[3]) << 12;
+    out |= char_to_hex(id[4]) << 8;
+    out |= char_to_hex(id[5]) << 4;
+    out |= char_to_hex(id[6]);
 
-    out = lai_bswap32(out);
+    out = bswap32(out);
     object->integer = (uint64_t)out & 0xFFFFFFFF;
 }
 

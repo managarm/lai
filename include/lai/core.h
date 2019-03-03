@@ -385,23 +385,19 @@ volatile uint16_t lai_last_event;
 
 // The remaining of these functions are OS independent!
 // ACPI namespace functions
-size_t acpins_resolve_path(lai_nsnode_t *, char *, uint8_t *);
 void lai_create_namespace(void *);
-int lai_is_name(char);
-size_t lai_eval_integer(uint8_t *, uint64_t *);
-size_t lai_parse_pkgsize(uint8_t *, size_t *);
-int lai_eval_package(lai_object_t *, size_t, lai_object_t *);
-lai_nsnode_t *acpins_resolve(char *);
-lai_nsnode_t *acpins_get_device(size_t);
-lai_nsnode_t *acpins_get_deviceid(size_t, lai_object_t *);
-lai_nsnode_t *acpins_enum(char *, size_t);
+lai_nsnode_t *lai_resolve(char *);
+lai_nsnode_t *lai_get_device(size_t);
+lai_nsnode_t *lai_get_deviceid(size_t, lai_object_t *);
+lai_nsnode_t *lai_enum(char *, size_t);
 void lai_eisaid(lai_object_t *, char *);
 size_t lai_read_resource(lai_nsnode_t *, acpi_resource_t *);
 
 // ACPI Control Methods
-void lai_eval_operand(lai_object_t *, lai_state_t *, uint8_t *);
 int lai_eval(lai_object_t *, char *);
 int lai_populate(lai_nsnode_t *, void *, size_t, lai_state_t *);
+int lai_exec_method(lai_nsnode_t *, lai_state_t *);
+int lai_eval_node(lai_nsnode_t *, lai_state_t *);
 
 // Generic Functions
 int lai_enable_acpi(uint32_t);
