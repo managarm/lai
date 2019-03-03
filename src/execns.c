@@ -8,6 +8,8 @@
 
 #include <lai/core.h>
 #include "ns_impl.h"
+#include "eval.h"
+#include "libc.h"
 
 // lai_exec_name(): Creates a Name() object in a Method's private namespace
 // Param:    void *data - data
@@ -20,17 +22,17 @@ void lai_exec_name(void *data, lai_nsnode_t *parent, lai_state_t *state)
     uint8_t *code = data;
 
     char path[ACPI_MAX_NAME];
-    state->pc += acpins_resolve_path(parent, path, code + state->pc);
+    state->pc += lai_resolve_path(parent, path, code + state->pc);
 
     lai_nsnode_t *handle;
-    handle = acpins_resolve(path);
+    handle = lai_resolve(path);
     if(!handle)
     {
         // Create it if it does not already exist.
-        handle = acpins_create_nsnode_or_die();
+        handle = lai_create_nsnode_or_die();
         handle->type = LAI_NAMESPACE_NAME;
         lai_strcpy(handle->path, path);
-        acpins_install_nsnode(handle);
+        lai_install_nsnode(handle);
     }
 
     lai_eval_operand(&handle->object, state, code);
@@ -43,7 +45,7 @@ void lai_exec_name(void *data, lai_nsnode_t *parent, lai_state_t *state)
 void lai_exec_bytefield(void *data, lai_nsnode_t *parent, lai_state_t *state)
 {
     uint8_t *code = data;
-    state->pc += acpins_create_bytefield(parent, code + state->pc);    // dirty af solution but good enough for now
+    state->pc += lai_create_bytefield(parent, code + state->pc);    // dirty af solution but good enough for now
 }
 
 
@@ -54,7 +56,7 @@ void lai_exec_bytefield(void *data, lai_nsnode_t *parent, lai_state_t *state)
 void lai_exec_wordfield(void *data, lai_nsnode_t *parent, lai_state_t *state)
 {
     uint8_t *code = data;
-    state->pc += acpins_create_wordfield(parent, code + state->pc);    // dirty af solution but good enough for now
+    state->pc += lai_create_wordfield(parent, code + state->pc);    // dirty af solution but good enough for now
 }
 
 
@@ -65,6 +67,6 @@ void lai_exec_wordfield(void *data, lai_nsnode_t *parent, lai_state_t *state)
 void lai_exec_dwordfield(void *data, lai_nsnode_t *parent, lai_state_t *state)
 {
     uint8_t *code = data;
-    state->pc += acpins_create_dwordfield(parent, code + state->pc);    // dirty af solution but good enough for now
+    state->pc += lai_create_dwordfield(parent, code + state->pc);    // dirty af solution but good enough for now
 }
 

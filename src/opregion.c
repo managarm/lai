@@ -12,6 +12,8 @@
 
 #include <lai/core.h>
 #include "aml_opcodes.h"
+#include "libc.h"
+#include "opregion.h"
 
 void lai_read_field(lai_object_t *, lai_nsnode_t *);
 void lai_write_field(lai_nsnode_t *, lai_object_t *);
@@ -58,7 +60,7 @@ void lai_write_opregion(lai_nsnode_t *field, lai_object_t *source)
 void lai_read_field(lai_object_t *destination, lai_nsnode_t *field)
 {
     lai_nsnode_t *opregion;
-    opregion = acpins_resolve(field->field_opregion);
+    opregion = lai_resolve(field->field_opregion);
     if(!opregion)
     {
         lai_panic("Field: %s, OpRegion %s doesn't exist.\n", field->path, field->field_opregion);
@@ -230,7 +232,7 @@ void lai_write_field(lai_nsnode_t *field, lai_object_t *source)
 {
     // determine the flags we need in order to write
     lai_nsnode_t *opregion;
-    opregion = acpins_resolve(field->field_opregion);
+    opregion = lai_resolve(field->field_opregion);
     if(!opregion)
     {
         lai_panic("Field %s, OpRegion %s doesn't exist.\n", field->path, field->field_opregion);
@@ -480,7 +482,7 @@ void lai_write_field(lai_nsnode_t *field, lai_object_t *source)
 void lai_read_indexfield(lai_object_t *destination, lai_nsnode_t *indexfield)
 {
     lai_nsnode_t *field;
-    field = acpins_resolve(indexfield->indexfield_index);
+    field = lai_resolve(indexfield->indexfield_index);
     if(!field)
     {
         lai_panic("undefined reference %s\n", indexfield->indexfield_index);
@@ -492,7 +494,7 @@ void lai_read_indexfield(lai_object_t *destination, lai_nsnode_t *indexfield)
 
     lai_write_field(field, &index);    // the index register
 
-    field = acpins_resolve(indexfield->indexfield_data);
+    field = lai_resolve(indexfield->indexfield_data);
     if(!field)
     {
         lai_panic("undefined reference %s\n", indexfield->indexfield_data);
@@ -509,7 +511,7 @@ void lai_read_indexfield(lai_object_t *destination, lai_nsnode_t *indexfield)
 void lai_write_indexfield(lai_nsnode_t *indexfield, lai_object_t *source)
 {
     lai_nsnode_t *field;
-    field = acpins_resolve(indexfield->indexfield_index);
+    field = lai_resolve(indexfield->indexfield_index);
     if(!field)
     {
         lai_panic("undefined reference %s\n", indexfield->indexfield_index);
@@ -521,7 +523,7 @@ void lai_write_indexfield(lai_nsnode_t *indexfield, lai_object_t *source)
 
     lai_write_field(field, &index);    // the index register
 
-    field = acpins_resolve(indexfield->indexfield_data);
+    field = lai_resolve(indexfield->indexfield_data);
     if(!field)
     {
         lai_panic("undefined reference %s\n", indexfield->indexfield_data);

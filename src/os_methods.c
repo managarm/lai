@@ -1,5 +1,5 @@
-
 #include <lai/core.h>
+#include "libc.h"
 
 static const char *lai_emulated_os = "Microsoft Windows NT";        // OS family
 static uint64_t lai_implemented_version = 2;                // ACPI 2.0

@@ -7,6 +7,8 @@
 /* System Control Interrupt Initialization */
 
 #include <lai/core.h>
+#include "libc.h"
+#include "exec_impl.h"
 
 static void lai_init_children(char *);
 
@@ -73,7 +75,7 @@ int lai_enable_acpi(uint32_t mode)
         lai_panic("host does not provide timer functions required by lai_enable_acpi()\n");
 
     /* first run \._SB_._INI */
-    handle = acpins_resolve("\\._SB_._INI");
+    handle = lai_resolve("\\._SB_._INI");
     if(handle) {
         lai_init_state(&state);
         if(!lai_exec_method(handle, &state))
@@ -85,7 +87,7 @@ int lai_enable_acpi(uint32_t mode)
     lai_init_children("\\._SB_");
 
     /* tell the firmware about the IRQ mode */
-    handle = acpins_resolve("\\._PIC");
+    handle = lai_resolve("\\._PIC");
     if(handle)
     {
         lai_init_state(&state);
@@ -126,7 +128,7 @@ static int evaluate_sta(lai_nsnode_t *node)
     lai_strcpy(path, node->path);
     lai_strcpy(path + lai_strlen(path), "._STA");
 
-    lai_nsnode_t *handle = acpins_resolve(path);
+    lai_nsnode_t *handle = lai_resolve(path);
     if(handle)
     {
         lai_state_t state;
@@ -148,7 +150,7 @@ static void lai_init_children(char *parent)
 
     for(size_t i = 0; i < lai_ns_size; i++)
     {
-        node = acpins_enum(parent, i);
+        node = lai_enum(parent, i);
         if(!node) return;
 
         if(node->type == LAI_NAMESPACE_DEVICE)
@@ -160,7 +162,7 @@ static void lai_init_children(char *parent)
             {
                 lai_strcpy(path, node->path);
                 lai_strcpy(path + lai_strlen(path), "._INI");
-                handle = acpins_resolve(path);
+                handle = lai_resolve(path);
 
                 if(handle)
                 {

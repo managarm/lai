@@ -5,6 +5,11 @@
  */
 
 #include <lai/core.h>
+#include "libc.h"
+#include "opregion.h"
+#include "exec_impl.h"
+
+void lai_write_buffer(lai_nsnode_t *, lai_object_t *);
 
 /* ACPI Control Method Execution */
 /* Type2Opcode := DefAcquire | DefAdd | DefAnd | DefBuffer | DefConcat |
@@ -26,15 +31,15 @@
 lai_nsnode_t *lai_exec_resolve(char *path)
 {
     lai_nsnode_t *object;
-    object = acpins_resolve(path);
+    object = lai_resolve(path);
 
     if(lai_strlen(path) == 4)
-        return acpins_resolve(path);
+        return lai_resolve(path);
 
     while(!object && lai_strlen(path) > 6)
     {
         memmove(path + lai_strlen(path) - 9, path + lai_strlen(path) - 4, 5);
-        object = acpins_resolve(path);
+        object = lai_resolve(path);
         if(object != NULL)
             goto resolve_alias;
     }
@@ -46,7 +51,7 @@ resolve_alias:
     // resolve Aliases too
     while(object->type == LAI_NAMESPACE_ALIAS)
     {
-        object = acpins_resolve(object->alias);
+        object = lai_resolve(object->alias);
         if(!object)
             return NULL;
     }
@@ -349,7 +354,7 @@ void lai_store_operand(lai_state_t *state, lai_object_t *target, lai_object_t *o
 void lai_write_buffer(lai_nsnode_t *handle, lai_object_t *source)
 {
     lai_nsnode_t *buffer_handle;
-    buffer_handle = acpins_resolve(handle->buffer);
+    buffer_handle = lai_resolve(handle->buffer);
 
     if(!buffer_handle)
         lai_debug("undefined reference %s\n", handle->buffer);
