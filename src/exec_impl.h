@@ -1,6 +1,7 @@
+
 /*
  * Lux ACPI Implementation
- * Copyright (C) 2019 by LAI contributors
+ * Copyright (C) 2018-2019 the lai authors
  */
 
 // Internal header file. Do not use outside of LAI.

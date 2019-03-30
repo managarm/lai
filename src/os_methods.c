@@ -1,3 +1,9 @@
+
+/*
+ * Lux ACPI Implementation
+ * Copyright (C) 2018-2019 the lai authors
+ */
+
 #include <lai/core.h>
 #include "libc.h"
 

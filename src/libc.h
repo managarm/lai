@@ -1,3 +1,9 @@
+
+/*
+ * Lux ACPI Implementation
+ * Copyright (C) 2018-2019 the lai authors
+ */
+
 #pragma once
 
 // LAI internal header
