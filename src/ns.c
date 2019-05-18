@@ -154,17 +154,15 @@ start:
     return name_size;
 }
 
-// lai_create_namespace(): Initializes the AML interpreter and creates the ACPI namespace
-// Param:    void *dsdt - pointer to the DSDT
-// Return:    Nothing
-
-void lai_create_namespace(void *dsdt)
+// Creates the ACPI namespace. Requires the ability to scan for ACPI tables - ensure this is
+// implemented in the host operating system.
+void lai_create_namespace(void)
 {
-    if(!laihost_scan)
+    if (!laihost_scan)
         lai_panic("lai_create_namespace() needs table management functions\n");
 
     lai_namespace = lai_calloc(sizeof(lai_nsnode_t *), NAMESPACE_WINDOW);
-    if(!lai_namespace)
+    if (!lai_namespace)
         lai_panic("unable to allocate memory.\n");
 
     lai_acpins_code = laihost_malloc(CODE_WINDOW);
@@ -179,7 +177,7 @@ void lai_create_namespace(void *dsdt)
         lai_panic("unable to find ACPI FADT.\n");
     }
 
-    // load the DSDT
+    void *dsdt = laihost_scan("DSDT", 0);
     lai_load_table(dsdt);
 
     // load all SSDTs
