@@ -133,19 +133,3 @@ typedef struct acpi_aml_t        // AML tables, DSDT and SSDT
     acpi_header_t header;
     uint8_t data[];
 }__attribute__((packed)) acpi_aml_t;
-
-typedef struct {
-    char signature[4];
-    uint32_t length;
-    uint8_t unneeded1[40 - 8];
-    uint32_t dsdt;
-    uint8_t unneeded2[48 - 44];
-    uint32_t SMI_CMD;
-    uint8_t ACPI_ENABLE;
-    uint8_t ACPI_DISABLE;
-    uint8_t unneeded3[64 - 54];
-    uint32_t PM1a_CNT_BLK;
-    uint32_t PM1b_CNT_BLK;
-    uint8_t unneeded4[89 - 72];
-    uint8_t PM1_CNT_LEN;
-} __attribute__((packed)) acpi_facp_t;
