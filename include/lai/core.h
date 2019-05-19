@@ -221,8 +221,8 @@ int lai_eval_node(lai_nsnode_t *, lai_state_t *);
 // Generic Functions
 int lai_enable_acpi(uint32_t);
 int lai_disable_acpi();
-uint16_t lai_read_event();
-void lai_set_event(uint16_t);
+uint16_t lai_get_sci_event(void);
+void lai_set_sci_event(uint16_t);
 int lai_enter_sleep(uint8_t);
 int lai_pci_route(acpi_resource_t *, uint8_t, uint8_t, uint8_t);
 

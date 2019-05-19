@@ -17,8 +17,7 @@ volatile uint16_t lai_last_event = 0;
 // lai_read_event(): Reads the contents of the event register
 // Return:  uint16_t - contents of event register
 
-uint16_t lai_read_event()
-{
+uint16_t lai_get_sci_event(void) {
     if(!laihost_inw || !laihost_outw)
         lai_panic("lai_read_event() requires port I/O\n");
 
@@ -42,8 +41,7 @@ uint16_t lai_read_event()
 // lai_set_event(): Sets the event enable registers
 // Param:   uint16_t value - value to be written
 
-void lai_set_event(uint16_t value)
-{
+void lai_set_sci_event(uint16_t value) {
     if(!laihost_inw || !laihost_outw)
         lai_panic("lai_set_event() requires port I/O\n");
 
@@ -112,8 +110,8 @@ int lai_enable_acpi(uint32_t mode)
     }
 
     /* set FADT event fields */
-    lai_set_event(ACPI_POWER_BUTTON | ACPI_SLEEP_BUTTON | ACPI_WAKE);
-    lai_read_event();
+    lai_set_sci_event(ACPI_POWER_BUTTON | ACPI_SLEEP_BUTTON | ACPI_WAKE);
+    lai_get_sci_event();
 
     lai_debug("ACPI is now enabled.\n");
     return 0;
