@@ -16,6 +16,7 @@ library = static_library('lai',
         'src/resource.c',
         'src/sci.c',
         'src/sleep.c',
+        'src/vsnprintf.c',
     include_directories: include)
 
 dependency = declare_dependency(link_with: library,
