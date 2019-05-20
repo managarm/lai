@@ -11,8 +11,10 @@ void lai_debug(const char *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
+    char buf[128 + 16];
+    lai_vsnprintf(buf, 128, fmt, args);
     if(laihost_log)
-        laihost_log(LAI_DEBUG_LOG, fmt, args);
+        laihost_log(LAI_DEBUG_LOG, buf);
     va_end(args);
 }
 
@@ -20,8 +22,10 @@ void lai_warn(const char *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
+    char buf[128 + 16];
+    lai_vsnprintf(buf, 128, fmt, args);
     if(laihost_log)
-        laihost_log(LAI_WARN_LOG, fmt, args);
+        laihost_log(LAI_WARN_LOG, buf);
     va_end(args);
 }
 
@@ -29,13 +33,15 @@ void lai_panic(const char *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
+    char buf[128 + 16];
+    lai_vsnprintf(buf, 128, fmt, args);
     if(laihost_panic)
-        laihost_panic(fmt, args);
+        laihost_panic(buf);
     else
     {
         // If the panic function is undefined, try to log the error and abort.
         if(laihost_log)
-            laihost_log(LAI_WARN_LOG, fmt, args);
+            laihost_log(LAI_WARN_LOG, buf);
         __builtin_trap();
     }
 }
