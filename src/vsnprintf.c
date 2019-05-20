@@ -19,6 +19,9 @@
 /*	This version of the source file contains modifications required to make it
 	work within lai */
 
+#include <stdarg.h>
+#include <stddef.h>
+#include <stdint.h>
 #include "libc.h"
 
 #define FMT_PUT(dst, len, c) {\

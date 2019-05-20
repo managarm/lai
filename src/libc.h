@@ -17,4 +17,4 @@ void lai_debug(const char *, ...);
 void lai_warn(const char *, ...);
 __attribute__((noreturn)) void lai_panic(const char *, ...);
 
-void lai_vsnprintf(char *, size_t, const char *, ...);
+void lai_vsnprintf(char *, size_t, const char *, va_list);
