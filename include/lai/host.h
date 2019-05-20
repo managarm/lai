@@ -22,7 +22,7 @@ void *laihost_realloc(void *, size_t);
 void laihost_free(void *);
 
 __attribute__((weak)) void laihost_log(int, const char *);
-__attribute__((weak, noreturn)) void laihost_panic(const char *, va_list);
+__attribute__((weak, noreturn)) void laihost_panic(const char *);
 
 __attribute__((weak)) void *laihost_scan(char *, size_t);
 __attribute__((weak)) void *laihost_map(size_t, size_t);
