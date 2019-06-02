@@ -226,3 +226,8 @@ void lai_set_sci_event(uint16_t);
 int lai_enter_sleep(uint8_t);
 int lai_pci_route(acpi_resource_t *, uint8_t, uint8_t, uint8_t);
 
+// LAI debugging functions.
+
+// Trace all opcodes. This will produce *very* verbose output.
+void lai_enable_tracing(int enable);
+

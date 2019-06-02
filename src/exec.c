@@ -1407,6 +1407,7 @@ void lai_exec_sleep(void *code, lai_state_t *state)
     laihost_sleep(time.integer);
 }
 
-
-
+void lai_enable_tracing(int enable) {
+    debug_opcodes = enable;
+}
 
