@@ -129,12 +129,13 @@ static int lai_compare(lai_object_t *lhs, lai_object_t *rhs) {
     return lhs->integer - rhs->integer;
 }
 
+// Parse a given Type10 opcode.
 static void lai_exec_reduce(int opcode, lai_state_t *state, lai_object_t *operands,
         lai_object_t *reduction_res) {
-    if(debug_opcodes)
+    if (debug_opcodes)
         lai_debug("lai_exec_reduce: opcode 0x%02X\n", opcode);
     lai_object_t result = {0};
-    switch(opcode) {
+    switch (opcode) {
     case STORE_OP:
         lai_load_operand(state, &operands[0], &result);
         lai_store_operand(state, &operands[1], &result);
@@ -344,29 +345,31 @@ static void lai_exec_reduce(int opcode, lai_state_t *state, lai_object_t *operan
         lai_load_operand(state, &operands[1], &index);
         int n = index.integer;
 
-        if(storage.type == LAI_STRING_REFERENCE)
-        {
-            if(n >= lai_strlen(storage.string))
-                lai_panic("string Index() out of bounds");
-            result.type = LAI_STRING_INDEX;
-            result.string = storage.string;
-            result.integer = n;
-        }else if(storage.type == LAI_BUFFER_REFERENCE)
-        {
-            if(n >= storage.buffer_size)
-                lai_panic("buffer Index() out of bounds");
-            result.type = LAI_BUFFER_INDEX;
-            result.buffer = storage.buffer;
-            result.integer = n;
-        }else if(storage.type == LAI_PACKAGE_REFERENCE)
-        {
-            if(n >= storage.package_size)
-                lai_panic("package Index() out of bounds");
-            result.type = LAI_PACKAGE_INDEX;
-            result.package = storage.package;
-            result.integer = n;
-        }else
-            lai_panic("Index() is only defined for buffers, strings and packages\n");
+        switch (storage.type) {
+            case LAI_STRING_REFERENCE:
+                if (n >= lai_strlen(storage.string))
+                    lai_panic("string Index() out of bounds");
+                result.type = LAI_STRING_INDEX;
+                result.string = storage.string;
+                result.integer = n;
+                break;
+            case LAI_BUFFER_REFERENCE:
+                if (n >= storage.buffer_size)
+                    lai_panic("buffer Index() out of bounds");
+                result.type = LAI_BUFFER_INDEX;
+                result.buffer = storage.buffer;
+                result.integer = n;
+                break;
+            case LAI_PACKAGE_REFERENCE:
+                if (n >= storage.package_size)
+                    lai_panic("package Index() out of bounds");
+                result.type = LAI_PACKAGE_INDEX;
+                result.package = storage.package;
+                result.integer = n;
+                break;
+            default:
+                lai_panic("Index() is only defined for buffers, strings and packages");
+        }
         lai_free_object(&storage);
 
         lai_store_operand(state, &operands[2], &result);
@@ -377,20 +380,23 @@ static void lai_exec_reduce(int opcode, lai_state_t *state, lai_object_t *operan
         lai_object_t ref = {0};
         lai_load_operand(state, &operands[0], &ref);
 
-        if(ref.type == LAI_STRING_INDEX)
-        {
-            result.type = LAI_INTEGER;
-            result.integer = ref.string[ref.integer];
-        }else if(ref.type == LAI_BUFFER)
-        {
-            uint8_t *window = ref.buffer;
-            result.type = LAI_INTEGER;
-            result.integer = window[ref.integer];
-        }else if(ref.type == LAI_PACKAGE)
-        {
-            lai_copy_object(&result, &ref.package[ref.integer]);
-        }else
-            lai_panic("DeRefOf() is only defined for references\n");
+        switch (ref.type) {
+            case LAI_STRING_INDEX:
+                result.type = LAI_INTEGER;
+                result.integer = ref.string[ref.integer];
+                break;
+            case LAI_BUFFER:
+                uint8_t *window = ref.buffer;
+                result.type = LAI_INTEGER
+                result.integer = window[ref.integer];
+                break;
+            case LAI_PACKAGE:
+                lai_copy_object(&result, &ref.package[ref.integer]);
+                break;
+            default:
+                lai_panic("DeRefOf() is only defined for references");
+        }
+
         break;
     }
     case SIZEOF_OP:
@@ -398,20 +404,23 @@ static void lai_exec_reduce(int opcode, lai_state_t *state, lai_object_t *operan
         lai_object_t object = {0};
         lai_load_operand(state, &operands[0], &object);
 
-        if(object.type == LAI_STRING)
-        {
-            result.type = LAI_INTEGER;
-            result.integer = lai_strlen(object.string);
-        }else if(object.type == LAI_BUFFER)
-        {
-            result.type = LAI_INTEGER;
-            result.integer = object.buffer_size;
-        }else if(object.type == LAI_PACKAGE)
-        {
-            result.type = LAI_INTEGER;
-            result.integer = object.package_size;
-        }else
-            lai_panic("SizeOf() is only defined for buffers, strings and packages\n");
+        switch (object.type) {
+            case LAI_STRING:
+                result.type = LAI_INTEGER;
+                result.integer = lai_strlen(object.string);
+                break;
+            case LAI_BUFFER:
+                result.type = LAI_INTEGER;
+                result.integer = object.buffer_size;
+                break;
+            case LAI_PACKAGE:
+                result.type = LAI_INTEGER;
+                result.integer = object.package_size;
+                break;
+            default:
+                lai_panic("SizeOf() is only defined for buffers, strings and packages");
+        }
+
         break;
     }
     case (EXTOP_PREFIX << 8) | CONDREF_OP:
@@ -421,31 +430,29 @@ static void lai_exec_reduce(int opcode, lai_state_t *state, lai_object_t *operan
 
         // TODO: The resolution code should be shared with REF_OP.
         lai_object_t ref = {0};
-        switch(operand->type)
-        {
-        case LAI_UNRESOLVED_NAME:
-        {
-            lai_nsnode_t *handle = lai_exec_resolve(operand->name);
-            if(handle) {
-                ref.type = LAI_HANDLE;
-                ref.handle = handle;
+        switch (operand->type) {
+            case LAI_UNRESOLVED_NAME:
+            {
+                lai_nsnode_t *handle = lai_exec_resolve(operand->name);
+                if (handle) {
+                    ref.type = LAI_HANDLE;
+                    ref.handle = handle;
+                }
+                break;
             }
-            break;
-        }
-        default:
-            lai_panic("CondRefOp() is only defined for names\n");
+            default:
+                lai_panic("CondRefOp() is only defined for names");
         }
 
-        if(ref.type)
-        {
+        if (ref.type) {
             result.type = LAI_INTEGER;
             result.integer = 1;
             lai_store_operand(state, target, &ref);
-        }else
-        {
+        } else {
             result.type = LAI_INTEGER;
             result.integer = 0;
         }
+
         break;
     }
     case (EXTOP_PREFIX << 8) | ACQUIRE_OP:
@@ -489,30 +496,30 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state)
 
         if(item->kind == LAI_POPULATE_CONTEXT_STACKITEM)
         {
-			if(state->pc == item->ctx_limit)
+    		if(state->pc == item->ctx_limit)
             {
-				lai_exec_pop_stack_back(state);
+    			lai_exec_pop_stack_back(state);
                 lai_exec_update_context(state);
-				continue;
-			}
+    			continue;
+    		}
 
             if(state->pc > item->ctx_limit) // This would be an interpreter bug.
                 lai_panic("namespace population escaped out of code range\n");
         }else if(item->kind == LAI_METHOD_CONTEXT_STACKITEM)
         {
-			// ACPI does an implicit Return(0) at the end of a control method.
-			if(state->pc == state->limit)
-			{
-				if(state->opstack_ptr) // This is an internal error.
-					lai_panic("opstack is not empty before return\n");
-				lai_object_t *result = lai_exec_push_opstack_or_die(state);
-				result->type = LAI_INTEGER;
-				result->integer = 0;
+    		// ACPI does an implicit Return(0) at the end of a control method.
+    		if(state->pc == state->limit)
+    		{
+    			if(state->opstack_ptr) // This is an internal error.
+    				lai_panic("opstack is not empty before return\n");
+    			lai_object_t *result = lai_exec_push_opstack_or_die(state);
+    			result->type = LAI_INTEGER;
+    			result->integer = 0;
 
-				lai_exec_pop_stack_back(state);
+    			lai_exec_pop_stack_back(state);
                 lai_exec_update_context(state);
-				continue;
-			}
+    			continue;
+    		}
         }else if(item->kind == LAI_EVALOPERAND_STACKITEM)
         {
             if(state->opstack_ptr == item->opstack_frame + 1)
