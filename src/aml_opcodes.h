@@ -81,6 +81,8 @@
 #define CONDREF_OP			0x12
 #define ARBFIELD_OP			0x13
 #define SLEEP_OP			0x22
+#define ACQUIRE_OP			0x23
+#define RELEASE_OP			0x27
 #define DEBUG_OP			0x31
 #define OPREGION			0x80
 #define FIELD				0x81

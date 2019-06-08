@@ -448,6 +448,19 @@ static void lai_exec_reduce(int opcode, lai_state_t *state, lai_object_t *operan
         }
         break;
     }
+    case (EXTOP_PREFIX << 8) | ACQUIRE_OP:
+    {
+        lai_debug("Acquire() is a stub\n");
+        result.type = LAI_INTEGER;
+        result.integer = 1;
+        break;
+    }
+    case (EXTOP_PREFIX << 8) | RELEASE_OP:
+    {
+        lai_debug("Release() is a stub\n");
+        break;
+    }
+
     default:
         lai_panic("undefined opcode in lai_exec_reduce: %02X\n", opcode);
     }
@@ -1267,6 +1280,31 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state)
             op_item->op_arg_modes[0] = LAI_DATA_MODE;
             op_item->op_arg_modes[1] = LAI_TARGET_MODE;
             op_item->op_arg_modes[2] = 0;
+            op_item->op_result_mode = exec_result_mode;
+            state->pc += 2;
+            break;
+        }
+        case (EXTOP_PREFIX << 8) | ACQUIRE_OP:
+        {
+            lai_stackitem_t *op_item = lai_exec_push_stack_or_die(state);
+            op_item->kind = LAI_OP_STACKITEM;
+            op_item->op_opcode = opcode;
+            op_item->opstack_frame = state->opstack_ptr;
+            op_item->op_arg_modes[0] = LAI_DATA_MODE;
+            op_item->op_arg_modes[1] = LAI_OBJECT_MODE;
+            op_item->op_arg_modes[2] = 0;
+            op_item->op_result_mode = exec_result_mode;
+            state->pc += 2;
+            break;
+        }
+        case (EXTOP_PREFIX << 8) | RELEASE_OP:
+        {
+            lai_stackitem_t *op_item = lai_exec_push_stack_or_die(state);
+            op_item->kind = LAI_OP_STACKITEM;
+            op_item->op_opcode = opcode;
+            op_item->opstack_frame = state->opstack_ptr;
+            op_item->op_arg_modes[0] = LAI_DATA_MODE;
+            op_item->op_arg_modes[1] = 0;
             op_item->op_result_mode = exec_result_mode;
             state->pc += 2;
             break;
