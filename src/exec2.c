@@ -286,7 +286,7 @@ void lai_load_operand(lai_state_t *state, lai_object_t *source, lai_object_t *ob
             lai_copy_object(object, &state->local[source->index]);
             break;
         default:
-            lai_panic("object type %d is not valid for lai_load_operand()\n", source->type);
+            lai_panic("object type %d is not valid for lai_load_operand()", source->type);
     }
 }
 
@@ -313,10 +313,10 @@ void lai_store_operand(lai_state_t *state, lai_object_t *target, lai_object_t *o
         {
             lai_nsnode_t *handle = lai_exec_resolve(target->name);
             if(!handle)
-                lai_panic("undefined reference %s\n", target->name);
+                lai_panic("undefined reference %s", target->name);
             lai_store_ns(handle, object);
             break;
-        }   
+        }
         case LAI_ARG_NAME:
             lai_copy_object(&state->arg[target->index], object);
             break;
@@ -343,7 +343,7 @@ void lai_store_operand(lai_state_t *state, lai_object_t *target, lai_object_t *o
             }
             break;
         default:
-            lai_panic("object type %d is not valid for lai_store_operand()\n", target->type);
+            lai_panic("object type %d is not valid for lai_store_operand()", target->type);
         }
 }
 
@@ -357,7 +357,7 @@ void lai_write_buffer(lai_nsnode_t *handle, lai_object_t *source) {
     buffer_handle = lai_resolve(handle->buffer);
 
     if (!buffer_handle)
-        lai_debug("undefined reference %s\n", handle->buffer);
+        lai_debug("undefined reference %s", handle->buffer);
 
     uint64_t value = source->integer;
 
