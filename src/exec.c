@@ -385,11 +385,12 @@ static void lai_exec_reduce(int opcode, lai_state_t *state, lai_object_t *operan
                 result.type = LAI_INTEGER;
                 result.integer = ref.string[ref.integer];
                 break;
-            case LAI_BUFFER:
+            case LAI_BUFFER: {
                 uint8_t *window = ref.buffer;
-                result.type = LAI_INTEGER
+                result.type = LAI_INTEGER;
                 result.integer = window[ref.integer];
                 break;
+            }
             case LAI_PACKAGE:
                 lai_copy_object(&result, &ref.package[ref.integer]);
                 break;
