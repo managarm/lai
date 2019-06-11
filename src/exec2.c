@@ -209,7 +209,7 @@ void lai_load_ns(lai_nsnode_t *source, lai_object_t *object) {
 }
 
 void lai_store_ns(lai_nsnode_t *target, lai_object_t *object) {
-    switch (source->type) {
+    switch (target->type) {
         case LAI_NAMESPACE_NAME:
             lai_copy_object(&target->object, object);
             break;
