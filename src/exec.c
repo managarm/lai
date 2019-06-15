@@ -954,18 +954,36 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state) {
 
         // "Simple" objects in the ACPI namespace.
         case NAME_OP:
-            lai_exec_name(method, ctx_handle, state);
+        {
+            state->pc++;
+
+            char path[ACPI_MAX_NAME];
+            state->pc += lai_resolve_path(ctx_handle, path, method + state->pc);
+
+            lai_nsnode_t *handle = lai_resolve(path);
+            if (!handle) {
+                // Create it if it does not already exist.
+                handle = lai_create_nsnode_or_die();
+                handle->type = LAI_NAMESPACE_NAME;
+                lai_strcpy(handle->path, path);
+                lai_install_nsnode(handle);
+            }
+
+            lai_eval_operand(&handle->object, state, method);
             break;
+        }
         case BYTEFIELD_OP:
-            lai_exec_bytefield(method, ctx_handle, state);
+            state->pc += lai_create_bytefield(ctx_handle, method + state->pc);
             break;
         case WORDFIELD_OP:
-            lai_exec_wordfield(method, ctx_handle, state);
+            state->pc += lai_create_wordfield(ctx_handle, method + state->pc);
             break;
         case DWORDFIELD_OP:
-            lai_exec_dwordfield(method, ctx_handle, state);
+            state->pc += lai_create_dwordfield(ctx_handle, method + state->pc);
             break;
-
+        case QWORDFIELD_OP:
+            state->pc += lai_create_qwordfield(ctx_handle, method + state->pc);
+            break;
         // Scope-like objects in the ACPI namespace.
         case SCOPE_OP:
         {
