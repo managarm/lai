@@ -228,6 +228,20 @@ void lai_store_ns(lai_nsnode_t *target, lai_object_t *object) {
 void lai_alias_operand(lai_state_t *state, lai_object_t *object, lai_object_t *ref) {
     lai_nsnode_t *node;
     switch (object->type) {
+        case LAI_STRING:
+            ref->type = LAI_STRING_REFERENCE;
+            ref->string = object->string;
+            break;
+        case LAI_BUFFER:
+            ref->type = LAI_BUFFER_REFERENCE;
+            ref->buffer_size = object->buffer_size;
+            ref->buffer = object->buffer;
+            break;
+        case LAI_PACKAGE:
+            ref->type = LAI_PACKAGE_REFERENCE;
+            ref->package_size = object->package_size;
+            ref->package = object->package;
+            break;
         case LAI_ARG_NAME:
             lai_alias_object(ref, &state->arg[object->index]);
             break;
