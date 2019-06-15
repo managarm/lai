@@ -626,6 +626,14 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state) {
         lai_stackitem_t *ctx_item = lai_exec_context(state);
         lai_nsnode_t *ctx_handle = ctx_item->ctx_handle;
 
+        if (exec_result_mode == LAI_IMMEDIATE_WORD_MODE) {
+            lai_object_t *result = lai_exec_push_opstack_or_die(state);
+            result->type = LAI_INTEGER;
+            result->integer = (method[state->pc + 1] << 8) | method[state->pc];
+            state->pc += 2;
+            continue;
+        }
+
         // Process names.
         if (lai_is_name(method[state->pc])) {
             lai_object_t unresolved = {0};
@@ -1293,7 +1301,7 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state) {
             op_item->op_opcode = opcode;
             op_item->opstack_frame = state->opstack_ptr;
             op_item->op_arg_modes[0] = LAI_DATA_MODE;
-            op_item->op_arg_modes[1] = LAI_OBJECT_MODE;
+            op_item->op_arg_modes[1] = LAI_IMMEDIATE_WORD_MODE;
             op_item->op_arg_modes[2] = 0;
             op_item->op_result_mode = exec_result_mode;
             state->pc += 2;

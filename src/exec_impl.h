@@ -23,6 +23,7 @@
 // Like LAI_OBJECT_MODE, but discard the result.
 #define LAI_EXEC_MODE 3
 #define LAI_TARGET_MODE 4
+#define LAI_IMMEDIATE_WORD_MODE 5
 
 void lai_load_ns(lai_nsnode_t *, lai_object_t *);
 void lai_store_ns(lai_nsnode_t *, lai_object_t *);
