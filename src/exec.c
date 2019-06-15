@@ -1036,6 +1036,14 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state) {
         case (EXTOP_PREFIX << 8) | MUTEX:
             state->pc += lai_create_mutex(ctx_handle, method + state->pc);
             break;
+        case (EXTOP_PREFIX << 8) | EVENT:
+        {
+            state->pc += 2;
+            lai_nsnode_t* node = lai_create_nsnode_or_die();
+            node->type = LAI_NAMESPACE_EVENT;
+            state->pc += lai_resolve_path(ctx_handle, node->path, method + state->pc);
+            break;
+        }
         case (EXTOP_PREFIX << 8) | OPREGION:
         {
             state->pc += 2;

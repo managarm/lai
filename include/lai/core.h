@@ -29,20 +29,21 @@ int memcmp(const void *, const void *, size_t);
                        __FILE__ ":" LAI_EXPAND_STRINGIFY(__LINE__) "\n"); \
     } while(0)
 
-#define ACPI_MAX_NAME            64
-#define ACPI_MAX_RESOURCES        512
+#define ACPI_MAX_NAME               64
+#define ACPI_MAX_RESOURCES          512
 
-#define LAI_NAMESPACE_NAME        1
-#define LAI_NAMESPACE_ALIAS        2
-#define LAI_NAMESPACE_SCOPE        3
-#define LAI_NAMESPACE_FIELD        4
+#define LAI_NAMESPACE_NAME          1
+#define LAI_NAMESPACE_ALIAS         2
+#define LAI_NAMESPACE_SCOPE         3
+#define LAI_NAMESPACE_FIELD         4
 #define LAI_NAMESPACE_METHOD        5
 #define LAI_NAMESPACE_DEVICE        6
 #define LAI_NAMESPACE_INDEXFIELD    7
-#define LAI_NAMESPACE_MUTEX        8
-#define LAI_NAMESPACE_PROCESSOR    9
-#define LAI_NAMESPACE_BUFFER_FIELD    10
-#define LAI_NAMESPACE_THERMALZONE    11
+#define LAI_NAMESPACE_MUTEX         8
+#define LAI_NAMESPACE_PROCESSOR     9
+#define LAI_NAMESPACE_BUFFER_FIELD  10
+#define LAI_NAMESPACE_THERMALZONE   11
+#define LAI_NAMESPACE_EVENT         12
 
 // ----------------------------------------------------------------------------
 // Data types defined by AML.
