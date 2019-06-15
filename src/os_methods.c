@@ -55,7 +55,7 @@ int lai_do_osi_method(lai_object_t *args, lai_object_t *result)
 int lai_do_os_method(lai_object_t *args, lai_object_t *result)
 {
     result->type = LAI_STRING;
-    result->string = laihost_malloc(lai_strlen(lai_emulated_os));
+    result->string = laihost_malloc(lai_strlen(lai_emulated_os) + 1);
     lai_strcpy(result->string, lai_emulated_os);
 
     lai_debug("_OS_ returned '%s'\n", result->string);
