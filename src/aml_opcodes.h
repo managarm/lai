@@ -78,6 +78,7 @@
 
 // Extended opcodes
 #define MUTEX				0x01
+#define EVENT               0x02
 #define CONDREF_OP			0x12
 #define ARBFIELD_OP			0x13
 #define SLEEP_OP			0x22
