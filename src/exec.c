@@ -1004,6 +1004,33 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state) {
         case (EXTOP_PREFIX << 8) | PROCESSOR:
             state->pc += lai_create_processor(ctx_handle, method + state->pc);
             break;
+        case (EXTOP_PREFIX << 8) | POWER_RES:
+        {
+            state->pc += 2;
+
+            size_t encoded_size;
+            state->pc += lai_parse_pkgsize(method + state->pc, &encoded_size);
+            char name[ACPI_MAX_NAME];
+            state->pc += lai_resolve_path(ctx_handle, name, method + state->pc);
+
+            lai_nsnode_t *node = lai_create_nsnode_or_die();
+            node->type = LAI_NAMESPACE_POWER_RES;
+            lai_strcpy(node->path, name);
+            lai_install_nsnode(node);
+
+//            uint8_t system_level = method[state->pc];
+            state->pc++;
+
+//            uint16_t resource_order = *(uint16_t*)&method[state->pc];
+            state->pc += 2;
+
+            lai_stackitem_t *item = lai_exec_push_stack_or_die(state);
+            item->kind = LAI_POPULATE_CONTEXT_STACKITEM;
+            item->ctx_handle = node;
+            item->ctx_limit = opcode_pc + encoded_size + 2;
+            lai_exec_update_context(state);
+            break;
+        }
         case (EXTOP_PREFIX << 8) | THERMALZONE:
         {
             state->pc += 2;

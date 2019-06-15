@@ -44,6 +44,7 @@ int memcmp(const void *, const void *, size_t);
 #define LAI_NAMESPACE_BUFFER_FIELD  10
 #define LAI_NAMESPACE_THERMALZONE   11
 #define LAI_NAMESPACE_EVENT         12
+#define LAI_NAMESPACE_POWER_RES     13
 
 // ----------------------------------------------------------------------------
 // Data types defined by AML.

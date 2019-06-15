@@ -89,6 +89,7 @@
 #define FIELD				0x81
 #define DEVICE				0x82
 #define PROCESSOR			0x83
+#define POWER_RES           0x84
 #define THERMALZONE			0x85
 #define INDEXFIELD			0x86	// ACPI spec v5.0 section 19.5.60
 
