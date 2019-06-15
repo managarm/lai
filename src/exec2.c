@@ -221,7 +221,7 @@ void lai_store_ns(lai_nsnode_t *target, lai_object_t *object) {
             lai_write_buffer(target, object);
             break;
         default:
-            lai_panic("unexpected type %d of named object in lai_load_ns()");
+            lai_panic("unexpected type %d of named object in lai_store_ns()");
     }
 }
 
@@ -355,9 +355,8 @@ void lai_store_operand(lai_state_t *state, lai_object_t *target, lai_object_t *o
 void lai_write_buffer(lai_nsnode_t *handle, lai_object_t *source) {
     lai_nsnode_t *buffer_handle;
     buffer_handle = lai_resolve(handle->buffer);
-
     if (!buffer_handle)
-        lai_debug("undefined reference %s", handle->buffer);
+        lai_panic("undefined reference %s", handle->buffer);
 
     uint64_t value = source->integer;
 
