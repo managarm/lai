@@ -973,16 +973,16 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state) {
             break;
         }
         case BYTEFIELD_OP:
-            state->pc += lai_create_bytefield(ctx_handle, method + state->pc);
+            state->pc += lai_create_n_wordfield(ctx_handle, method + state->pc, 8);
             break;
         case WORDFIELD_OP:
-            state->pc += lai_create_wordfield(ctx_handle, method + state->pc);
+            state->pc += lai_create_n_wordfield(ctx_handle, method + state->pc, 16);
             break;
         case DWORDFIELD_OP:
-            state->pc += lai_create_dwordfield(ctx_handle, method + state->pc);
+            state->pc += lai_create_n_wordfield(ctx_handle, method + state->pc, 32);
             break;
         case QWORDFIELD_OP:
-            state->pc += lai_create_qwordfield(ctx_handle, method + state->pc);
+            state->pc += lai_create_n_wordfield(ctx_handle, method + state->pc, 64);
             break;
         // Scope-like objects in the ACPI namespace.
         case SCOPE_OP:

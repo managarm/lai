@@ -23,10 +23,6 @@ size_t lai_create_mutex(lai_nsnode_t *, void *);
 size_t lai_create_indexfield(lai_nsnode_t *, void *);
 size_t lai_create_processor(lai_nsnode_t *, void *);
 
-
-size_t lai_create_bytefield(lai_nsnode_t *, void *);
-size_t lai_create_wordfield(lai_nsnode_t *, void *);
-size_t lai_create_dwordfield(lai_nsnode_t *, void *);
-size_t lai_create_qwordfield(lai_nsnode_t *, void *);
+size_t lai_create_n_wordfield(lai_nsnode_t *, void *, size_t);
 
 size_t lai_resolve_path(lai_nsnode_t *, char *, uint8_t *);
