@@ -257,7 +257,7 @@ size_t lai_create_field(lai_nsnode_t *parent, void *data) {
 
     // parse the field's entries now
     uint8_t field_flags;
-    field = (uint8_t*)data + 2 + pkgsize + name_size;
+    field = (uint8_t *)data + 2 + pkgsize + name_size;
     field_flags = field[0];
 
 

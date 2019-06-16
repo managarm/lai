@@ -10,8 +10,7 @@
 static const char *lai_emulated_os = "Microsoft Windows NT";        // OS family
 static uint64_t lai_implemented_version = 2;                // ACPI 2.0
 
-static const char *supported_osi_strings[] =
-{
+static const char *supported_osi_strings[] = {
     "Windows 2000",        /* Windows 2000 */
     "Windows 2001",        /* Windows XP */
     "Windows 2001 SP1",    /* Windows XP SP1 */
@@ -26,50 +25,40 @@ static const char *supported_osi_strings[] =
     "Windows 2015",        /* Windows 10 */
 };
 
-// When executing the _OSI() method, we'll have one parameter which contains
-// the name of an OS. We have to pretend to be a modern version of Windows,
-// for AML to let us use its features.
-int lai_do_osi_method(lai_object_t *args, lai_object_t *result)
-{
+// Pretend to be windows when we execute the OSI() method.
+int lai_do_osi_method(lai_object_t *args, lai_object_t *result) {
     uint32_t osi_return = 0;
-    for(int i = 0; i < (sizeof(supported_osi_strings) / sizeof(uintptr_t)); i++)
-    {
-        if(!lai_strcmp(args[0].string, supported_osi_strings[i]))
-        {
+    for (size_t i = 0; i < (sizeof(supported_osi_strings) / sizeof(uint64_t)); i++) {
+        if (!lai_strcmp(args[0].string, supported_osi_strings[i])) {
             osi_return = 0xFFFFFFFF;
             break;
         }
     }
 
-    if(!osi_return && !lai_strcmp(args[0].string, "Linux"))
-        lai_warn("buggy BIOS requested _OSI('Linux'), ignoring...\n");
+    if (!osi_return && !lai_strcmp(args[0].string, "Linux"))
+        lai_warn("buggy BIOS requested _OSI('Linux'), ignoring...");
 
     result->type = LAI_INTEGER;
     result->integer = osi_return;
 
-    lai_debug("_OSI('%s') returned 0x%08X\n", args[0].string, osi_return);
+    lai_debug("_OSI('%s') returned %08X", args[0].string, osi_return);
     return 0;
 }
 
-// OS family -- pretend to be Windows
-int lai_do_os_method(lai_object_t *args, lai_object_t *result)
-{
+// same for both of the functions below.
+int lai_do_os_method(lai_object_t *args, lai_object_t *result) {
     result->type = LAI_STRING;
     result->string = laihost_malloc(lai_strlen(lai_emulated_os) + 1);
     lai_strcpy(result->string, lai_emulated_os);
 
-    lai_debug("_OS_ returned '%s'\n", result->string);
+    lai_debug("_OS_ returned '%s'", result->string);
     return 0;
 }
 
-// All versions of Windows starting from Windows Vista claim to implement
-// at least ACPI 2.0. Therefore we also need to do the same.
-int lai_do_rev_method(lai_object_t *args, lai_object_t *result)
-{
+int lai_do_rev_method(lai_object_t *args, lai_object_t *result) {
     result->type = LAI_INTEGER;
     result->integer = lai_implemented_version;
 
-    lai_debug("_REV returned %d\n", result->integer);
+    lai_debug("_REV returned %d", result->integer);
     return 0;
 }
-
