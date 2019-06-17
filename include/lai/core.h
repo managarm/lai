@@ -80,8 +80,8 @@ typedef struct lai_object_t
     uint64_t integer;        // for Name()
     char *string;            // for Name()
 
-    int package_size;        // for Package(), size in entries
-    struct lai_object_t *package;    // for Package(), actual entries
+    int package_size_;        // for Package(), size in entries
+    struct lai_object_t *package_;    // for Package(), actual entries
 
     size_t buffer_size;        // for Buffer(), size in bytes
     void *buffer;            // for Buffer(), actual bytes
@@ -91,6 +91,16 @@ typedef struct lai_object_t
 
     int index;
 } lai_object_t;
+
+// Returns the size of a package.
+__attribute__((always_inline))
+inline size_t lai_exec_pkg_size(lai_object_t *object) {
+    return object->package_size_;
+}
+
+// Load/store values from/to packages.
+void lai_exec_pkg_load(lai_object_t *out, lai_object_t *object, size_t i);
+void lai_exec_pkg_store(lai_object_t *in, lai_object_t *object, size_t i);
 
 typedef struct lai_nsnode_t
 {

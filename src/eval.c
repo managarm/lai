@@ -88,12 +88,13 @@ int lai_eval_package(lai_object_t *package, size_t index, lai_object_t *destinat
     if (package->type != LAI_PACKAGE) {
         lai_warn("attempt to evaluate non-package object.");
         return 1;
-    } else if (index >= package->package_size) {
-        lai_warn("attempt to evaluate index %d of package of size %d", index, package->package_size);
+    } else if (index >= lai_exec_pkg_size(package)) {
+        lai_warn("attempt to evaluate index %d of package of size %d",
+                index, lai_exec_pkg_size(package));
         return 1;
     }
 
-    lai_copy_object(destination, &package->package[index]);
+    lai_exec_pkg_load(destination, package, index);
     return 0;
 }
 

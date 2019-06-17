@@ -359,10 +359,10 @@ static void lai_exec_reduce(int opcode, lai_state_t *state, lai_object_t *operan
                 result.integer = n;
                 break;
             case LAI_PACKAGE_REFERENCE:
-                if (n >= storage.package_size)
+                if (n >= lai_exec_pkg_size(&storage))
                     lai_panic("package Index() out of bounds");
                 result.type = LAI_PACKAGE_INDEX;
-                result.package = storage.package;
+                result.package_ = storage.package_;
                 result.integer = n;
                 break;
             default:
@@ -390,7 +390,7 @@ static void lai_exec_reduce(int opcode, lai_state_t *state, lai_object_t *operan
                 break;
             }
             case LAI_PACKAGE_INDEX:
-                lai_copy_object(&result, &ref.package[ref.integer]);
+                lai_exec_pkg_load(&result, &ref, ref.integer);
                 break;
             default:
                 lai_panic("DeRefOf() is only defined for references");
@@ -414,7 +414,7 @@ static void lai_exec_reduce(int opcode, lai_state_t *state, lai_object_t *operan
                 break;
             case LAI_PACKAGE:
                 result.type = LAI_INTEGER;
-                result.integer = object.package_size;
+                result.integer = lai_exec_pkg_size(&object);
                 break;
             default:
                 lai_panic("SizeOf() is only defined for buffers, strings and packages");
@@ -525,11 +525,11 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state) {
             lai_object_t *package = &frame[0];
             lai_object_t *initializer = &frame[1];
             if (state->opstack_ptr == item->opstack_frame + 2) {
-                if (item->pkg_index == package->package_size)
+                if (item->pkg_index == lai_exec_pkg_size(package))
                     lai_panic("package initializer overflows its size");
-                LAI_ENSURE(item->pkg_index < package->package_size);
+                LAI_ENSURE(item->pkg_index < lai_exec_pkg_size(package));
 
-                lai_move_object(&package->package[item->pkg_index], initializer);
+                lai_exec_pkg_store(initializer, package, item->pkg_index);
                 item->pkg_index++;
                 lai_exec_pop_opstack(state, 1);
             }
@@ -832,8 +832,8 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state) {
 
             lai_object_t *opstack_pkg = lai_exec_push_opstack_or_die(state);
             opstack_pkg->type = LAI_PACKAGE;
-            opstack_pkg->package = lai_calloc(num_ents, sizeof(lai_object_t));
-            opstack_pkg->package_size = num_ents;
+            opstack_pkg->package_ = lai_calloc(num_ents, sizeof(lai_object_t));
+            opstack_pkg->package_size_ = num_ents;
             break;
         }
 
