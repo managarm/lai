@@ -362,7 +362,7 @@ static void lai_exec_reduce(int opcode, lai_state_t *state, lai_object_t *operan
                 if (n >= lai_exec_pkg_size(&storage))
                     lai_panic("package Index() out of bounds");
                 result.type = LAI_PACKAGE_INDEX;
-                result.package_ = storage.package_;
+                result.pkg_ptr = storage.pkg_ptr;
                 result.integer = n;
                 break;
             default:
@@ -832,8 +832,12 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state) {
 
             lai_object_t *opstack_pkg = lai_exec_push_opstack_or_die(state);
             opstack_pkg->type = LAI_PACKAGE;
-            opstack_pkg->package_ = lai_calloc(num_ents, sizeof(lai_object_t));
-            opstack_pkg->package_size_ = num_ents;
+            opstack_pkg->pkg_ptr = laihost_malloc(sizeof(struct lai_pkg_head)
+                    + num_ents * sizeof(lai_object_t));
+            if (!opstack_pkg->pkg_ptr)
+                lai_panic("could not allocate memory for package");
+            opstack_pkg->pkg_ptr->size = num_ents;
+            memset(opstack_pkg->pkg_ptr->elems, 0, num_ents * sizeof(lai_object_t));
             break;
         }
 

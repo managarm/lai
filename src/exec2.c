@@ -62,9 +62,9 @@ resolve_alias:
 // Return:  Nothing
 
 static void laihost_free_package(lai_object_t *object) {
-    for(int i = 0; i < object->package_size_; i++)
-        lai_free_object(&object->package_[i]);
-    laihost_free(object->package_);
+    for(int i = 0; i < object->pkg_ptr->size; i++)
+        lai_free_object(&object->pkg_ptr->elems[i]);
+    laihost_free(object->pkg_ptr);
 }
 
 void lai_free_object(lai_object_t *object) {
@@ -102,11 +102,11 @@ static void lai_assign_object(lai_object_t *dest, lai_object_t *src) {
 }
 
 void lai_exec_pkg_load(lai_object_t *out, lai_object_t *pkg, size_t i) {
-    lai_assign_object(out, &pkg->package_[i]);
+    lai_assign_object(out, &pkg->pkg_ptr->elems[i]);
 }
 
 void lai_exec_pkg_store(lai_object_t *in, lai_object_t *pkg, size_t i) {
-    lai_assign_object(&pkg->package_[i], in);
+    lai_assign_object(&pkg->pkg_ptr->elems[i], in);
 }
 
 // lai_clone_buffer(): Clones a buffer object
@@ -139,19 +139,22 @@ static void lai_clone_string(lai_object_t *destination, lai_object_t *source) {
 }
 
 // lai_clone_package(): Clones a package object
-// Param:    lai_object_t *destination - destination
+// Param:    lai_object_t *dest - dest
 // Param:    lai_object_t *source - source
 // Return:   Nothing
 
-static void lai_clone_package(lai_object_t *destination, lai_object_t *source) {
-    destination->type = LAI_PACKAGE;
-    destination->package_size_ = source->package_size_;
-    destination->package_ = lai_calloc(source->package_size_, sizeof(lai_object_t));
-    if (!destination->package_)
+static void lai_clone_package(lai_object_t *dest, lai_object_t *src) {
+    dest->type = LAI_PACKAGE;
+    dest->pkg_ptr = laihost_malloc(sizeof(struct lai_pkg_head)
+            + src->pkg_ptr->size * sizeof(lai_object_t));
+    if (!dest->pkg_ptr)
         lai_panic("unable to allocate memory for package object.\n");
+    dest->pkg_ptr->size = src->pkg_ptr->size;
 
-    for (int i = 0; i < source->package_size_; i++)
-        lai_copy_object(&destination->package_[i], &source->package_[i]);
+    for (int i = 0; i < src->pkg_ptr->size; i++) {
+        memset(&dest->pkg_ptr->elems[i], 0, sizeof(lai_object_t));
+        lai_copy_object(&dest->pkg_ptr->elems[i], &src->pkg_ptr->elems[i]);
+    }
 }
 
 // lai_copy_object(): Copies an object
@@ -196,8 +199,7 @@ void lai_alias_object(lai_object_t *alias, lai_object_t *object) {
             break;
         case LAI_PACKAGE:
             alias->type = LAI_PACKAGE_REFERENCE;
-            alias->package_size_ = object->package_size_;
-            alias->package_ = object->package_;
+            alias->pkg_ptr = object->pkg_ptr;
             break;
         default:
             lai_panic("object type %d is not valid for lai_alias_object()", object->type);
@@ -253,8 +255,7 @@ void lai_alias_operand(lai_state_t *state, lai_object_t *object, lai_object_t *r
             break;
         case LAI_PACKAGE:
             ref->type = LAI_PACKAGE_REFERENCE;
-            ref->package_size_ = object->package_size_;
-            ref->package_ = object->package_;
+            ref->pkg_ptr = object->pkg_ptr;
             break;
         case LAI_ARG_NAME:
             lai_alias_object(ref, &state->arg[object->index]);
