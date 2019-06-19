@@ -213,10 +213,9 @@ inline lai_object_t *lai_arg(lai_state_t *state, int n) {
     return &state->arg[n];
 }
 
-acpi_fadt_t *lai_fadt;
-acpi_aml_t *lai_dsdt;
-size_t lai_ns_size;
-volatile uint16_t lai_last_event;
+extern acpi_fadt_t *lai_fadt;
+extern size_t lai_ns_size;
+extern volatile uint16_t lai_last_event;
 
 // The remaining of these functions are OS independent!
 // ACPI namespace functions

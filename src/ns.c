@@ -33,6 +33,8 @@ lai_nsnode_t **lai_namespace;
 size_t lai_ns_size = 0;
 size_t lai_ns_capacity = 0;
 
+acpi_fadt_t *lai_fadt;
+
 void lai_load_table(void *);
 
 lai_nsnode_t *lai_create_nsnode(void) {
