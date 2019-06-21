@@ -78,9 +78,11 @@ typedef struct lai_object_t
 {
     int type;
     uint64_t integer;        // for Name()
-    char *string;            // for Name()
 
-    struct lai_pkg_head *pkg_ptr;
+    union {
+        struct lai_string_head *string_ptr;
+        struct lai_pkg_head *pkg_ptr;
+    };
 
     size_t buffer_size;        // for Buffer(), size in bytes
     void *buffer;            // for Buffer(), actual bytes
@@ -91,10 +93,24 @@ typedef struct lai_object_t
     int index;
 } lai_object_t;
 
+struct lai_string_head {
+    unsigned int dummy;
+    char content[];
+};
+
 struct lai_pkg_head {
     unsigned int size;
     struct lai_object_t elems[];
 };
+
+// Allows access to the contents of a string.
+__attribute__((always_inline))
+inline char *lai_exec_string_access(lai_object_t *object) {
+    return object->string_ptr->content;
+}
+
+// Returns the size of a string.
+size_t lai_exec_string_length(lai_object_t *object);
 
 // Returns the size of a package.
 __attribute__((always_inline))

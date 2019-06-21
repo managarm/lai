@@ -57,6 +57,26 @@ resolve_alias:
     return object;
 }
 
+int lai_create_string(lai_object_t *object, size_t length) {
+    object->type = LAI_STRING;
+    object->string_ptr = laihost_malloc(sizeof(struct lai_string_head)
+            + length + 1);
+    if (!object->string_ptr)
+        return 1;
+    memset(object->string_ptr->content, 0, length + 1);
+    return 0;
+}
+
+int lai_create_c_string(lai_object_t *object, const char *s) {
+    size_t n = lai_strlen(s);
+    int e;
+    e = lai_create_string(object, n);
+    if(e)
+        return e;
+    memcpy(lai_exec_string_access(object), s, n);
+    return 0;
+}
+
 int lai_create_pkg(lai_object_t *object, size_t n) {
     object->type = LAI_PACKAGE;
     object->pkg_ptr = laihost_malloc(sizeof(struct lai_pkg_head)
@@ -112,11 +132,19 @@ static void lai_assign_object(lai_object_t *dest, lai_object_t *src) {
     lai_move_object(dest, &temp);
 }
 
+size_t lai_exec_string_length(lai_object_t *str) {
+    // TODO: We should probably be more strict and not allow references here.
+    LAI_ENSURE(str->type == LAI_STRING || str->type == LAI_STRING_REFERENCE);
+    return lai_strlen(str->string_ptr->content);
+}
+
 void lai_exec_pkg_load(lai_object_t *out, lai_object_t *pkg, size_t i) {
+    LAI_ENSURE(pkg->type == LAI_PACKAGE);
     lai_assign_object(out, &pkg->pkg_ptr->elems[i]);
 }
 
 void lai_exec_pkg_store(lai_object_t *in, lai_object_t *pkg, size_t i) {
+    LAI_ENSURE(pkg->type == LAI_PACKAGE);
     lai_assign_object(&pkg->pkg_ptr->elems[i], in);
 }
 
@@ -136,17 +164,15 @@ static void lai_clone_buffer(lai_object_t *destination, lai_object_t *source) {
 }
 
 // lai_clone_string(): Clones a string object
-// Param:    lai_object_t *destination - destination
+// Param:    lai_object_t *dest - destination
 // Param:    lai_object_t *source - source
 // Return:   Nothing
 
-static void lai_clone_string(lai_object_t *destination, lai_object_t *source) {
-    destination->type = LAI_STRING;
-    destination->string = laihost_malloc(lai_strlen(source->string) + 1);
-    if (!destination->string)
+static void lai_clone_string(lai_object_t *dest, lai_object_t *source) {
+    size_t n = lai_exec_string_length(source);
+    if (lai_create_string(dest, n))
         lai_panic("unable to allocate memory for string object.");
-
-    lai_strcpy(destination->string, source->string);
+    memcpy(lai_exec_string_access(dest), lai_exec_string_access(source), n);
 }
 
 // lai_clone_package(): Clones a package object
@@ -195,7 +221,7 @@ void lai_alias_object(lai_object_t *alias, lai_object_t *object) {
     switch (object->type) {
         case LAI_STRING:
             alias->type = LAI_STRING_REFERENCE;
-            alias->string = object->string;
+            alias->string_ptr = object->string_ptr;
             break;
         case LAI_BUFFER:
             alias->type = LAI_BUFFER_REFERENCE;
@@ -251,7 +277,7 @@ void lai_alias_operand(lai_state_t *state, lai_object_t *object, lai_object_t *r
     switch (object->type) {
         case LAI_STRING:
             ref->type = LAI_STRING_REFERENCE;
-            ref->string = object->string;
+            ref->string_ptr = object->string_ptr;
             break;
         case LAI_BUFFER:
             ref->type = LAI_BUFFER_REFERENCE;
@@ -332,7 +358,7 @@ void lai_store_operand(lai_state_t *state, lai_object_t *target, lai_object_t *o
             // Stores to the null target are ignored.
             break;
         case LAI_STRING_INDEX:
-            target->string[target->integer] = object->integer;
+            lai_exec_string_access(target)[target->integer] = object->integer;
             break;
         case LAI_BUFFER_INDEX:
         {
@@ -371,7 +397,7 @@ void lai_store_operand(lai_state_t *state, lai_object_t *target, lai_object_t *o
                         lai_debug("Debug(): integer(%ld)", object->integer);
                         break;
                     case LAI_STRING:
-                        lai_debug("Debug(): string(\"%s\")", object->string);
+                        lai_debug("Debug(): string(\"%s\")", lai_exec_string_access(object));
                         break;
                     case LAI_BUFFER:
                         lai_debug("Debug(): buffer(%X)", (size_t)object->buffer);

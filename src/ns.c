@@ -601,7 +601,8 @@ lai_nsnode_t *lai_get_deviceid(size_t index, lai_object_t *id) {
             if (device_id.integer == id->integer)
                 i++;
         } else if (device_id.type == LAI_STRING && id->type == LAI_STRING) {
-            if (!lai_strcmp(device_id.string, id->string))
+            if (!lai_strcmp(lai_exec_string_access(&device_id),
+                            lai_exec_string_access(id)))
                 i++;
         }
 

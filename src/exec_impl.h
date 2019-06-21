@@ -26,6 +26,8 @@
 #define LAI_IMMEDIATE_WORD_MODE 5
 
 // Allocate a new package.
+int lai_create_string(lai_object_t *, size_t);
+int lai_create_c_string(lai_object_t *, const char *);
 int lai_create_pkg(lai_object_t *, size_t);
 
 void lai_load_ns(lai_nsnode_t *, lai_object_t *);

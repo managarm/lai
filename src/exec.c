@@ -345,10 +345,10 @@ static void lai_exec_reduce(int opcode, lai_state_t *state, lai_object_t *operan
 
         switch (storage.type) {
             case LAI_STRING_REFERENCE:
-                if (n >= lai_strlen(storage.string))
+                if (n >= lai_exec_string_length(&storage))
                     lai_panic("string Index() out of bounds");
                 result.type = LAI_STRING_INDEX;
-                result.string = storage.string;
+                result.string_ptr = storage.string_ptr;
                 result.integer = n;
                 break;
             case LAI_BUFFER_REFERENCE:
@@ -381,7 +381,7 @@ static void lai_exec_reduce(int opcode, lai_state_t *state, lai_object_t *operan
         switch (ref.type) {
             case LAI_STRING_INDEX:
                 result.type = LAI_INTEGER;
-                result.integer = ref.string[ref.integer];
+                result.integer = lai_exec_string_access(&ref)[ref.integer];
                 break;
             case LAI_BUFFER_INDEX: {
                 uint8_t *window = ref.buffer;
@@ -406,7 +406,7 @@ static void lai_exec_reduce(int opcode, lai_state_t *state, lai_object_t *operan
         switch (object.type) {
             case LAI_STRING:
                 result.type = LAI_INTEGER;
-                result.integer = lai_strlen(object.string);
+                result.integer = lai_exec_string_length(&object);
                 break;
             case LAI_BUFFER:
                 result.type = LAI_INTEGER;
@@ -764,10 +764,9 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state) {
 
             if (exec_result_mode == LAI_DATA_MODE || exec_result_mode == LAI_OBJECT_MODE) {
                 lai_object_t *opstack_res = lai_exec_push_opstack_or_die(state);
-                opstack_res->type = LAI_STRING;
-                opstack_res->string = laihost_malloc(n + 1);
-                memcpy(opstack_res->string, method + state->pc, n);
-                opstack_res->string[n] = 0;
+                if(lai_create_string(opstack_res, n))
+                    lai_panic("could not allocate memory for string");
+                memcpy(lai_exec_string_access(opstack_res), method + state->pc, n);
             } else
                 LAI_ENSURE(exec_result_mode == LAI_EXEC_MODE);
             state->pc += n + 1;

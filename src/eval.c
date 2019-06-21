@@ -153,9 +153,11 @@ uint8_t char_to_hex(char character) {
 }
 
 void lai_eisaid(lai_object_t *object, char *id) {
+    size_t n = lai_strlen(id);
     if (lai_strlen(id) != 7) {
-        object->type = LAI_STRING;
-        object->string = id;
+        if(lai_create_string(object, n))
+            lai_panic("could not allocate memory for string");
+        memcpy(lai_exec_string_access(object), id, n);
         return;
     }
 
