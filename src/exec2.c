@@ -111,15 +111,25 @@ static void laihost_free_package(lai_object_t *object) {
 }
 
 void lai_free_object(lai_object_t *object) {
-    if (object->type == LAI_STRING) {
-        if (lai_rc_unref(&object->string_ptr->rc))
-            laihost_free(object->string_ptr);
-    }else if (object->type == LAI_BUFFER) {
-        if (lai_rc_unref(&object->buffer_ptr->rc))
-            laihost_free(object->buffer_ptr);
-    }else if (object->type == LAI_PACKAGE) {
-        if (lai_rc_unref(&object->pkg_ptr->rc))
-            laihost_free_package(object);
+    switch (object->type) {
+        case LAI_STRING:
+        case LAI_STRING_REFERENCE:
+        case LAI_STRING_INDEX:
+            if (lai_rc_unref(&object->string_ptr->rc))
+                laihost_free(object->string_ptr);
+            break;
+        case LAI_BUFFER:
+        case LAI_BUFFER_REFERENCE:
+        case LAI_BUFFER_INDEX:
+            if (lai_rc_unref(&object->buffer_ptr->rc))
+                laihost_free(object->buffer_ptr);
+            break;
+        case LAI_PACKAGE:
+        case LAI_PACKAGE_REFERENCE:
+        case LAI_PACKAGE_INDEX:
+            if (lai_rc_unref(&object->pkg_ptr->rc))
+                laihost_free_package(object);
+            break;
     }
 
     memset(object, 0, sizeof(lai_object_t));
@@ -149,12 +159,18 @@ static void lai_assign_object(lai_object_t *dest, lai_object_t *src) {
     lai_object_t temp = *src;
     switch (src->type) {
         case LAI_STRING:
+        case LAI_STRING_REFERENCE:
+        case LAI_STRING_INDEX:
             lai_rc_ref(&src->string_ptr->rc);
             break;
         case LAI_BUFFER:
+        case LAI_BUFFER_REFERENCE:
+        case LAI_BUFFER_INDEX:
             lai_rc_ref(&src->buffer_ptr->rc);
             break;
         case LAI_PACKAGE:
+        case LAI_PACKAGE_REFERENCE:
+        case LAI_PACKAGE_INDEX:
             lai_rc_ref(&src->pkg_ptr->rc);
             break;
     }
@@ -218,13 +234,13 @@ static void lai_clone_package(lai_object_t *dest, lai_object_t *src) {
 }
 
 // lai_copy_object(): Copies an object
-// Param:    lai_object_t *destination - destination
+// Param:    lai_object_t *dest - destination
 // Param:    lai_object_t *source - source
 // Return:   Nothing
 
-void lai_copy_object(lai_object_t *destination, lai_object_t *source) {
-    // First, clone into a temporary object.
-    lai_object_t temp;
+void lai_copy_object(lai_object_t *dest, lai_object_t *source) {
+    // Clone into a temporary object.
+    lai_object_t temp = {0};
     switch (source->type) {
         case LAI_STRING:
             lai_clone_string(&temp, source);
@@ -235,14 +251,16 @@ void lai_copy_object(lai_object_t *destination, lai_object_t *source) {
         case LAI_PACKAGE:
             lai_clone_package(&temp, source);
             break;
-        default:
-            temp = *source;
-            break;
     }
 
-    // Afterwards, swap to the destination. This handles copy-to-self correctly.
-    lai_swap_object(destination, &temp);
-    lai_free_object(&temp);
+    if (temp.type) {
+        // Afterwards, swap to the destination. This handles copy-to-self correctly.
+        lai_swap_object(dest, &temp);
+        lai_free_object(&temp);
+    }else{
+        // For others objects: just do a shallow copy.
+        lai_assign_object(dest, source);
+    }
 }
 
 // lai_alias_object(): Creates a reference to the storage of an object.
