@@ -17,7 +17,7 @@ void lai_install_nsnode(lai_nsnode_t *node);
 
 // Namespace parsing function.
 size_t lai_create_field(lai_nsnode_t *, void *);
-size_t lai_create_method(lai_nsnode_t *, void *);
+size_t lai_create_method(lai_nsnode_t *, struct lai_aml_segment *, void *);
 size_t lai_create_alias(lai_nsnode_t *, void *);
 size_t lai_create_mutex(lai_nsnode_t *, void *);
 size_t lai_create_indexfield(lai_nsnode_t *, void *);

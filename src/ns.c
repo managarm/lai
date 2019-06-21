@@ -20,22 +20,13 @@ int lai_do_osi_method(lai_object_t *args, lai_object_t *result);
 int lai_do_os_method(lai_object_t *args, lai_object_t *result);
 int lai_do_rev_method(lai_object_t *args, lai_object_t *result);
 
-// These variables are information about the size, capacity,
-// and number of objects in the buffer we use to store all
-// the AML objects.
-uint8_t *lai_aml_code;
-size_t lai_aml_capacity = 0;
-size_t lai_aml_size = 0;
-size_t lai_aml_obj_count = 0;
-extern char aml_test[];
-
 lai_nsnode_t **lai_namespace;
 size_t lai_ns_size = 0;
 size_t lai_ns_capacity = 0;
 
 acpi_fadt_t *lai_fadt;
 
-void lai_load_table(void *);
+static struct lai_aml_segment *lai_load_table(void *ptr, int index);
 
 lai_nsnode_t *lai_create_nsnode(void) {
     lai_nsnode_t *node = laihost_malloc(sizeof(lai_nsnode_t));
@@ -153,40 +144,13 @@ void lai_create_namespace(void) {
     if (!lai_namespace)
         lai_panic("unable to allocate memory.");
 
-    lai_aml_code = laihost_malloc(CODE_WINDOW);
-    lai_aml_capacity = CODE_WINDOW;
-
-    //acpins_load_table(aml_test);    // custom AML table just for testing
-
     // we need the FADT
     lai_fadt = laihost_scan("FACP", 0);
     if (!lai_fadt) {
         lai_panic("unable to find ACPI FADT.");
     }
 
-    void *dsdt = laihost_scan("DSDT", 0);
-    lai_load_table(dsdt);
-
-    // load all SSDTs
-    size_t index = 0;
-    acpi_aml_t *ssdt = laihost_scan("SSDT", index);
-    while (ssdt != NULL) {
-        lai_load_table(ssdt);
-        index++;
-        ssdt = laihost_scan("SSDT", index);
-    }
-
-    // the PSDT is treated the same way as the SSDT
-    // scan for PSDTs too for compatibility with some ACPI 1.0 PCs
-    index = 0;
-    acpi_aml_t *psdt = laihost_scan("PSDT", index);
-    while (psdt != NULL) {
-        lai_load_table(psdt);
-        index++;
-        psdt = laihost_scan("PSDT", index);
-    }
-
-    // create the OS-defined objects first
+    // Create the OS-defined objects first.
     lai_nsnode_t *osi_node = lai_create_nsnode_or_die();
     osi_node->type = LAI_NAMESPACE_METHOD;
     lai_strcpy(osi_node->path, "\\._OSI");
@@ -210,27 +174,54 @@ void lai_create_namespace(void) {
 
     // Create the namespace with all the objects.
     lai_state_t state;
+
+    // Load the DSDT.
+    void *dsdt_table = laihost_scan("DSDT", 0);
+    void *dsdt_amls = lai_load_table(dsdt_table, 0);
     lai_init_state(&state);
-    lai_populate(NULL, lai_aml_code, lai_aml_size, &state);
+    lai_populate(NULL, dsdt_amls, &state);
     lai_finalize_state(&state);
+
+    // Load all SSDTs.
+    size_t index = 0;
+    acpi_aml_t *ssdt_table;
+    while ((ssdt_table = laihost_scan("SSDT", index))) {
+        void *ssdt_amls = lai_load_table(ssdt_table, index);
+        lai_init_state(&state);
+        lai_populate(NULL, ssdt_amls, &state);
+        lai_finalize_state(&state);
+    }
+
+    // The PSDT is treated the same way as the SSDT.
+    // Scan for PSDTs too for compatibility with some ACPI 1.0 PCs.
+    index = 0;
+    acpi_aml_t *psdt_table;
+    while ((psdt_table = laihost_scan("PSDT", index))) {
+        void *psdt_amls = lai_load_table(psdt_table, index);
+        lai_init_state(&state);
+        lai_populate(NULL, psdt_amls, &state);
+        lai_finalize_state(&state);
+    }
 
     lai_debug("ACPI namespace created, total of %d predefined objects.", lai_ns_size);
 }
 
-void lai_load_table(void *ptr) {
-    acpi_aml_t *table = (acpi_aml_t*)ptr;
-    while (lai_aml_size + table->header.length >= lai_aml_capacity) {
-        lai_aml_capacity += CODE_WINDOW;
-        lai_aml_code = laihost_realloc(lai_aml_code, lai_aml_capacity);
-    }
+static struct lai_aml_segment *lai_load_table(void *ptr, int index) {
+    struct lai_aml_segment *amls = laihost_malloc(sizeof(struct lai_aml_segment));
+    if(!amls)
+        lai_panic("could not allocate memory for struct lai_aml_segment");
+    memset(amls, 0, sizeof(struct lai_aml_segment));
 
-    // copy the actual AML code
-    memcpy(lai_aml_code + lai_aml_size, table->data, table->header.length - sizeof(acpi_header_t));
-    lai_aml_size += (table->header.length - sizeof(acpi_header_t));
+    amls->table = ptr;
+    amls->index = index;
 
-    lai_debug("loaded AML table '%c%c%c%c', total %d bytes of AML code.", table->header.signature[0], table->header.signature[1], table->header.signature[2], table->header.signature[3], lai_aml_size);
-
-    lai_aml_obj_count++;
+    lai_debug("loaded AML table '%c%c%c%c', total %d bytes of AML code.",
+            amls->table->header.signature[0],
+            amls->table->header.signature[1],
+            amls->table->header.signature[2],
+            amls->table->header.signature[3],
+            amls->table->header.length);
+    return amls;
 }
 
 // TODO: This entire function could probably do with a rewrite soonish.
@@ -339,7 +330,7 @@ size_t lai_create_field(lai_nsnode_t *parent, void *data) {
 }
 
 // Create a control method in the namespace.
-size_t lai_create_method(lai_nsnode_t *parent, void *data) {
+size_t lai_create_method(lai_nsnode_t *parent, struct lai_aml_segment *amls, void *data) {
     uint8_t *method = (uint8_t *)data;
     method++;        // skip over METHOD_OP
 
@@ -359,6 +350,7 @@ size_t lai_create_method(lai_nsnode_t *parent, void *data) {
     // and add it to the namespace.
     node->type = LAI_NAMESPACE_METHOD;
     node->method_flags = method[0];
+    node->amls = amls;
     node->pointer = (void *)(method + 1);
     node->size = size - pkgsize - name_length - 1;
 

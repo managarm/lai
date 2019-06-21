@@ -93,6 +93,12 @@ inline int lai_rc_unref(lai_rc_t *rc_ptr) {
     return !nrefs;
 }
 
+struct lai_aml_segment {
+    acpi_aml_t *table;
+    // Index of the table (e.g., for SSDTs).
+    size_t index;
+};
+
 typedef struct lai_object_t
 {
     int type;
@@ -164,6 +170,7 @@ typedef struct lai_nsnode_t
 {
     char path[ACPI_MAX_NAME];    // full path of object
     int type;
+    struct lai_aml_segment *amls;
     void *pointer;            // valid for scopes, methods, etc.
     size_t size;            // valid for scopes, methods, etc.
 
@@ -283,7 +290,7 @@ size_t lai_read_resource(lai_nsnode_t *, acpi_resource_t *);
 
 // ACPI Control Methods
 int lai_eval(lai_object_t *, char *);
-int lai_populate(lai_nsnode_t *, void *, size_t, lai_state_t *);
+int lai_populate(lai_nsnode_t *, struct lai_aml_segment *, lai_state_t *);
 int lai_exec_method(lai_nsnode_t *, lai_state_t *);
 int lai_eval_node(lai_nsnode_t *, lai_state_t *);
 

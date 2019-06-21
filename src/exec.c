@@ -18,7 +18,8 @@ static int debug_opcodes = 0;
    DefLoad | DefNoop | DefNotify | DefRelease | DefReset | DefReturn |
    DefSignal | DefSleep | DefStall | DefUnload | DefWhile */
 
-void lai_eval_operand(lai_object_t *destination, lai_state_t *state, uint8_t *code);
+static void lai_eval_operand(lai_object_t *destination, lai_state_t *state,
+        struct lai_aml_segment *amls, uint8_t *code);
 
 // Prepare the interpreter state for a control method call.
 // Param: lai_state_t *state - will store method name and arguments
@@ -508,7 +509,7 @@ size_t lai_parse_integer(uint8_t *object, uint64_t *out) {
 // Param:  lai_state_t *state - machine state
 // Return: int - 0 on success
 
-static int lai_exec_run(uint8_t *method, lai_state_t *state) {
+static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state_t *state) {
     lai_stackitem_t *item;
     while ((item = lai_exec_peek_stack_back(state))) {
         // Package-size encoding (and similar) needs to know the PC of the opcode.
@@ -607,7 +608,7 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state) {
                 // We are at the beginning of a loop. We check the predicate; if it is false,
                 // we jump to the end of the loop and remove the stack item.
                 lai_object_t predicate = {0};
-                lai_eval_operand(&predicate, state, method);
+                lai_eval_operand(&predicate, state, amls, method);
                 if (!predicate.integer) {
                     state->pc = item->loop_end;
                     lai_exec_pop_stack_back(state);
@@ -693,7 +694,7 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state) {
                     lai_init_state(&nested_state);
                     int argc = handle->method_flags & METHOD_ARGC_MASK;
                     for(int i = 0; i < argc; i++)
-                        lai_eval_operand(&nested_state.arg[i], state, method);
+                        lai_eval_operand(&nested_state.arg[i], state, amls, method);
 
                     lai_exec_method(handle, &nested_state);
                     lai_move_object(&result, &nested_state.retvalue);
@@ -722,8 +723,15 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state) {
             opcode = (EXTOP_PREFIX << 8) | method[state->pc + 1];
         } else
             opcode = method[state->pc];
-        if (debug_opcodes)
-            lai_debug("parsing opcode 0x%02x [@ %d]", opcode, opcode_pc);
+        if (debug_opcodes) {
+            size_t table_pc = sizeof(acpi_header_t) + opcode_pc;
+            lai_debug("parsing opcode 0x%02x [0x%x @ %c%c%c%c %d]", opcode, table_pc,
+                    amls->table->header.signature[0],
+                    amls->table->header.signature[1],
+                    amls->table->header.signature[2],
+                    amls->table->header.signature[3],
+                    amls->index);
+        }
 
         // This switch handles the majority of all opcodes.
         switch (opcode) {
@@ -814,7 +822,7 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state) {
 
             // The size of the buffer in bytes.
             lai_object_t buffer_size = {0};
-            lai_eval_operand(&buffer_size, state, method);
+            lai_eval_operand(&buffer_size, state, amls, method);
 
             lai_object_t result = {0};
             if (lai_create_buffer(&result, buffer_size.integer))
@@ -863,7 +871,7 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state) {
         }
 
         case (EXTOP_PREFIX << 8) | SLEEP_OP:
-            lai_exec_sleep(method, state);
+            lai_exec_sleep(amls, method, state);
             break;
 
         /* A control method can return literally any object */
@@ -872,7 +880,7 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state) {
         {
             state->pc++;
             lai_object_t result = {0};
-            lai_eval_operand(&result, state, method);
+            lai_eval_operand(&result, state, amls, method);
 
             // Find the last LAI_METHOD_CONTEXT_STACKITEM on the stack.
             int j = 0;
@@ -961,7 +969,7 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state) {
 
             // Evaluate the predicate
             lai_object_t predicate = {0};
-            lai_eval_operand(&predicate, state, method);
+            lai_eval_operand(&predicate, state, amls, method);
 
             lai_stackitem_t *cond_item = lai_exec_push_stack_or_die(state);
             cond_item->kind = LAI_COND_STACKITEM;
@@ -994,7 +1002,7 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state) {
                 lai_install_nsnode(handle);
             }
 
-            lai_eval_operand(&handle->object, state, method);
+            lai_eval_operand(&handle->object, state, amls, method);
             break;
         }
         case BYTEFIELD_OP:
@@ -1106,7 +1114,7 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state) {
 
         // Leafs in the ACPI namespace.
         case METHOD_OP:
-            state->pc += lai_create_method(ctx_handle, method + state->pc);
+            state->pc += lai_create_method(ctx_handle, amls, method + state->pc);
             break;
         case ALIAS_OP:
             state->pc += lai_create_alias(ctx_handle, method + state->pc);
@@ -1135,8 +1143,8 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state) {
             // Now, parse the offset and length of the opregion.
             lai_object_t disp = {0};
             lai_object_t length = {0};
-            lai_eval_operand(&disp, state, method);
-            lai_eval_operand(&length, state, method);
+            lai_eval_operand(&disp, state, amls, method);
+            lai_eval_operand(&length, state, amls, method);
 
             lai_nsnode_t *node = lai_create_nsnode_or_die();
             lai_strcpy(node->path, name);
@@ -1373,7 +1381,9 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state) {
     return 0;
 }
 
-int lai_populate(lai_nsnode_t *parent, void *data, size_t size, lai_state_t *state) {
+int lai_populate(lai_nsnode_t *parent, struct lai_aml_segment *amls, lai_state_t *state) {
+    size_t size = amls->table->header.length - sizeof(acpi_header_t);
+
     lai_stackitem_t *item = lai_exec_push_stack_or_die(state);
     item->kind = LAI_POPULATE_CONTEXT_STACKITEM;
     item->ctx_handle = parent;
@@ -1382,7 +1392,7 @@ int lai_populate(lai_nsnode_t *parent, void *data, size_t size, lai_state_t *sta
 
     state->pc = 0;
     state->limit = size;
-    int status = lai_exec_run(data, state);
+    int status = lai_exec_run(amls, amls->table->data, state);
     if (status)
         lai_panic("lai_exec_run() failed in lai_populate()");
     return 0;
@@ -1397,6 +1407,7 @@ int lai_exec_method(lai_nsnode_t *method, lai_state_t *state) {
     // Check for OS-defined methods.
     if (method->method_override)
         return method->method_override(state->arg, &state->retvalue);
+    LAI_ENSURE(method->amls);
 
     // Okay, by here it's a real method.
     //lai_debug("execute control method %s", method->path);
@@ -1407,7 +1418,7 @@ int lai_exec_method(lai_nsnode_t *method, lai_state_t *state) {
 
     state->pc = 0;
     state->limit = method->size;
-    int status = lai_exec_run(method->pointer, state);
+    int status = lai_exec_run(method->amls, method->pointer, state);
     if (status)
         return status;
 
@@ -1456,14 +1467,15 @@ int lai_eval_node(lai_nsnode_t *handle, lai_state_t *state) {
 // TODO: Eventually, we want to remove this function. However, this requires refactoring
 //       lai_exec_run() to avoid all kinds of recursion.
 
-void lai_eval_operand(lai_object_t *destination, lai_state_t *state, uint8_t *code) {
+static void lai_eval_operand(lai_object_t *destination, lai_state_t *state,
+        struct lai_aml_segment *amls, uint8_t *code) {
     int opstack = state->opstack_ptr;
 
     lai_stackitem_t *item = lai_exec_push_stack_or_die(state);
     item->kind = LAI_EVALOPERAND_STACKITEM;
     item->opstack_frame = opstack;
 
-    int status = lai_exec_run(code, state);
+    int status = lai_exec_run(amls, code, state);
     if (status)
         lai_panic("lai_exec_run() failed in lai_eval_operand()");
 
@@ -1478,11 +1490,11 @@ void lai_eval_operand(lai_object_t *destination, lai_state_t *state, uint8_t *co
 // Param:    void *code - opcode data
 // Param:    lai_state_t *state - AML VM state
 
-void lai_exec_sleep(void *code, lai_state_t *state) {
+void lai_exec_sleep(struct lai_aml_segment *amls, void *code, lai_state_t *state) {
     state->pc += 2; // Skip EXTOP_PREFIX and SLEEP_OP.
 
     lai_object_t time = {0};
-    lai_eval_operand(&time, state, code);
+    lai_eval_operand(&time, state, amls, code);
 
     if (!time.integer)
         time.integer = 1;
