@@ -592,8 +592,10 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state) {
                         || item->op_result_mode == LAI_TARGET_MODE) {
                     lai_object_t *opstack_res = lai_exec_push_opstack_or_die(state);
                     lai_move_object(opstack_res, &result);
-                } else
+                } else {
                     LAI_ENSURE(item->op_result_mode == LAI_EXEC_MODE);
+                    lai_free_object(&result);
+                }
 
                 lai_exec_pop_stack_back(state);
                 continue;
