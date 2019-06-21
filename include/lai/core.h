@@ -81,11 +81,9 @@ typedef struct lai_object_t
 
     union {
         struct lai_string_head *string_ptr;
+        struct lai_buffer_head *buffer_ptr;
         struct lai_pkg_head *pkg_ptr;
     };
-
-    size_t buffer_size;        // for Buffer(), size in bytes
-    void *buffer;            // for Buffer(), actual bytes
 
     char name[ACPI_MAX_NAME];    // for Name References
     struct lai_nsnode_t *handle;
@@ -96,6 +94,11 @@ typedef struct lai_object_t
 struct lai_string_head {
     unsigned int dummy;
     char content[];
+};
+
+struct lai_buffer_head {
+    size_t size;
+    uint8_t content[];
 };
 
 struct lai_pkg_head {
@@ -112,9 +115,23 @@ inline char *lai_exec_string_access(lai_object_t *object) {
 // Returns the size of a string.
 size_t lai_exec_string_length(lai_object_t *object);
 
+// Returns the size of a buffer.
+__attribute__((always_inline))
+inline size_t lai_exec_buffer_size(lai_object_t *object) {
+    // TODO: Ensure that this is a buffer.
+    return object->buffer_ptr->size;
+}
+
+// Allows access to the contents of a buffer.
+__attribute__((always_inline))
+inline void *lai_exec_buffer_access(lai_object_t *object) {
+    return object->buffer_ptr->content;
+}
+
 // Returns the size of a package.
 __attribute__((always_inline))
 inline size_t lai_exec_pkg_size(lai_object_t *object) {
+    // TODO: Ensure that this is a package.
     return object->pkg_ptr->size;
 }
 

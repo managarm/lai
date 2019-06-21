@@ -38,7 +38,7 @@ size_t lai_read_resource(lai_nsnode_t *device, acpi_resource_t *dest) {
 
     // read the resource buffer
     size_t count = 0;
-    uint8_t *data = (uint8_t*)buffer.buffer;
+    uint8_t *data = lai_exec_buffer_access(&buffer);
     size_t data_size;
 
     acpi_small_irq_t *small_irq;

@@ -59,8 +59,7 @@ resolve_alias:
 
 int lai_create_string(lai_object_t *object, size_t length) {
     object->type = LAI_STRING;
-    object->string_ptr = laihost_malloc(sizeof(struct lai_string_head)
-            + length + 1);
+    object->string_ptr = laihost_malloc(sizeof(struct lai_string_head) + length + 1);
     if (!object->string_ptr)
         return 1;
     memset(object->string_ptr->content, 0, length + 1);
@@ -74,6 +73,16 @@ int lai_create_c_string(lai_object_t *object, const char *s) {
     if(e)
         return e;
     memcpy(lai_exec_string_access(object), s, n);
+    return 0;
+}
+
+int lai_create_buffer(lai_object_t *object, size_t size) {
+    object->type = LAI_BUFFER;
+    object->buffer_ptr = laihost_malloc(sizeof(struct lai_buffer_head) + size);
+    if (!object->buffer_ptr)
+        return 1;
+    object->buffer_ptr->size = size;
+    memset(object->buffer_ptr->content, 0, size);
     return 0;
 }
 
@@ -100,7 +109,7 @@ static void laihost_free_package(lai_object_t *object) {
 
 void lai_free_object(lai_object_t *object) {
     if (object->type == LAI_BUFFER)
-        laihost_free(object->buffer);
+        laihost_free(object->buffer_ptr);
     else if (object->type == LAI_PACKAGE)
         laihost_free_package(object);
 
@@ -149,18 +158,15 @@ void lai_exec_pkg_store(lai_object_t *in, lai_object_t *pkg, size_t i) {
 }
 
 // lai_clone_buffer(): Clones a buffer object
-// Param:    lai_object_t *destination - destination
+// Param:    lai_object_t *dest - destination
 // Param:    lai_object_t *source - source
 // Return:   Nothing
 
-static void lai_clone_buffer(lai_object_t *destination, lai_object_t *source) {
-    destination->type = LAI_BUFFER;
-    destination->buffer_size = source->buffer_size;
-    destination->buffer = laihost_malloc(source->buffer_size);
-    if (!destination->buffer)
+static void lai_clone_buffer(lai_object_t *dest, lai_object_t *source) {
+    size_t size = lai_exec_buffer_size(source);
+    if (lai_create_buffer(dest, size))
         lai_panic("unable to allocate memory for buffer object.");
-
-    memcpy(destination->buffer, source->buffer, source->buffer_size);
+    memcpy(lai_exec_buffer_access(dest), lai_exec_buffer_access(source), size);
 }
 
 // lai_clone_string(): Clones a string object
@@ -225,8 +231,7 @@ void lai_alias_object(lai_object_t *alias, lai_object_t *object) {
             break;
         case LAI_BUFFER:
             alias->type = LAI_BUFFER_REFERENCE;
-            alias->buffer_size = object->buffer_size;
-            alias->buffer = object->buffer;
+            alias->buffer_ptr = object->buffer_ptr;
             break;
         case LAI_PACKAGE:
             alias->type = LAI_PACKAGE_REFERENCE;
@@ -281,8 +286,7 @@ void lai_alias_operand(lai_state_t *state, lai_object_t *object, lai_object_t *r
             break;
         case LAI_BUFFER:
             ref->type = LAI_BUFFER_REFERENCE;
-            ref->buffer_size = object->buffer_size;
-            ref->buffer = object->buffer;
+            ref->buffer_ptr = object->buffer_ptr;
             break;
         case LAI_PACKAGE:
             ref->type = LAI_PACKAGE_REFERENCE;
@@ -362,7 +366,7 @@ void lai_store_operand(lai_state_t *state, lai_object_t *target, lai_object_t *o
             break;
         case LAI_BUFFER_INDEX:
         {
-            uint8_t *window = target->buffer;
+            uint8_t *window = lai_exec_buffer_access(target);
             window[target->integer] = object->integer;
             break;
         }
@@ -400,7 +404,7 @@ void lai_store_operand(lai_state_t *state, lai_object_t *target, lai_object_t *o
                         lai_debug("Debug(): string(\"%s\")", lai_exec_string_access(object));
                         break;
                     case LAI_BUFFER:
-                        lai_debug("Debug(): buffer(%X)", (size_t)object->buffer);
+                        lai_debug("Debug(): buffer(%X)", (size_t)lai_exec_buffer_access(object));
                         break;
                     default:
                         lai_debug("Debug(): type %d", object->type);
@@ -435,10 +439,10 @@ void lai_write_buffer(lai_nsnode_t *handle, lai_object_t *source) {
     mask--;
     mask <<= bitshift;
 
-    uint8_t *byte = (uint8_t*)(buffer_handle->object.buffer + offset);
-    uint16_t *word = (uint16_t*)(buffer_handle->object.buffer + offset);
-    uint32_t *dword = (uint32_t*)(buffer_handle->object.buffer + offset);
-    uint64_t *qword = (uint64_t*)(buffer_handle->object.buffer + offset);
+    uint8_t *byte = (uint8_t*)(lai_exec_buffer_access(&buffer_handle->object) + offset);
+    uint16_t *word = (uint16_t*)(lai_exec_buffer_access(&buffer_handle->object) + offset);
+    uint32_t *dword = (uint32_t*)(lai_exec_buffer_access(&buffer_handle->object) + offset);
+    uint64_t *qword = (uint64_t*)(lai_exec_buffer_access(&buffer_handle->object) + offset);
 
     if (handle->buffer_size <= 8) {
         byte[0] &= (uint8_t)mask;

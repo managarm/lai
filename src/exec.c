@@ -352,10 +352,10 @@ static void lai_exec_reduce(int opcode, lai_state_t *state, lai_object_t *operan
                 result.integer = n;
                 break;
             case LAI_BUFFER_REFERENCE:
-                if (n >= storage.buffer_size)
+                if (n >= lai_exec_buffer_size(&storage))
                     lai_panic("buffer Index() out of bounds");
                 result.type = LAI_BUFFER_INDEX;
-                result.buffer = storage.buffer;
+                result.buffer_ptr = storage.buffer_ptr;
                 result.integer = n;
                 break;
             case LAI_PACKAGE_REFERENCE:
@@ -384,7 +384,7 @@ static void lai_exec_reduce(int opcode, lai_state_t *state, lai_object_t *operan
                 result.integer = lai_exec_string_access(&ref)[ref.integer];
                 break;
             case LAI_BUFFER_INDEX: {
-                uint8_t *window = ref.buffer;
+                uint8_t *window = lai_exec_buffer_access(&ref);
                 result.type = LAI_INTEGER;
                 result.integer = window[ref.integer];
                 break;
@@ -410,7 +410,7 @@ static void lai_exec_reduce(int opcode, lai_state_t *state, lai_object_t *operan
                 break;
             case LAI_BUFFER:
                 result.type = LAI_INTEGER;
-                result.integer = object.buffer_size;
+                result.integer = lai_exec_buffer_size(&object);
                 break;
             case LAI_PACKAGE:
                 result.type = LAI_INTEGER;
@@ -786,19 +786,15 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state) {
             lai_eval_operand(&buffer_size, state, method);
 
             lai_object_t result = {0};
-            result.type = LAI_BUFFER;
-            result.buffer_size = buffer_size.integer;
-            result.buffer = laihost_malloc(buffer_size.integer);
-            if (!result.buffer)
+            if (lai_create_buffer(&result, buffer_size.integer))
                  lai_panic("failed to allocate memory for AML buffer");
-            memset(result.buffer, 0, buffer_size.integer);
 
             int initial_size = (opcode_pc + encoded_size + 1) - state->pc;
             if (initial_size < 0)
                 lai_panic("buffer initializer has negative size");
-            if (initial_size > result.buffer_size)
+            if (initial_size > lai_exec_buffer_size(&result))
                 lai_panic("buffer initializer overflows buffer");
-            memcpy(result.buffer, method + state->pc, initial_size);
+            memcpy(lai_exec_buffer_access(&result), method + state->pc, initial_size);
             state->pc += initial_size;
 
             if (exec_result_mode == LAI_DATA_MODE || exec_result_mode == LAI_OBJECT_MODE) {

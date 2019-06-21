@@ -5,6 +5,7 @@
  */
 
 #include <lai/core.h>
+#include "exec_impl.h"
 #include "libc.h"
 
 static const char *lai_emulated_os = "Microsoft Windows NT";        // OS family
