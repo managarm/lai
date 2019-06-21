@@ -28,39 +28,6 @@ int lai_is_name(char character) {
         return 0;
 }
 
-size_t lai_eval_integer(uint8_t *object, uint64_t *integer) {
-    uint8_t *byte = (uint8_t*)(object + 1);
-    uint16_t *word = (uint16_t*)(object + 1);
-    uint32_t *dword = (uint32_t*)(object + 1);
-    uint64_t *qword = (uint64_t*)(object + 1);
-
-    switch (object[0]) {
-        case ZERO_OP:
-            integer[0] = 0;
-            return 1;
-        case ONE_OP:
-            integer[0] = 1;
-            return 1;
-        case ONES_OP:
-            integer[0] = 0xFFFFFFFFFFFFFFFF;
-            return 1;
-        case BYTEPREFIX:
-            integer[0] = (uint64_t)byte[0];
-            return 2;
-        case WORDPREFIX:
-            integer[0] = (uint64_t)word[0];
-            return 3;
-        case DWORDPREFIX:
-            integer[0] = (uint64_t)dword[0];
-            return 5;
-        case QWORDPREFIX:
-            integer[0] = qword[0];
-            return 9;
-        default:
-            return 0;
-    }
-}
-
 size_t lai_parse_pkgsize(uint8_t *data, size_t *destination) {
     destination[0] = 0;
 

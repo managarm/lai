@@ -518,7 +518,7 @@ size_t lai_create_n_wordfield(lai_nsnode_t *parent, void *data, size_t n) {
     field += name_size;
 
     uint64_t integer;
-    size_t integer_size = lai_eval_integer(field, &integer);
+    size_t integer_size = lai_parse_integer(field, &integer);
 
     node->buffer_offset = integer * 8;
     // the buffer is as wide as the width of the word

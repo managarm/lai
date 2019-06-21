@@ -6,7 +6,7 @@
 
 #pragma once
 
-size_t lai_eval_integer(uint8_t *object, uint64_t *integer);
+size_t lai_parse_integer(uint8_t *object, uint64_t *integer);
 size_t lai_parse_pkgsize(uint8_t *, size_t *);
 int lai_eval_package(lai_object_t *, size_t, lai_object_t *);
 int lai_is_name(char);

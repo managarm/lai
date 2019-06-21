@@ -477,6 +477,32 @@ static void lai_exec_reduce(int opcode, lai_state_t *state, lai_object_t *operan
     lai_move_object(reduction_res, &result);
 }
 
+// TODO: Make this static.
+size_t lai_parse_integer(uint8_t *object, uint64_t *out) {
+    uint16_t u16;
+    uint32_t u32;
+    uint64_t u64;
+    switch (*object) {
+        case BYTEPREFIX:
+            *out = *(object + 1);
+            return 2;
+        case WORDPREFIX:
+            memcpy(&u16, object + 1, sizeof(uint16_t));
+            *out = u16;
+            return 3;
+        case DWORDPREFIX:
+            memcpy(&u32, object + 1, sizeof(uint32_t));
+            *out = u32;
+            return 5;
+        case QWORDPREFIX:
+            memcpy(&u64, object + 1, sizeof(uint64_t));
+            *out = u64;
+            return 9;
+        default:
+            lai_panic("unexpected prefix for lai_parse_integer()");
+    }
+}
+
 // lai_exec_run(): Internal function, executes actual AML opcodes
 // Param:  uint8_t *method - pointer to method opcodes
 // Param:  lai_state_t *state - machine state
@@ -743,7 +769,7 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state) {
         case QWORDPREFIX:
         {
             uint64_t integer;
-            size_t integer_size = lai_eval_integer(method + state->pc, &integer);
+            size_t integer_size = lai_parse_integer(method + state->pc, &integer);
             if (!integer_size)
                 lai_panic("failed to parse integer opcode");
             if (exec_result_mode == LAI_DATA_MODE || exec_result_mode == LAI_OBJECT_MODE) {
