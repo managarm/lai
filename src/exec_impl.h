@@ -25,6 +25,9 @@
 #define LAI_TARGET_MODE 4
 #define LAI_IMMEDIATE_WORD_MODE 5
 
+// Allocate a new package.
+int lai_create_pkg(lai_object_t *, size_t);
+
 void lai_load_ns(lai_nsnode_t *, lai_object_t *);
 void lai_store_ns(lai_nsnode_t *, lai_object_t *);
 

@@ -831,13 +831,8 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state) {
             pkg_item->pkg_result_mode = exec_result_mode;
 
             lai_object_t *opstack_pkg = lai_exec_push_opstack_or_die(state);
-            opstack_pkg->type = LAI_PACKAGE;
-            opstack_pkg->pkg_ptr = laihost_malloc(sizeof(struct lai_pkg_head)
-                    + num_ents * sizeof(lai_object_t));
-            if (!opstack_pkg->pkg_ptr)
+            if (lai_create_pkg(opstack_pkg, num_ents))
                 lai_panic("could not allocate memory for package");
-            opstack_pkg->pkg_ptr->size = num_ents;
-            memset(opstack_pkg->pkg_ptr->elems, 0, num_ents * sizeof(lai_object_t));
             break;
         }
 
