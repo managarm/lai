@@ -356,6 +356,7 @@ static void lai_exec_reduce(int opcode, lai_state_t *state, lai_object_t *operan
                     lai_panic("buffer Index() out of bounds");
                 result.type = LAI_BUFFER_INDEX;
                 result.buffer_ptr = storage.buffer_ptr;
+                lai_rc_ref(&storage.buffer_ptr->rc);
                 result.integer = n;
                 break;
             case LAI_PACKAGE_REFERENCE:

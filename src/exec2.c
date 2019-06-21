@@ -81,6 +81,7 @@ int lai_create_buffer(lai_object_t *object, size_t size) {
     object->buffer_ptr = laihost_malloc(sizeof(struct lai_buffer_head) + size);
     if (!object->buffer_ptr)
         return 1;
+    object->buffer_ptr->rc = 1;
     object->buffer_ptr->size = size;
     memset(object->buffer_ptr->content, 0, size);
     return 0;
@@ -108,9 +109,10 @@ static void laihost_free_package(lai_object_t *object) {
 }
 
 void lai_free_object(lai_object_t *object) {
-    if (object->type == LAI_BUFFER)
-        laihost_free(object->buffer_ptr);
-    else if (object->type == LAI_PACKAGE)
+    if (object->type == LAI_BUFFER) {
+        if (lai_rc_unref(&object->buffer_ptr->rc))
+            laihost_free(object->buffer_ptr);
+    }else if (object->type == LAI_PACKAGE)
         laihost_free_package(object);
 
     memset(object, 0, sizeof(lai_object_t));
@@ -232,6 +234,7 @@ void lai_alias_object(lai_object_t *alias, lai_object_t *object) {
         case LAI_BUFFER:
             alias->type = LAI_BUFFER_REFERENCE;
             alias->buffer_ptr = object->buffer_ptr;
+            lai_rc_ref(&object->buffer_ptr->rc);
             break;
         case LAI_PACKAGE:
             alias->type = LAI_PACKAGE_REFERENCE;
@@ -287,6 +290,7 @@ void lai_alias_operand(lai_state_t *state, lai_object_t *object, lai_object_t *r
         case LAI_BUFFER:
             ref->type = LAI_BUFFER_REFERENCE;
             ref->buffer_ptr = object->buffer_ptr;
+            lai_rc_ref(&object->buffer_ptr->rc);
             break;
         case LAI_PACKAGE:
             ref->type = LAI_PACKAGE_REFERENCE;
