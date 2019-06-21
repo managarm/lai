@@ -366,6 +366,7 @@ static void lai_exec_reduce(int opcode, lai_state_t *state, lai_object_t *operan
                 result.type = LAI_PACKAGE_INDEX;
                 result.pkg_ptr = storage.pkg_ptr;
                 result.integer = n;
+                lai_rc_ref(&storage.pkg_ptr->rc);
                 break;
             default:
                 lai_panic("Index() is only defined for buffers, strings and packages");

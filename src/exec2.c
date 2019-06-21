@@ -94,6 +94,7 @@ int lai_create_pkg(lai_object_t *object, size_t n) {
             + n * sizeof(lai_object_t));
     if (!object->pkg_ptr)
         return 1;
+    object->pkg_ptr->rc = 1;
     object->pkg_ptr->size = n;
     memset(object->pkg_ptr->elems, 0, n * sizeof(lai_object_t));
     return 0;
@@ -116,8 +117,10 @@ void lai_free_object(lai_object_t *object) {
     }else if (object->type == LAI_BUFFER) {
         if (lai_rc_unref(&object->buffer_ptr->rc))
             laihost_free(object->buffer_ptr);
-    }else if (object->type == LAI_PACKAGE)
-        laihost_free_package(object);
+    }else if (object->type == LAI_PACKAGE) {
+        if (lai_rc_unref(&object->pkg_ptr->rc))
+            laihost_free_package(object);
+    }
 
     memset(object, 0, sizeof(lai_object_t));
 }
@@ -244,6 +247,7 @@ void lai_alias_object(lai_object_t *alias, lai_object_t *object) {
         case LAI_PACKAGE:
             alias->type = LAI_PACKAGE_REFERENCE;
             alias->pkg_ptr = object->pkg_ptr;
+            lai_rc_ref(&object->pkg_ptr->rc);
             break;
         default:
             lai_panic("object type %d is not valid for lai_alias_object()", object->type);
@@ -301,6 +305,7 @@ void lai_alias_operand(lai_state_t *state, lai_object_t *object, lai_object_t *r
         case LAI_PACKAGE:
             ref->type = LAI_PACKAGE_REFERENCE;
             ref->pkg_ptr = object->pkg_ptr;
+            lai_rc_ref(&object->pkg_ptr->rc);
             break;
         case LAI_ARG_NAME:
             lai_alias_object(ref, &state->arg[object->index]);
