@@ -145,8 +145,20 @@ void lai_move_object(lai_object_t *destination, lai_object_t *source) {
 }
 
 static void lai_assign_object(lai_object_t *dest, lai_object_t *src) {
-    // TODO: This has to handle reference counting in the future.
+    // Make a local shallow copy of the AML object.
     lai_object_t temp = *src;
+    switch (src->type) {
+        case LAI_STRING:
+            lai_rc_ref(&src->string_ptr->rc);
+            break;
+        case LAI_BUFFER:
+            lai_rc_ref(&src->buffer_ptr->rc);
+            break;
+        case LAI_PACKAGE:
+            lai_rc_ref(&src->pkg_ptr->rc);
+            break;
+    }
+
     lai_move_object(dest, &temp);
 }
 
