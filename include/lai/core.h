@@ -19,6 +19,10 @@ void *memmove(void *, const void *, size_t);
 void *memset(void *, int, size_t);
 int memcmp(const void *, const void *, size_t);
 
+void lai_debug(const char *, ...);
+void lai_warn(const char *, ...);
+__attribute__((noreturn)) void lai_panic(const char *, ...);
+
 #define LAI_STRINGIFY(x) #x
 #define LAI_EXPAND_STRINGIFY(x) LAI_STRINGIFY(x)
 
@@ -74,6 +78,21 @@ int memcmp(const void *, const void *, size_t);
 #define LAI_BUFFER_REFERENCE  15
 #define LAI_PACKAGE_REFERENCE 16
 
+typedef int lai_rc_t;
+
+__attribute__((always_inline))
+inline void lai_rc_ref(lai_rc_t *rc_ptr) {
+    lai_rc_t nrefs = (*rc_ptr)++;
+    LAI_ENSURE(nrefs > 0);
+}
+
+__attribute__((always_inline))
+inline int lai_rc_unref(lai_rc_t *rc_ptr) {
+    lai_rc_t nrefs = --(*rc_ptr);
+    LAI_ENSURE(nrefs >= 0);
+    return !nrefs;
+}
+
 typedef struct lai_object_t
 {
     int type;
@@ -92,16 +111,18 @@ typedef struct lai_object_t
 } lai_object_t;
 
 struct lai_string_head {
-    unsigned int dummy;
+    lai_rc_t rc;
     char content[];
 };
 
 struct lai_buffer_head {
+    lai_rc_t rc;
     size_t size;
     uint8_t content[];
 };
 
 struct lai_pkg_head {
+    lai_rc_t rc;
     unsigned int size;
     struct lai_object_t elems[];
 };
