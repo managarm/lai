@@ -46,7 +46,7 @@ void lai_finalize_state(lai_state_t *state) {
 // Pushes a new item to the opstack and returns it.
 static lai_object_t *lai_exec_push_opstack_or_die(lai_state_t *state) {
     if (state->opstack_ptr == 16)
-        lai_panic("operand stack overflow\n");
+        lai_panic("operand stack overflow");
     lai_object_t *object = &state->opstack[state->opstack_ptr];
     memset(object, 0, sizeof(lai_object_t));
     state->opstack_ptr++;
@@ -71,7 +71,7 @@ static void lai_exec_pop_opstack(lai_state_t *state, int n) {
 static lai_stackitem_t *lai_exec_push_stack_or_die(lai_state_t *state) {
     state->stack_ptr++;
     if (state->stack_ptr == 16)
-        lai_panic("execution engine stack overflow\n");
+        lai_panic("execution engine stack overflow");
     return &state->stack[state->stack_ptr];
 }
 
@@ -122,7 +122,7 @@ static void lai_exec_update_context(lai_state_t *state) {
 static int lai_compare(lai_object_t *lhs, lai_object_t *rhs) {
     // TODO: Allow comparsions of strings and buffers as in the spec.
     if (lhs->type != LAI_INTEGER || rhs->type != LAI_INTEGER)
-        lai_panic("comparsion of object type %d with type %d is not implemented\n",
+        lai_panic("comparsion of object type %d with type %d is not implemented",
                 lhs->type, rhs->type);
     return lhs->integer - rhs->integer;
 }
@@ -131,7 +131,7 @@ static int lai_compare(lai_object_t *lhs, lai_object_t *rhs) {
 static void lai_exec_reduce(int opcode, lai_state_t *state, lai_object_t *operands,
         lai_object_t *reduction_res) {
     if (debug_opcodes)
-        lai_debug("lai_exec_reduce: opcode 0x%02X\n", opcode);
+        lai_debug("lai_exec_reduce: opcode 0x%02X", opcode);
     lai_object_t result = {0};
     switch (opcode) {
     case STORE_OP:
@@ -456,19 +456,19 @@ static void lai_exec_reduce(int opcode, lai_state_t *state, lai_object_t *operan
     }
     case (EXTOP_PREFIX << 8) | ACQUIRE_OP:
     {
-        lai_debug("Acquire() is a stub\n");
+        lai_debug("Acquire() is a stub");
         result.type = LAI_INTEGER;
         result.integer = 1;
         break;
     }
     case (EXTOP_PREFIX << 8) | RELEASE_OP:
     {
-        lai_debug("Release() is a stub\n");
+        lai_debug("Release() is a stub");
         break;
     }
 
     default:
-        lai_panic("undefined opcode in lai_exec_reduce: %02X\n", opcode);
+        lai_panic("undefined opcode in lai_exec_reduce: %02X", opcode);
     }
 
     lai_move_object(reduction_res, &result);
@@ -499,12 +499,12 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state) {
     		}
 
             if (state->pc > item->ctx_limit) // This would be an interpreter bug.
-                lai_panic("namespace population escaped out of code range\n");
+                lai_panic("namespace population escaped out of code range");
         } else if(item->kind == LAI_METHOD_CONTEXT_STACKITEM) {
     		// ACPI does an implicit Return(0) at the end of a control method.
     		if (state->pc == state->limit) {
     			if (state->opstack_ptr) // This is an internal error.
-    				lai_panic("opstack is not empty before return\n");
+    				lai_panic("opstack is not empty before return");
     			lai_object_t *result = lai_exec_push_opstack_or_die(state);
     			result->type = LAI_INTEGER;
     			result->integer = 0;
@@ -547,12 +547,12 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state) {
             }
 
             if (state->pc > item->pkg_end) // This would be an interpreter bug.
-                lai_panic("package initializer escaped out of code range\n");
+                lai_panic("package initializer escaped out of code range");
 
             exec_result_mode = LAI_DATA_MODE;
         } else if (item->kind == LAI_OP_STACKITEM) {
             int k = state->opstack_ptr - item->opstack_frame;
-//            lai_debug("got %d parameters\n", k);
+//            lai_debug("got %d parameters", k);
             if (!item->op_arg_modes[k]) {
                 lai_object_t result = {0};
                 lai_object_t *operands = lai_exec_get_opstack(state, item->opstack_frame);
@@ -589,7 +589,7 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state) {
             }
 
             if (state->pc > item->loop_end) // This would be an interpreter bug.
-                lai_panic("execution escaped out of While() body\n");
+                lai_panic("execution escaped out of While() body");
         } else if (item->kind == LAI_COND_STACKITEM) {
             // If the condition wasn't taken, execute the Else() block if it exists
             if (!item->cond_taken) {
@@ -617,10 +617,10 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state) {
                 continue;
             }
         } else
-            lai_panic("unexpected lai_stackitem_t\n");
+            lai_panic("unexpected lai_stackitem_t");
 
         if (state->pc >= state->limit) // This would be an interpreter bug.
-            lai_panic("execution escaped out of code range (PC is 0x%x with limit 0x%x)\n",
+            lai_panic("execution escaped out of code range (PC is 0x%x with limit 0x%x)",
                     state->pc, state->limit);
 
         lai_stackitem_t *ctx_item = lai_exec_context(state);
@@ -642,7 +642,7 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state) {
 
             if (exec_result_mode == LAI_DATA_MODE || exec_result_mode == LAI_TARGET_MODE) {
                 if (debug_opcodes)
-                    lai_debug("parsing name %s [@ %d]\n", unresolved.name, opcode_pc);
+                    lai_debug("parsing name %s [@ %d]", unresolved.name, opcode_pc);
 
                 lai_object_t *opstack_res = lai_exec_push_opstack_or_die(state);
                 lai_move_object(opstack_res, &unresolved);
@@ -651,12 +651,12 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state) {
                            || exec_result_mode == LAI_EXEC_MODE);
                 lai_nsnode_t *handle = lai_exec_resolve(unresolved.name);
                 if (!handle)
-                    lai_panic("undefined reference %s in object mode\n", unresolved.name);
+                    lai_panic("undefined reference %s in object mode", unresolved.name);
 
                 lai_object_t result = {0};
                 if(handle->type == LAI_NAMESPACE_METHOD) {
                     if (debug_opcodes)
-                        lai_debug("parsing invocation %s [@ %d]\n", unresolved.name, opcode_pc);
+                        lai_debug("parsing invocation %s [@ %d]", unresolved.name, opcode_pc);
 
                     lai_state_t nested_state;
                     lai_init_state(&nested_state);
@@ -669,7 +669,7 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state) {
                     lai_finalize_state(&nested_state);
                 } else {
                     if (debug_opcodes)
-                        lai_debug("parsing name %s [@ %d]\n", unresolved.name, opcode_pc);
+                        lai_debug("parsing name %s [@ %d]", unresolved.name, opcode_pc);
 
                     lai_load_ns(handle, &result);
                 }
@@ -687,12 +687,12 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state) {
         int opcode;
         if (method[state->pc] == EXTOP_PREFIX) {
             if (state->pc + 1 == state->limit)
-                lai_panic("two-byte opcode on method boundary\n");
+                lai_panic("two-byte opcode on method boundary");
             opcode = (EXTOP_PREFIX << 8) | method[state->pc + 1];
         } else
             opcode = method[state->pc];
         if (debug_opcodes)
-            lai_debug("parsing opcode 0x%02x [@ %d]\n", opcode, opcode_pc);
+            lai_debug("parsing opcode 0x%02x [@ %d]", opcode, opcode_pc);
 
         // This switch handles the majority of all opcodes.
         switch (opcode) {
@@ -710,7 +710,7 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state) {
                 lai_object_t *result = lai_exec_push_opstack_or_die(state);
                 result->type = LAI_NULL_NAME;
             } else {
-                lai_warn("Zero() in execution mode has no effect\n");
+                lai_warn("Zero() in execution mode has no effect");
                 LAI_ENSURE(exec_result_mode == LAI_EXEC_MODE);
             }
             state->pc++;
@@ -742,7 +742,7 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state) {
             uint64_t integer;
             size_t integer_size = lai_eval_integer(method + state->pc, &integer);
             if (!integer_size)
-                lai_panic("failed to parse integer opcode\n");
+                lai_panic("failed to parse integer opcode");
             if (exec_result_mode == LAI_DATA_MODE || exec_result_mode == LAI_OBJECT_MODE) {
                 lai_object_t *result = lai_exec_push_opstack_or_die(state);
                 result->type = LAI_INTEGER;
@@ -796,9 +796,9 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state) {
 
             int initial_size = (opcode_pc + encoded_size + 1) - state->pc;
             if (initial_size < 0)
-                lai_panic("buffer initializer has negative size\n");
+                lai_panic("buffer initializer has negative size");
             if (initial_size > result.buffer_size)
-                lai_panic("buffer initializer overflows buffer\n");
+                lai_panic("buffer initializer overflows buffer");
             memcpy(result.buffer, method + state->pc, initial_size);
             state->pc += initial_size;
 
@@ -859,7 +859,7 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state) {
             while (1) {
                 method_item = lai_exec_peek_stack(state, j);
                 if (!method_item)
-                    lai_panic("Return() outside of control method()\n");
+                    lai_panic("Return() outside of control method()");
                 if (method_item->kind == LAI_METHOD_CONTEXT_STACKITEM)
                     break;
                 // TODO: Verify that we only cross conditions/loops.
@@ -868,7 +868,7 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state) {
 
             // Remove the method stack item and push the return value.
             if (state->opstack_ptr) // This is an internal error.
-                lai_panic("opstack is not empty before return\n");
+                lai_panic("opstack is not empty before return");
             lai_object_t *opstack_res = lai_exec_push_opstack_or_die(state);
             lai_move_object(opstack_res, &result);
 
@@ -898,7 +898,7 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state) {
             while (1) {
                 loop_item = lai_exec_peek_stack(state, j);
                 if (!loop_item)
-                    lai_panic("Continue() outside of While()\n");
+                    lai_panic("Continue() outside of While()");
                 if (loop_item->kind == LAI_LOOP_STACKITEM)
                     break;
                 // TODO: Verify that we only cross conditions/loops.
@@ -919,7 +919,7 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state) {
             while (1) {
                 loop_item = lai_exec_peek_stack(state, j);
                 if (!loop_item)
-                    lai_panic("Break() outside of While()\n");
+                    lai_panic("Break() outside of While()");
                 if (loop_item->kind == LAI_LOOP_STACKITEM)
                     break;
                 // TODO: Verify that we only cross conditions/loops.
@@ -953,7 +953,7 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state) {
             break;
         }
         case ELSE_OP:
-            lai_panic("Else() outside of If()\n");
+            lai_panic("Else() outside of If()");
             break;
 
         // "Simple" objects in the ACPI namespace.
@@ -1343,7 +1343,7 @@ static int lai_exec_run(uint8_t *method, lai_state_t *state) {
         }
 
         default:
-            lai_panic("unexpected opcode in lai_exec_run(), sequence %02X %02X %02X %02X\n",
+            lai_panic("unexpected opcode in lai_exec_run(), sequence %02X %02X %02X %02X",
                     method[state->pc + 0], method[state->pc + 1],
                     method[state->pc + 2], method[state->pc + 3]);
         }
@@ -1363,7 +1363,7 @@ int lai_populate(lai_nsnode_t *parent, void *data, size_t size, lai_state_t *sta
     state->limit = size;
     int status = lai_exec_run(data, state);
     if (status)
-        lai_panic("lai_exec_run() failed in lai_populate()\n");
+        lai_panic("lai_exec_run() failed in lai_populate()");
     return 0;
 }
 
@@ -1378,7 +1378,7 @@ int lai_exec_method(lai_nsnode_t *method, lai_state_t *state) {
         return method->method_override(state->arg, &state->retvalue);
 
     // Okay, by here it's a real method.
-    //lai_debug("execute control method %s\n", method->path);
+    //lai_debug("execute control method %s", method->path);
     lai_stackitem_t *item = lai_exec_push_stack_or_die(state);
     item->kind = LAI_METHOD_CONTEXT_STACKITEM;
     item->ctx_handle = method;
@@ -1393,16 +1393,16 @@ int lai_exec_method(lai_nsnode_t *method, lai_state_t *state) {
     /*lai_debug("%s finished, ", method->path);
 
     if(state->retvalue.type == LAI_INTEGER)
-        lai_debug("return value is integer: %d\n", state->retvalue.integer);
+        lai_debug("return value is integer: %d", state->retvalue.integer);
     else if(state->retvalue.type == LAI_STRING)
-        lai_debug("return value is string: '%s'\n", state->retvalue.string);
+        lai_debug("return value is string: '%s'", state->retvalue.string);
     else if(state->retvalue.type == LAI_PACKAGE)
-        lai_debug("return value is package\n");
+        lai_debug("return value is package");
     else if(state->retvalue.type == LAI_BUFFER)
-        lai_debug("return value is buffer\n");*/
+        lai_debug("return value is buffer");*/
 
     if (state->opstack_ptr != 1) // This would be an internal error.
-        lai_panic("expected exactly one return value after method invocation\n");
+        lai_panic("expected exactly one return value after method invocation");
     lai_object_t *result = lai_exec_get_opstack(state, 0);
     lai_move_object(&state->retvalue, result);
     lai_exec_pop_opstack(state, 1);
@@ -1444,10 +1444,10 @@ void lai_eval_operand(lai_object_t *destination, lai_state_t *state, uint8_t *co
 
     int status = lai_exec_run(code, state);
     if (status)
-        lai_panic("lai_exec_run() failed in lai_eval_operand()\n");
+        lai_panic("lai_exec_run() failed in lai_eval_operand()");
 
     if (state->opstack_ptr != opstack + 1) // This would be an internal error.
-        lai_panic("expected exactly one opstack item after operand evaluation\n");
+        lai_panic("expected exactly one opstack item after operand evaluation");
     lai_object_t *result = lai_exec_get_opstack(state, opstack);
     lai_load_operand(state, result, destination);
     lai_exec_pop_opstack(state, 1);
@@ -1467,7 +1467,7 @@ void lai_exec_sleep(void *code, lai_state_t *state) {
         time.integer = 1;
 
     if (!laihost_sleep)
-        lai_panic("host does not provide timer functions required by Sleep()\n");
+        lai_panic("host does not provide timer functions required by Sleep()");
     laihost_sleep(time.integer);
 }
 

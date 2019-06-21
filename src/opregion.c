@@ -346,7 +346,7 @@ void lai_write_field(lai_nsnode_t *field, lai_object_t *source) {
                 break;
             case FIELD_WORD_ACCESS:
                 laihost_outw(opregion->op_base + offset, (uint16_t)value);
-                //lai_debug("wrote 0x%X to I/O port 0x%X\n", (uint16_t)value, opregion->op_base + offset);
+                //lai_debug("wrote 0x%X to I/O port 0x%X", (uint16_t)value, opregion->op_base + offset);
                 break;
             case FIELD_DWORD_ACCESS:
             case FIELD_ANY_ACCESS:
@@ -386,7 +386,7 @@ void lai_write_field(lai_nsnode_t *field, lai_object_t *source) {
             case FIELD_QWORD_ACCESS:
                 mmio_qword = (uint64_t*)mmio;
                 mmio_qword[0] = value;
-                //lai_debug("wrote 0x%lX to MMIO address 0x%lX\n", value, opregion->op_base + offset);
+                //lai_debug("wrote 0x%lX to MMIO address 0x%lX", value, opregion->op_base + offset);
                 break;
             default:
                 lai_panic("undefined field flags 0x%02X", field->field_flags);
@@ -439,7 +439,7 @@ void lai_write_indexfield(lai_nsnode_t *indexfield, lai_object_t *source) {
 
     field = lai_resolve(indexfield->indexfield_data);
     if (!field) {
-        lai_panic("undefined reference %s\n", indexfield->indexfield_data);
+        lai_panic("undefined reference %s", indexfield->indexfield_data);
     }
 
     lai_write_field(field, source);    // the data register

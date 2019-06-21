@@ -21,7 +21,7 @@
 // This function resolves PCI IRQ routing for a specific device corresponding to
 // a given bus, slot, function combination.
 int lai_pci_route(acpi_resource_t *dest, uint8_t bus, uint8_t slot, uint8_t function) {
-    //lai_debug("attempt to resolve PCI IRQ for device %X:%X:%X\n", bus, slot, function);
+    //lai_debug("attempt to resolve PCI IRQ for device %X:%X:%X", bus, slot, function);
 
     // determine the interrupt pin
     uint8_t pin = (uint8_t)(laihost_pci_read(bus, slot, function, 0x3C) >> 8);

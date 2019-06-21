@@ -19,11 +19,11 @@
 int lai_enter_sleep(uint8_t state)
 {
     if(!laihost_inw || !laihost_outw)
-        lai_panic("lai_enter_sleep() requires port I/O\n");
+        lai_panic("lai_enter_sleep() requires port I/O");
 
     if(state > 5)
     {
-        lai_debug("undefined sleep state S%d\n", state);
+        lai_debug("undefined sleep state S%d", state);
         return 1;
     }
 
@@ -34,7 +34,7 @@ int lai_enter_sleep(uint8_t state)
     lai_nsnode_t *handle = lai_resolve((char*)sleep_object);
     if(!handle)
     {
-        lai_debug("sleep state S%d is not supported.\n", state);
+        lai_debug("sleep state S%d is not supported.", state);
         return 1;
     }
 
@@ -45,11 +45,11 @@ int lai_enter_sleep(uint8_t state)
     eval_status = lai_eval(&package, handle->path);
     if(eval_status != 0)
     {
-        lai_debug("sleep state S%d is not supported.\n", state);
+        lai_debug("sleep state S%d is not supported.", state);
         return 1;
     }
 
-    lai_debug("entering sleep state S%d...\n", state);
+    lai_debug("entering sleep state S%d...", state);
 
     // ACPI spec says we should call _PTS() and _GTS() before actually sleeping
     // Who knows, it might do some required firmware-specific stuff
@@ -64,7 +64,7 @@ int lai_enter_sleep(uint8_t state)
         lai_arg(&acpi_state, 0)->type = LAI_INTEGER;
         lai_arg(&acpi_state, 0)->integer = (uint64_t)state & 0xFF;
 
-        lai_debug("execute _PTS(%d)\n", state);
+        lai_debug("execute _PTS(%d)", state);
         lai_exec_method(handle, &acpi_state);
         lai_finalize_state(&acpi_state);
     }
@@ -79,7 +79,7 @@ int lai_enter_sleep(uint8_t state)
         lai_arg(&acpi_state, 0)->type = LAI_INTEGER;
         lai_arg(&acpi_state, 0)->integer = (uint64_t)state & 0xFF;
 
-        lai_debug("execute _GTS(%d)\n", state);
+        lai_debug("execute _GTS(%d)", state);
         lai_exec_method(handle, &acpi_state);
         lai_finalize_state(&acpi_state);
     }

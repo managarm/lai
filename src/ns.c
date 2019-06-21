@@ -68,7 +68,7 @@ void lai_install_nsnode(lai_nsnode_t *node) {
         lai_ns_capacity = new_capacity;
     }
 
-    /*lai_debug("created %s\n", node->path);*/
+    /*lai_debug("created %s", node->path);*/
     lai_namespace[lai_ns_size++] = node;
 }
 
@@ -383,7 +383,7 @@ size_t lai_create_alias(lai_nsnode_t *parent, void *data) {
 
     name_size = lai_resolve_path(parent, node->path, alias);
 
-    //lai_debug("alias %s for object %s\n", node->path, node->alias);
+    //lai_debug("alias %s for object %s", node->path, node->alias);
 
     lai_install_nsnode(node);
     return_size += name_size;
@@ -444,7 +444,7 @@ size_t lai_create_indexfield(lai_nsnode_t *parent, void *data) {
             byte_count += skip_size;
         }
 
-        //lai_debug("indexfield %c%c%c%c: size %d bits, at bit offset %d\n", indexfield[0], indexfield[1], indexfield[2], indexfield[3], indexfield[4], current_offset);
+        //lai_debug("indexfield %c%c%c%c: size %d bits, at bit offset %d", indexfield[0], indexfield[1], indexfield[2], indexfield[3], indexfield[4], current_offset);
         lai_nsnode_t *node = lai_create_nsnode_or_die();
         node->type = LAI_NAMESPACE_INDEXFIELD;
         // FIXME: This looks odd. Why don't we all acpins_resolve_path()?

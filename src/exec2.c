@@ -119,7 +119,7 @@ static void lai_clone_buffer(lai_object_t *destination, lai_object_t *source) {
     destination->buffer_size = source->buffer_size;
     destination->buffer = laihost_malloc(source->buffer_size);
     if (!destination->buffer)
-        lai_panic("unable to allocate memory for buffer object.\n");
+        lai_panic("unable to allocate memory for buffer object.");
 
     memcpy(destination->buffer, source->buffer, source->buffer_size);
 }
@@ -133,7 +133,7 @@ static void lai_clone_string(lai_object_t *destination, lai_object_t *source) {
     destination->type = LAI_STRING;
     destination->string = laihost_malloc(lai_strlen(source->string) + 1);
     if (!destination->string)
-        lai_panic("unable to allocate memory for string object.\n");
+        lai_panic("unable to allocate memory for string object.");
 
     lai_strcpy(destination->string, source->string);
 }
@@ -148,7 +148,7 @@ static void lai_clone_package(lai_object_t *dest, lai_object_t *src) {
     dest->pkg_ptr = laihost_malloc(sizeof(struct lai_pkg_head)
             + src->pkg_ptr->size * sizeof(lai_object_t));
     if (!dest->pkg_ptr)
-        lai_panic("unable to allocate memory for package object.\n");
+        lai_panic("unable to allocate memory for package object.");
     dest->pkg_ptr->size = src->pkg_ptr->size;
 
     for (int i = 0; i < src->pkg_ptr->size; i++) {
@@ -304,7 +304,7 @@ void lai_load_operand(lai_state_t *state, lai_object_t *source, lai_object_t *ob
         {
             lai_nsnode_t *handle = lai_exec_resolve(source->name);
             if (!handle)
-                lai_panic("undefined reference %s\n", source->name);
+                lai_panic("undefined reference %s", source->name);
             lai_load_ns(handle, object);
             break;
         }
