@@ -349,6 +349,7 @@ static void lai_exec_reduce(int opcode, lai_state_t *state, lai_object_t *operan
                     lai_panic("string Index() out of bounds");
                 result.type = LAI_STRING_INDEX;
                 result.string_ptr = storage.string_ptr;
+                lai_rc_ref(&storage.string_ptr->rc);
                 result.integer = n;
                 break;
             case LAI_BUFFER_REFERENCE:

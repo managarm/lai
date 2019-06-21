@@ -62,6 +62,7 @@ int lai_create_string(lai_object_t *object, size_t length) {
     object->string_ptr = laihost_malloc(sizeof(struct lai_string_head) + length + 1);
     if (!object->string_ptr)
         return 1;
+    object->string_ptr->rc = 1;
     memset(object->string_ptr->content, 0, length + 1);
     return 0;
 }
@@ -109,7 +110,10 @@ static void laihost_free_package(lai_object_t *object) {
 }
 
 void lai_free_object(lai_object_t *object) {
-    if (object->type == LAI_BUFFER) {
+    if (object->type == LAI_STRING) {
+        if (lai_rc_unref(&object->string_ptr->rc))
+            laihost_free(object->string_ptr);
+    }else if (object->type == LAI_BUFFER) {
         if (lai_rc_unref(&object->buffer_ptr->rc))
             laihost_free(object->buffer_ptr);
     }else if (object->type == LAI_PACKAGE)
@@ -230,6 +234,7 @@ void lai_alias_object(lai_object_t *alias, lai_object_t *object) {
         case LAI_STRING:
             alias->type = LAI_STRING_REFERENCE;
             alias->string_ptr = object->string_ptr;
+            lai_rc_ref(&object->string_ptr->rc);
             break;
         case LAI_BUFFER:
             alias->type = LAI_BUFFER_REFERENCE;
@@ -286,6 +291,7 @@ void lai_alias_operand(lai_state_t *state, lai_object_t *object, lai_object_t *r
         case LAI_STRING:
             ref->type = LAI_STRING_REFERENCE;
             ref->string_ptr = object->string_ptr;
+            lai_rc_ref(&object->string_ptr->rc);
             break;
         case LAI_BUFFER:
             ref->type = LAI_BUFFER_REFERENCE;
