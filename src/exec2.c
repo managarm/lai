@@ -169,12 +169,14 @@ size_t lai_exec_string_length(lai_object_t *str) {
 }
 
 void lai_exec_pkg_load(lai_object_t *out, lai_object_t *pkg, size_t i) {
-    LAI_ENSURE(pkg->type == LAI_PACKAGE);
+    // TODO: We should probably be more strict and not allow references here.
+    LAI_ENSURE(pkg->type == LAI_PACKAGE || pkg->type == LAI_PACKAGE_REFERENCE);
     lai_assign_object(out, &pkg->pkg_ptr->elems[i]);
 }
 
 void lai_exec_pkg_store(lai_object_t *in, lai_object_t *pkg, size_t i) {
-    LAI_ENSURE(pkg->type == LAI_PACKAGE);
+    // TODO: We should probably be more strict and not allow references here.
+    LAI_ENSURE(pkg->type == LAI_PACKAGE || pkg->type == LAI_PACKAGE_REFERENCE);
     lai_assign_object(&pkg->pkg_ptr->elems[i], in);
 }
 
