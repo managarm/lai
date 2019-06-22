@@ -190,6 +190,7 @@ void lai_create_namespace(void) {
         lai_init_state(&state);
         lai_populate(NULL, ssdt_amls, &state);
         lai_finalize_state(&state);
+        index++;
     }
 
     // The PSDT is treated the same way as the SSDT.
@@ -201,6 +202,7 @@ void lai_create_namespace(void) {
         lai_init_state(&state);
         lai_populate(NULL, psdt_amls, &state);
         lai_finalize_state(&state);
+        index++;
     }
 
     lai_debug("ACPI namespace created, total of %d predefined objects.", lai_ns_size);
