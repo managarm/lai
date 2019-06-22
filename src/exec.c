@@ -417,18 +417,20 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, lai_object_t *ope
         lai_load_object_clone(state, &operands[0], &ref);
 
         switch (ref.type) {
-            case LAI_STRING_INDEX:
+            case LAI_STRING_INDEX: {
+                char *window = ref.string_ptr->content;
                 result.type = LAI_INTEGER;
-                result.integer = lai_exec_string_access(&ref)[ref.integer];
+                result.integer = window[ref.integer];
                 break;
+            }
             case LAI_BUFFER_INDEX: {
-                uint8_t *window = lai_exec_buffer_access(&ref);
+                uint8_t *window = ref.buffer_ptr->content;
                 result.type = LAI_INTEGER;
                 result.integer = window[ref.integer];
                 break;
             }
             case LAI_PACKAGE_INDEX:
-                lai_exec_pkg_load(&result, &ref, ref.integer);
+                lai_exec_pkg_var_load(&result, ref.pkg_ptr, ref.integer);
                 break;
             default:
                 lai_panic("DeRefOf() is only defined for references");

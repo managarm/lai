@@ -177,14 +177,14 @@ size_t lai_exec_string_length(lai_object_t *str) {
     return lai_strlen(str->string_ptr->content);
 }
 
-void lai_exec_pkg_load(lai_object_t *out, lai_object_t *pkg, size_t i) {
-    LAI_ENSURE(pkg->type == LAI_PACKAGE);
-    lai_assign_object(out, &pkg->pkg_ptr->elems[i]);
+// Note: This function exists to enable better GC and proper locking in the future.
+void lai_exec_pkg_var_load(lai_object_t *out, struct lai_pkg_head *head, size_t i) {
+    lai_assign_object(out, &head->elems[i]);
 }
 
-void lai_exec_pkg_store(lai_object_t *in, lai_object_t *pkg, size_t i) {
-    LAI_ENSURE(pkg->type == LAI_PACKAGE);
-    lai_assign_object(&pkg->pkg_ptr->elems[i], in);
+// Note: This function exists to enable better GC and proper locking in the future.
+void lai_exec_pkg_var_store(lai_object_t *in, struct lai_pkg_head *head, size_t i) {
+    lai_assign_object(&head->elems[i], in);
 }
 
 // lai_clone_buffer(): Clones a buffer object

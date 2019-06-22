@@ -132,24 +132,26 @@ struct lai_pkg_head {
 
 // Allows access to the contents of a string.
 __attribute__((always_inline))
-inline char *lai_exec_string_access(lai_object_t *object) {
-    return object->string_ptr->content;
+inline char *lai_exec_string_access(lai_object_t *str) {
+    LAI_ENSURE(str->type == LAI_STRING);
+    return str->string_ptr->content;
 }
 
 // Returns the size of a string.
-size_t lai_exec_string_length(lai_object_t *object);
+size_t lai_exec_string_length(lai_object_t *str);
 
 // Returns the size of a buffer.
 __attribute__((always_inline))
-inline size_t lai_exec_buffer_size(lai_object_t *object) {
-    // TODO: Ensure that this is a buffer.
-    return object->buffer_ptr->size;
+inline size_t lai_exec_buffer_size(lai_object_t *buffer) {
+    LAI_ENSURE(buffer->type == LAI_BUFFER);
+    return buffer->buffer_ptr->size;
 }
 
 // Allows access to the contents of a buffer.
 __attribute__((always_inline))
-inline void *lai_exec_buffer_access(lai_object_t *object) {
-    return object->buffer_ptr->content;
+inline void *lai_exec_buffer_access(lai_object_t *buffer) {
+    LAI_ENSURE(buffer->type == LAI_BUFFER);
+    return buffer->buffer_ptr->content;
 }
 
 // Returns the size of a package.
@@ -159,9 +161,21 @@ inline size_t lai_exec_pkg_size(lai_object_t *object) {
     return object->pkg_ptr->size;
 }
 
+// Helper functions for lai_exec_pkg_load()/lai_exec_pkg_store(), for internal interpreter use.
+void lai_exec_pkg_var_load(lai_object_t *out, struct lai_pkg_head *head, size_t i);
+void lai_exec_pkg_var_store(lai_object_t *in, struct lai_pkg_head *head, size_t i);
+
 // Load/store values from/to packages.
-void lai_exec_pkg_load(lai_object_t *out, lai_object_t *object, size_t i);
-void lai_exec_pkg_store(lai_object_t *in, lai_object_t *object, size_t i);
+__attribute__((always_inline))
+inline void lai_exec_pkg_load(lai_object_t *out, lai_object_t *pkg, size_t i) {
+    LAI_ENSURE(pkg->type == LAI_PACKAGE);
+    return lai_exec_pkg_var_load(out, pkg->pkg_ptr, i);
+}
+__attribute__((always_inline))
+inline void lai_exec_pkg_store(lai_object_t *in, lai_object_t *pkg, size_t i) {
+    LAI_ENSURE(pkg->type == LAI_PACKAGE);
+    return lai_exec_pkg_var_store(in, pkg->pkg_ptr, i);
+}
 
 typedef struct lai_nsnode_t
 {
