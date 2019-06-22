@@ -372,11 +372,14 @@ void lai_store_operand(lai_state_t *state, lai_object_t *target, lai_object_t *o
             // Stores to the null target are ignored.
             break;
         case LAI_STRING_INDEX:
-            lai_exec_string_access(target)[target->integer] = object->integer;
+        {
+            char *window = target->string_ptr->content;
+            window[target->integer] = object->integer;
             break;
+        }
         case LAI_BUFFER_INDEX:
         {
-            uint8_t *window = lai_exec_buffer_access(target);
+            uint8_t *window = target->buffer_ptr->content;
             window[target->integer] = object->integer;
             break;
         }
@@ -384,7 +387,7 @@ void lai_store_operand(lai_state_t *state, lai_object_t *target, lai_object_t *o
         {
             lai_object_t copy = {0};
             lai_copy_object(&copy, object);
-            lai_exec_pkg_store(&copy, target, target->integer);
+            lai_exec_pkg_var_store(&copy, target->pkg_ptr, target->integer);
             lai_free_object(&copy);
             break;
         }
