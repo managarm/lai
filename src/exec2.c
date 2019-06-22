@@ -404,14 +404,6 @@ void lai_get_objectref(lai_state_t *state, lai_object_t *src, lai_object_t *obje
     lai_move_object(object, &temp);
 }
 
-// Like lai_get_objectref() but returns an independent clone of the object.
-void lai_get_objectref_clone(lai_state_t *state, lai_object_t *src, lai_object_t *object) {
-    lai_object_t temp = {0};
-    lai_get_objectref(state, src, &temp);
-    lai_clone_object(object, &temp);
-    lai_free_object(&temp);
-}
-
 // Load an integer.
 // Returns immediate objects as-is.
 void lai_get_integer(lai_state_t *state, lai_object_t *src, lai_object_t *object) {
