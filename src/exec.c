@@ -154,7 +154,6 @@ static void lai_exec_reduce_node(int opcode, lai_state_t *state, lai_object_t *o
             }
             node->buffer_offset = offset.integer;
 
-            lai_debug("installing %s\n", node->path);
             lai_install_nsnode(node);
             break;
         }
