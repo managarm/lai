@@ -137,7 +137,7 @@ static void lai_exec_reduce_node(int opcode, lai_state_t *state, lai_object_t *o
         case DWORDFIELD_OP:
         case QWORDFIELD_OP: {
             lai_object_t offset = {0};
-            lai_load_object_clone(state, &operands[1], &offset);
+            lai_get_integer(state, &operands[1], &offset);
             LAI_ENSURE(operands[0].type == LAI_UNRESOLVED_NAME);
             LAI_ENSURE(operands[2].type == LAI_UNRESOLVED_NAME);
 
@@ -172,14 +172,15 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, lai_object_t *ope
         lai_debug("lai_exec_reduce_op: opcode 0x%02X", opcode);
     lai_object_t result = {0};
     switch (opcode) {
-    case STORE_OP:
-        lai_load_object_clone(state, &operands[0], &result);
+    case STORE_OP: {
+        lai_get_objectref_clone(state, &operands[0], &result);
         lai_store_operand(state, &operands[1], &result);
         break;
+    }
     case NOT_OP:
     {
         lai_object_t operand = {0};
-        lai_load_object_clone(state, operands, &operand);
+        lai_get_integer(state, operands, &operand);
 
         result.type = LAI_INTEGER;
         result.integer = ~operand.integer;
@@ -190,8 +191,8 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, lai_object_t *ope
     {
         lai_object_t lhs = {0};
         lai_object_t rhs = {0};
-        lai_load_object_clone(state, &operands[0], &lhs);
-        lai_load_object_clone(state, &operands[1], &rhs);
+        lai_get_integer(state, &operands[0], &lhs);
+        lai_get_integer(state, &operands[1], &rhs);
 
         result.type = LAI_INTEGER;
         result.integer = lhs.integer + rhs.integer;
@@ -202,8 +203,8 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, lai_object_t *ope
     {
         lai_object_t lhs = {0};
         lai_object_t rhs = {0};
-        lai_load_object_clone(state, &operands[0], &lhs);
-        lai_load_object_clone(state, &operands[1], &rhs);
+        lai_get_integer(state, &operands[0], &lhs);
+        lai_get_integer(state, &operands[1], &rhs);
 
         result.type = LAI_INTEGER;
         result.integer = lhs.integer - rhs.integer;
@@ -214,8 +215,8 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, lai_object_t *ope
     {
         lai_object_t lhs = {0};
         lai_object_t rhs = {0};
-        lai_load_object_clone(state, &operands[0], &lhs);
-        lai_load_object_clone(state, &operands[1], &rhs);
+        lai_get_integer(state, &operands[0], &lhs);
+        lai_get_integer(state, &operands[1], &rhs);
 
         result.type = LAI_INTEGER;
         result.integer = lhs.integer * rhs.integer;
@@ -226,8 +227,8 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, lai_object_t *ope
     {
         lai_object_t lhs = {0};
         lai_object_t rhs = {0};
-        lai_load_object_clone(state, &operands[0], &lhs);
-        lai_load_object_clone(state, &operands[1], &rhs);
+        lai_get_integer(state, &operands[0], &lhs);
+        lai_get_integer(state, &operands[1], &rhs);
 
         result.type = LAI_INTEGER;
         result.integer = lhs.integer & rhs.integer;
@@ -238,8 +239,8 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, lai_object_t *ope
     {
         lai_object_t lhs = {0};
         lai_object_t rhs = {0};
-        lai_load_object_clone(state, &operands[0], &lhs);
-        lai_load_object_clone(state, &operands[1], &rhs);
+        lai_get_integer(state, &operands[0], &lhs);
+        lai_get_integer(state, &operands[1], &rhs);
 
         result.type = LAI_INTEGER;
         result.integer = lhs.integer | rhs.integer;
@@ -250,8 +251,8 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, lai_object_t *ope
     {
         lai_object_t lhs = {0};
         lai_object_t rhs = {0};
-        lai_load_object_clone(state, &operands[0], &lhs);
-        lai_load_object_clone(state, &operands[1], &rhs);
+        lai_get_integer(state, &operands[0], &lhs);
+        lai_get_integer(state, &operands[1], &rhs);
 
         result.type = LAI_INTEGER;
         result.integer = lhs.integer ^ rhs.integer;
@@ -262,8 +263,8 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, lai_object_t *ope
     {
         lai_object_t lhs = {0};
         lai_object_t rhs = {0};
-        lai_load_object_clone(state, &operands[0], &lhs);
-        lai_load_object_clone(state, &operands[1], &rhs);
+        lai_get_integer(state, &operands[0], &lhs);
+        lai_get_integer(state, &operands[1], &rhs);
 
         result.type = LAI_INTEGER;
         result.integer = lhs.integer << rhs.integer;
@@ -274,8 +275,8 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, lai_object_t *ope
     {
         lai_object_t lhs = {0};
         lai_object_t rhs = {0};
-        lai_load_object_clone(state, &operands[0], &lhs);
-        lai_load_object_clone(state, &operands[1], &rhs);
+        lai_get_integer(state, &operands[0], &lhs);
+        lai_get_integer(state, &operands[1], &rhs);
 
         result.type = LAI_INTEGER;
         result.integer = lhs.integer >> rhs.integer;
@@ -286,8 +287,8 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, lai_object_t *ope
     {
         lai_object_t lhs = {0};
         lai_object_t rhs = {0};
-        lai_load_object_clone(state, &operands[0], &lhs);
-        lai_load_object_clone(state, &operands[1], &rhs);
+        lai_get_integer(state, &operands[0], &lhs);
+        lai_get_integer(state, &operands[1], &rhs);
 
         lai_object_t mod = {0};
         lai_object_t div = {0};
@@ -300,19 +301,19 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, lai_object_t *ope
         break;
     }
     case INCREMENT_OP:
-        lai_load_object_clone(state, operands, &result);
+        lai_get_integer(state, operands, &result);
         result.integer++;
         lai_store_operand(state, operands, &result);
         break;
     case DECREMENT_OP:
-        lai_load_object_clone(state, operands, &result);
+        lai_get_integer(state, operands, &result);
         result.integer--;
         lai_store_operand(state, operands, &result);
         break;
     case LNOT_OP:
     {
         lai_object_t operand = {0};
-        lai_load_object_clone(state, operands, &operand);
+        lai_get_integer(state, operands, &operand);
 
         result.type = LAI_INTEGER;
         result.integer = !operand.integer;
@@ -322,8 +323,8 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, lai_object_t *ope
     {
         lai_object_t lhs = {0};
         lai_object_t rhs = {0};
-        lai_load_object_clone(state, &operands[0], &lhs);
-        lai_load_object_clone(state, &operands[1], &rhs);
+        lai_get_integer(state, &operands[0], &lhs);
+        lai_get_integer(state, &operands[1], &rhs);
 
         result.type = LAI_INTEGER;
         result.integer = lhs.integer && rhs.integer;
@@ -333,8 +334,8 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, lai_object_t *ope
     {
         lai_object_t lhs = {0};
         lai_object_t rhs = {0};
-        lai_load_object_clone(state, &operands[0], &lhs);
-        lai_load_object_clone(state, &operands[1], &rhs);
+        lai_get_integer(state, &operands[0], &lhs);
+        lai_get_integer(state, &operands[1], &rhs);
 
         result.type = LAI_INTEGER;
         result.integer = lhs.integer || rhs.integer;
@@ -344,8 +345,8 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, lai_object_t *ope
     {
         lai_object_t lhs = {0};
         lai_object_t rhs = {0};
-        lai_load_object_clone(state, &operands[0], &lhs);
-        lai_load_object_clone(state, &operands[1], &rhs);
+        lai_get_integer(state, &operands[0], &lhs);
+        lai_get_integer(state, &operands[1], &rhs);
 
         result.type = LAI_INTEGER;
         result.integer = !lai_compare(&lhs, &rhs);
@@ -355,8 +356,8 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, lai_object_t *ope
     {
         lai_object_t lhs = {0};
         lai_object_t rhs = {0};
-        lai_load_object_clone(state, &operands[0], &lhs);
-        lai_load_object_clone(state, &operands[1], &rhs);
+        lai_get_integer(state, &operands[0], &lhs);
+        lai_get_integer(state, &operands[1], &rhs);
 
         result.type = LAI_INTEGER;
         result.integer = lai_compare(&lhs, &rhs) < 0;
@@ -366,8 +367,8 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, lai_object_t *ope
     {
         lai_object_t lhs = {0};
         lai_object_t rhs = {0};
-        lai_load_object_clone(state, &operands[0], &lhs);
-        lai_load_object_clone(state, &operands[1], &rhs);
+        lai_get_integer(state, &operands[0], &lhs);
+        lai_get_integer(state, &operands[1], &rhs);
 
         result.type = LAI_INTEGER;
         result.integer = lai_compare(&lhs, &rhs) > 0;
@@ -375,42 +376,42 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, lai_object_t *ope
     }
     case INDEX_OP:
     {
-        lai_object_t view = {0};
+        lai_object_t object = {0};
         lai_object_t index = {0};
-        lai_load_object_view(state, &operands[0], &view);
-        lai_load_object_clone(state, &operands[1], &index);
+        lai_get_objectref(state, &operands[0], &object);
+        lai_get_integer(state, &operands[1], &index);
         int n = index.integer;
 
-        switch (view.type) {
+        switch (object.type) {
             case LAI_STRING:
-                if (n >= lai_exec_string_length(&view))
+                if (n >= lai_exec_string_length(&object))
                     lai_panic("string Index() out of bounds");
                 result.type = LAI_STRING_INDEX;
-                result.string_ptr = view.string_ptr;
-                lai_rc_ref(&view.string_ptr->rc);
+                result.string_ptr = object.string_ptr;
+                lai_rc_ref(&object.string_ptr->rc);
                 result.integer = n;
                 break;
             case LAI_BUFFER:
-                if (n >= lai_exec_buffer_size(&view))
+                if (n >= lai_exec_buffer_size(&object))
                     lai_panic("buffer Index() out of bounds");
                 result.type = LAI_BUFFER_INDEX;
-                result.buffer_ptr = view.buffer_ptr;
-                lai_rc_ref(&view.buffer_ptr->rc);
+                result.buffer_ptr = object.buffer_ptr;
+                lai_rc_ref(&object.buffer_ptr->rc);
                 result.integer = n;
                 break;
             case LAI_PACKAGE:
-                if (n >= lai_exec_pkg_size(&view))
+                if (n >= lai_exec_pkg_size(&object))
                     lai_panic("package Index() out of bounds");
                 result.type = LAI_PACKAGE_INDEX;
-                result.pkg_ptr = view.pkg_ptr;
+                result.pkg_ptr = object.pkg_ptr;
                 result.integer = n;
-                lai_rc_ref(&view.pkg_ptr->rc);
+                lai_rc_ref(&object.pkg_ptr->rc);
                 break;
             default:
                 lai_panic("Index() is only defined for buffers, strings and packages"
-                        " but object of type %d was given", view.type);
+                        " but object of type %d was given", object.type);
         }
-        lai_free_object(&view);
+        lai_free_object(&object);
 
         lai_store_operand(state, &operands[2], &result);
         break;
@@ -418,7 +419,7 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, lai_object_t *ope
     case DEREF_OP:
     {
         lai_object_t ref = {0};
-        lai_load_object_clone(state, &operands[0], &ref);
+        lai_get_objectref(state, &operands[0], &ref);
 
         switch (ref.type) {
             case LAI_STRING_INDEX: {
@@ -445,7 +446,7 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, lai_object_t *ope
     case SIZEOF_OP:
     {
         lai_object_t object = {0};
-        lai_load_object_clone(state, &operands[0], &object);
+        lai_get_objectref(state, &operands[0], &object);
 
         switch (object.type) {
             case LAI_STRING:
@@ -1541,7 +1542,7 @@ static void lai_eval_operand(lai_object_t *destination, lai_state_t *state,
     if (state->opstack_ptr != opstack + 1) // This would be an internal error.
         lai_panic("expected exactly one opstack item after operand evaluation");
     lai_object_t *result = lai_exec_get_opstack(state, opstack);
-    lai_load_object_clone(state, result, destination);
+    lai_get_objectref_clone(state, result, destination);
     lai_exec_pop_opstack(state, 1);
 }
 
