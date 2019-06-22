@@ -435,15 +435,12 @@ void lai_store_operand(lai_state_t *state, lai_object_t *target, lai_object_t *o
 // Return:    Nothing
 
 void lai_write_buffer(lai_nsnode_t *handle, lai_object_t *source) {
-    lai_nsnode_t *buffer_handle;
-    buffer_handle = lai_resolve(handle->buffer);
-    if (!buffer_handle)
-        lai_panic("undefined reference %s", handle->buffer);
+    lai_nsnode_t *buffer_handle = handle->bf_node;
 
     uint64_t value = source->integer;
 
-    uint64_t offset = handle->buffer_offset / 8;
-    uint64_t bitshift = handle->buffer_offset % 8;
+    uint64_t offset = handle->bf_offset / 8;
+    uint64_t bitshift = handle->bf_offset % 8;
 
     value <<= bitshift;
 
@@ -452,21 +449,22 @@ void lai_write_buffer(lai_nsnode_t *handle, lai_object_t *source) {
     mask--;
     mask <<= bitshift;
 
+    // TODO: This function does unaligned access. That needs to be fixed!
     uint8_t *byte = (uint8_t*)(lai_exec_buffer_access(&buffer_handle->object) + offset);
     uint16_t *word = (uint16_t*)(lai_exec_buffer_access(&buffer_handle->object) + offset);
     uint32_t *dword = (uint32_t*)(lai_exec_buffer_access(&buffer_handle->object) + offset);
     uint64_t *qword = (uint64_t*)(lai_exec_buffer_access(&buffer_handle->object) + offset);
 
-    if (handle->buffer_size <= 8) {
+    if (handle->bf_size <= 8) {
         byte[0] &= (uint8_t)mask;
         byte[0] |= (uint8_t)value;
-    } else if (handle->buffer_size <= 16) {
+    } else if (handle->bf_size <= 16) {
         word[0] &= (uint16_t)mask;
         word[0] |= (uint16_t)value;
-    } else if (handle->buffer_size <= 32) {
+    } else if (handle->bf_size <= 32) {
         dword[0] &= (uint32_t)mask;
         dword[0] |= (uint32_t)value;
-    } else if (handle->buffer_size <= 64) {
+    } else if (handle->bf_size <= 64) {
         qword[0] &= mask;
         qword[0] |= value;
     }

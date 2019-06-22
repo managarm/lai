@@ -212,9 +212,13 @@ typedef struct lai_nsnode_t
 
     uint8_t cpu_id;            // for Processor
 
-    char buffer[ACPI_MAX_NAME];        // for Buffer field
-    uint64_t buffer_offset;        // for Buffer field, in bits
-    uint64_t buffer_size;        // for Buffer field, in bits
+    union {
+        struct { // LAI_NAMESPACE_BUFFER_FIELD.
+            struct lai_nsnode_t *bf_node;
+            uint64_t bf_offset; // In bits.
+            uint64_t bf_size;   // In bits.
+        };
+    };
 } lai_nsnode_t;
 
 #define LAI_POPULATE_CONTEXT_STACKITEM 1

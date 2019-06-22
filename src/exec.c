@@ -143,16 +143,20 @@ static void lai_exec_reduce_node(int opcode, lai_state_t *state, lai_object_t *o
 
             lai_nsnode_t *node = lai_create_nsnode_or_die();
             node->type = LAI_NAMESPACE_BUFFER_FIELD;
-            lai_strcpy(node->buffer, operands[0].name);
             lai_strcpy(node->path, operands[2].name);
 
+            lai_nsnode_t *buffer_node = lai_exec_resolve(operands[0].name);
+            if (!buffer_node)
+                lai_panic("could not resolve buffer %s", operands[0].name);
+            node->bf_node = buffer_node;
+
             switch (opcode) {
-                case BYTEFIELD_OP: node->buffer_size = 8; break;
-                case WORDFIELD_OP: node->buffer_size = 16; break;
-                case DWORDFIELD_OP: node->buffer_size = 32; break;
-                case QWORDFIELD_OP: node->buffer_size = 64; break;
+                case BYTEFIELD_OP: node->bf_size = 8; break;
+                case WORDFIELD_OP: node->bf_size = 16; break;
+                case DWORDFIELD_OP: node->bf_size = 32; break;
+                case QWORDFIELD_OP: node->bf_size = 64; break;
             }
-            node->buffer_offset = offset.integer;
+            node->bf_offset = offset.integer;
 
             lai_install_nsnode(node);
             break;
