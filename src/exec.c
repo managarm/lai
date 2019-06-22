@@ -724,7 +724,9 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
         } else
             opcode = method[state->pc];
         if (debug_opcodes) {
-            size_t table_pc = sizeof(acpi_header_t) + opcode_pc;
+            size_t table_pc = sizeof(acpi_header_t)
+                              + (method - amls->table->data)
+                              + opcode_pc;
             lai_debug("parsing opcode 0x%02x [0x%x @ %c%c%c%c %d]", opcode, table_pc,
                     amls->table->header.signature[0],
                     amls->table->header.signature[1],
