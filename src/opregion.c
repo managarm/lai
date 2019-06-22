@@ -41,17 +41,14 @@ void lai_write_opregion(lai_nsnode_t *field, lai_object_t *source) {
 }
 
 void lai_read_field(lai_object_t *destination, lai_nsnode_t *field) {
-    lai_nsnode_t *opregion;
-    opregion = lai_resolve(field->field_opregion);
-    if (!opregion)
-        lai_panic("Field: %s, OpRegion %s doesn't exist.", field->path, field->field_opregion);
+    lai_nsnode_t *opregion = field->fld_region_node;
 
     uint64_t offset, value, mask;
     size_t bit_offset;
 
-    mask = ((uint64_t)1 << field->field_size);
+    mask = ((uint64_t)1 << field->fld_size);
     mask--;
-    offset = field->field_offset / 8;
+    offset = field->fld_offset / 8;
     void *mmio;
 
     // these are for PCI
@@ -62,39 +59,39 @@ void lai_read_field(lai_object_t *destination, lai_nsnode_t *field) {
     size_t pci_byte_offset;
 
     if (opregion->op_address_space != OPREGION_PCI) {
-        switch (field->field_flags & 0x0F) {
+        switch (field->fld_flags & 0x0F) {
             case FIELD_BYTE_ACCESS:
-                bit_offset = field->field_offset % 8;
+                bit_offset = field->fld_offset % 8;
                 break;
 
             case FIELD_WORD_ACCESS:
-                bit_offset = field->field_offset % 16;
+                bit_offset = field->fld_offset % 16;
                 offset &= (~1);        // clear lowest bit
                 break;
 
             case FIELD_DWORD_ACCESS:
             case FIELD_ANY_ACCESS:
-                bit_offset = field->field_offset % 32;
+                bit_offset = field->fld_offset % 32;
                 offset &= (~3);        // clear lowest two bits
                 break;
 
             case FIELD_QWORD_ACCESS:
-                bit_offset = field->field_offset % 64;
+                bit_offset = field->fld_offset % 64;
                 offset &= (~7);        // clear lowest three bits
                 break;
 
             default:
-                lai_panic("undefined field flags 0x%02x: %s", field->field_flags, field->path);
+                lai_panic("undefined field flags 0x%02x: %s", field->fld_flags, field->path);
         }
     } else {
-        bit_offset = field->field_offset % 32;
-        pci_byte_offset = field->field_offset % 4;
+        bit_offset = field->fld_offset % 32;
+        pci_byte_offset = field->fld_offset % 4;
     }
 
     // now read from either I/O ports, MMIO, or PCI config
     if (opregion->op_address_space == OPREGION_IO) {
         // I/O port
-        switch (field->field_flags & 0x0F) {
+        switch (field->fld_flags & 0x0F) {
             case FIELD_BYTE_ACCESS:
                 if (!laihost_inb)
                     lai_panic("host does not provide port I/O functions");
@@ -112,7 +109,7 @@ void lai_read_field(lai_object_t *destination, lai_nsnode_t *field) {
                 value = (uint64_t)laihost_ind(opregion->op_base + offset) >> bit_offset;
                 break;
             default:
-                lai_panic("undefined field flags 0x%02X: %s", field->field_flags, field->path);
+                lai_panic("undefined field flags 0x%02X: %s", field->fld_flags, field->path);
         }
     } else if (opregion->op_address_space == OPREGION_MEMORY) {
         // Memory-mapped I/O
@@ -124,7 +121,7 @@ void lai_read_field(lai_object_t *destination, lai_nsnode_t *field) {
         uint32_t *mmio_dword;
         uint64_t *mmio_qword;
 
-        switch (field->field_flags & 0x0F) {
+        switch (field->fld_flags & 0x0F) {
             case FIELD_BYTE_ACCESS:
                 mmio_byte = (uint8_t*)mmio;
                 value = (uint64_t)mmio_byte[0] >> bit_offset;
@@ -143,7 +140,7 @@ void lai_read_field(lai_object_t *destination, lai_nsnode_t *field) {
                 value = mmio_qword[0] >> bit_offset;
                 break;
             default:
-                lai_panic("undefined field flags 0x%02X: %s", field->field_flags, field->path);
+                lai_panic("undefined field flags 0x%02X: %s", field->fld_flags, field->path);
         }
     } else if (opregion->op_address_space == OPREGION_PCI) {
         // PCI bus number is in the _BBN object
@@ -186,18 +183,14 @@ void lai_read_field(lai_object_t *destination, lai_nsnode_t *field) {
 
 void lai_write_field(lai_nsnode_t *field, lai_object_t *source) {
     // determine the flags we need in order to write
-    lai_nsnode_t *opregion;
-    opregion = lai_resolve(field->field_opregion);
-    if (!opregion) {
-        lai_panic("Field %s, OpRegion %s doesn't exist.", field->path, field->field_opregion);
-    }
+    lai_nsnode_t *opregion = field->fld_region_node;
 
     uint64_t offset, value, mask;
     size_t bit_offset;
 
-    mask = ((uint64_t)1 << field->field_size);
+    mask = ((uint64_t)1 << field->fld_size);
     mask--;
-    offset = field->field_offset / 8;
+    offset = field->fld_offset / 8;
     void *mmio;
 
     // these are for PCI
@@ -208,39 +201,39 @@ void lai_write_field(lai_nsnode_t *field, lai_object_t *source) {
     size_t pci_byte_offset;
 
     if (opregion->op_address_space != OPREGION_PCI) {
-        switch (field->field_flags & 0x0F) {
+        switch (field->fld_flags & 0x0F) {
             case FIELD_BYTE_ACCESS:
-                bit_offset = field->field_offset % 8;
+                bit_offset = field->fld_offset % 8;
                 break;
 
             case FIELD_WORD_ACCESS:
-                bit_offset = field->field_offset % 16;
+                bit_offset = field->fld_offset % 16;
                 offset &= (~1);        // clear lowest bit
                 break;
 
             case FIELD_DWORD_ACCESS:
             case FIELD_ANY_ACCESS:
-                bit_offset = field->field_offset % 32;
+                bit_offset = field->fld_offset % 32;
                 offset &= (~3);        // clear lowest two bits
                 break;
 
             case FIELD_QWORD_ACCESS:
-                bit_offset = field->field_offset % 64;
+                bit_offset = field->fld_offset % 64;
                 offset &= (~7);        // clear lowest three bits
                 break;
 
             default:
-                lai_panic("undefined field flags 0x%02X: %s", field->field_flags, field->path);
+                lai_panic("undefined field flags 0x%02X: %s", field->fld_flags, field->path);
         }
     } else {
-        bit_offset = field->field_offset % 32;
-        pci_byte_offset = field->field_offset % 4;
+        bit_offset = field->fld_offset % 32;
+        pci_byte_offset = field->fld_offset % 4;
     }
 
     // read from the field
     if (opregion->op_address_space == OPREGION_IO) {
         // I/O port
-        switch (field->field_flags & 0x0F) {
+        switch (field->fld_flags & 0x0F) {
             case FIELD_BYTE_ACCESS:
                 if (!laihost_inb)
                     lai_panic("host does not provide port I/O functions");
@@ -258,7 +251,7 @@ void lai_write_field(lai_nsnode_t *field, lai_object_t *source) {
                 value = (uint64_t)laihost_ind(opregion->op_base + offset);
                 break;
             default:
-                lai_panic("undefined field flags 0x%02X: %s", field->field_flags, field->path);
+                lai_panic("undefined field flags 0x%02X: %s", field->fld_flags, field->path);
         }
     } else if (opregion->op_address_space == OPREGION_MEMORY) {
         // Memory-mapped I/O
@@ -270,7 +263,7 @@ void lai_write_field(lai_nsnode_t *field, lai_object_t *source) {
         uint32_t *mmio_dword;
         uint64_t *mmio_qword;
 
-        switch (field->field_flags & 0x0F) {
+        switch (field->fld_flags & 0x0F) {
             case FIELD_BYTE_ACCESS:
                 mmio_byte = (uint8_t *)mmio;
                 value = (uint64_t)mmio_byte[0];
@@ -289,7 +282,7 @@ void lai_write_field(lai_nsnode_t *field, lai_object_t *source) {
                 value = mmio_qword[0];
                 break;
             default:
-                lai_panic("undefined field flags 0x%02X: %s", field->field_flags, field->path);
+                lai_panic("undefined field flags 0x%02X: %s", field->fld_flags, field->path);
         }
     } else if (opregion->op_address_space == OPREGION_PCI) {
         // PCI bus number is in the _BBN object
@@ -325,10 +318,10 @@ void lai_write_field(lai_nsnode_t *field, lai_object_t *source) {
     }
 
     // now determine how we need to write to the field
-    if (((field->field_flags >> 5) & 0x0F) == FIELD_PRESERVE) {
+    if (((field->fld_flags >> 5) & 0x0F) == FIELD_PRESERVE) {
         value &= ~(mask << bit_offset);
         value |= (source->integer << bit_offset);
-    } else if (((field->field_flags >> 5) & 0x0F) == FIELD_WRITE_ONES) {
+    } else if (((field->fld_flags >> 5) & 0x0F) == FIELD_WRITE_ONES) {
         value = 0xFFFFFFFFFFFFFFFF;
         value &= ~(mask << bit_offset);
         value |= (source->integer << bit_offset);
@@ -340,7 +333,7 @@ void lai_write_field(lai_nsnode_t *field, lai_object_t *source) {
     // finally, write to the field
     if (opregion->op_address_space == OPREGION_IO) {
         // I/O port
-        switch (field->field_flags & 0x0F) {
+        switch (field->fld_flags & 0x0F) {
             case FIELD_BYTE_ACCESS:
                 laihost_outb(opregion->op_base + offset, (uint8_t)value);
                 break;
@@ -353,7 +346,7 @@ void lai_write_field(lai_nsnode_t *field, lai_object_t *source) {
                 laihost_outd(opregion->op_base + offset, (uint32_t)value);
                 break;
             default:
-                lai_panic("undefined field flags 0x%02X: %s", field->field_flags, field->path);
+                lai_panic("undefined field flags 0x%02X: %s", field->fld_flags, field->path);
         }
 
         // iowait() equivalent
@@ -369,7 +362,7 @@ void lai_write_field(lai_nsnode_t *field, lai_object_t *source) {
         uint32_t *mmio_dword;
         uint64_t *mmio_qword;
 
-        switch (field->field_flags & 0x0F) {
+        switch (field->fld_flags & 0x0F) {
             case FIELD_BYTE_ACCESS:
                 mmio_byte = (uint8_t*)mmio;
                 mmio_byte[0] = (uint8_t)value;
@@ -389,7 +382,7 @@ void lai_write_field(lai_nsnode_t *field, lai_object_t *source) {
                 //lai_debug("wrote 0x%lX to MMIO address 0x%lX", value, opregion->op_base + offset);
                 break;
             default:
-                lai_panic("undefined field flags 0x%02X", field->field_flags);
+                lai_panic("undefined field flags 0x%02X", field->fld_flags);
         }
     } else if (opregion->op_address_space == OPREGION_PCI) {
         if (!laihost_pci_write)

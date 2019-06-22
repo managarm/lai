@@ -192,11 +192,6 @@ typedef struct lai_nsnode_t
     uint64_t op_base;        // for OpRegions only
     uint64_t op_length;        // for OpRegions only
 
-    uint64_t field_offset;        // for Fields only, in bits
-    size_t field_size;        // for Fields only, in bits
-    uint8_t field_flags;        // for Fields only
-    char field_opregion[ACPI_MAX_NAME];    // for Fields only
-
     uint8_t method_flags;        // for Methods only, includes ARG_COUNT in lowest three bits
     // Allows the OS to override methods. Mainly useful for _OSI, _OS and _REV.
     int (*method_override)(lai_object_t *args, lai_object_t *result);
@@ -207,6 +202,12 @@ typedef struct lai_nsnode_t
     uint8_t cpu_id;            // for Processor
 
     union {
+        struct { // LAI_NAMESPACE_FIELD.
+            struct lai_nsnode_t *fld_region_node;
+            uint64_t fld_offset; // In bits.
+            size_t fld_size;     // In bits.
+            uint8_t fld_flags;
+        };
         struct { // LAI_NAMESPACE_INDEX_FIELD.
             uint64_t idxf_offset; // In bits.
             struct lai_nsnode_t *idxf_index_node;

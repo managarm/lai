@@ -244,6 +244,10 @@ size_t lai_create_field(lai_nsnode_t *parent, void *data) {
 
     name_size = lai_resolve_path(parent, opregion_name, field);
 
+    lai_nsnode_t *region_node = lai_resolve(opregion_name);
+    if (!region_node)
+        lai_panic("could not resolve region of Field()");
+
     opregion = lai_exec_resolve(opregion_name);
     if (!opregion) {
         lai_debug("error parsing field for non-existant OpRegion %s, ignoring...", opregion_name);
@@ -314,14 +318,14 @@ size_t lai_create_field(lai_nsnode_t *parent, void *data) {
         // FIXME: This looks odd. Why do we insert a dot in the middle of the path?
         /*node->path[lai_strlen(parent->path)] = '.';*/
 
-        lai_strcpy(node->field_opregion, opregion->path);
+        node->fld_region_node = region_node;
 
-        field_size = lai_parse_pkgsize(&field[0], &node->field_size);
+        field_size = lai_parse_pkgsize(&field[0], &node->fld_size);
 
-        node->field_flags = field_flags;
-        node->field_offset = current_offset;
+        node->fld_flags = field_flags;
+        node->fld_offset = current_offset;
 
-        current_offset += (uint64_t)node->field_size;
+        current_offset += (uint64_t)node->fld_size;
         lai_install_nsnode(node);
 
         field += field_size;
