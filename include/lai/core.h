@@ -74,10 +74,6 @@ __attribute__((noreturn)) void lai_panic(const char *, ...);
 #define LAI_ARG_NAME          12
 #define LAI_LOCAL_NAME        13
 #define LAI_DEBUG_NAME        14
-// Reference types: references to object storage.
-#define LAI_STRING_REFERENCE  15
-#define LAI_BUFFER_REFERENCE  16
-#define LAI_PACKAGE_REFERENCE 17
 
 typedef int lai_rc_t;
 

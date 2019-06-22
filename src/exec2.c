@@ -113,19 +113,16 @@ static void laihost_free_package(lai_object_t *object) {
 void lai_free_object(lai_object_t *object) {
     switch (object->type) {
         case LAI_STRING:
-        case LAI_STRING_REFERENCE:
         case LAI_STRING_INDEX:
             if (lai_rc_unref(&object->string_ptr->rc))
                 laihost_free(object->string_ptr);
             break;
         case LAI_BUFFER:
-        case LAI_BUFFER_REFERENCE:
         case LAI_BUFFER_INDEX:
             if (lai_rc_unref(&object->buffer_ptr->rc))
                 laihost_free(object->buffer_ptr);
             break;
         case LAI_PACKAGE:
-        case LAI_PACKAGE_REFERENCE:
         case LAI_PACKAGE_INDEX:
             if (lai_rc_unref(&object->pkg_ptr->rc))
                 laihost_free_package(object);
@@ -159,17 +156,14 @@ static void lai_assign_object(lai_object_t *dest, lai_object_t *src) {
     lai_object_t temp = *src;
     switch (src->type) {
         case LAI_STRING:
-        case LAI_STRING_REFERENCE:
         case LAI_STRING_INDEX:
             lai_rc_ref(&src->string_ptr->rc);
             break;
         case LAI_BUFFER:
-        case LAI_BUFFER_REFERENCE:
         case LAI_BUFFER_INDEX:
             lai_rc_ref(&src->buffer_ptr->rc);
             break;
         case LAI_PACKAGE:
-        case LAI_PACKAGE_REFERENCE:
         case LAI_PACKAGE_INDEX:
             lai_rc_ref(&src->pkg_ptr->rc);
             break;
@@ -179,20 +173,17 @@ static void lai_assign_object(lai_object_t *dest, lai_object_t *src) {
 }
 
 size_t lai_exec_string_length(lai_object_t *str) {
-    // TODO: We should probably be more strict and not allow references here.
-    LAI_ENSURE(str->type == LAI_STRING || str->type == LAI_STRING_REFERENCE);
+    LAI_ENSURE(str->type == LAI_STRING);
     return lai_strlen(str->string_ptr->content);
 }
 
 void lai_exec_pkg_load(lai_object_t *out, lai_object_t *pkg, size_t i) {
-    // TODO: We should probably be more strict and not allow references here.
-    LAI_ENSURE(pkg->type == LAI_PACKAGE || pkg->type == LAI_PACKAGE_REFERENCE);
+    LAI_ENSURE(pkg->type == LAI_PACKAGE);
     lai_assign_object(out, &pkg->pkg_ptr->elems[i]);
 }
 
 void lai_exec_pkg_store(lai_object_t *in, lai_object_t *pkg, size_t i) {
-    // TODO: We should probably be more strict and not allow references here.
-    LAI_ENSURE(pkg->type == LAI_PACKAGE || pkg->type == LAI_PACKAGE_REFERENCE);
+    LAI_ENSURE(pkg->type == LAI_PACKAGE);
     lai_assign_object(&pkg->pkg_ptr->elems[i], in);
 }
 
