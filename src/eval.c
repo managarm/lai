@@ -81,7 +81,7 @@ int lai_eval(lai_object_t *destination, char *path) {
     }
 
     if (handle->type == LAI_NAMESPACE_NAME) {
-        lai_copy_object(destination, &handle->object);
+        lai_clone_object(destination, &handle->object);
         return 0;
     } else if (handle->type == LAI_NAMESPACE_METHOD) {
         lai_state_t state;

@@ -36,14 +36,15 @@ int lai_create_buffer(lai_object_t *, size_t);
 int lai_create_pkg(lai_object_t *, size_t);
 
 void lai_load(lai_state_t *, lai_object_t *, lai_object_t *);
+void lai_store(lai_state_t *, lai_object_t *, lai_object_t *);
+
 void lai_get_objectref(lai_state_t *, lai_object_t *, lai_object_t *);
 void lai_get_objectref_clone(lai_state_t *, lai_object_t *, lai_object_t *);
 void lai_get_integer(lai_state_t *, lai_object_t *, lai_object_t *);
-void lai_store_operand(lai_state_t *, lai_object_t *, lai_object_t *);
 
 void lai_free_object(lai_object_t *);
 void lai_move_object(lai_object_t *, lai_object_t *);
-void lai_copy_object(lai_object_t *, lai_object_t *);
+void lai_clone_object(lai_object_t *, lai_object_t *);
 
 void lai_exec_sleep(struct lai_aml_segment *, void *, lai_state_t *);
 

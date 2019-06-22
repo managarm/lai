@@ -132,7 +132,7 @@ void lai_free_object(lai_object_t *object) {
     memset(object, 0, sizeof(lai_object_t));
 }
 
-// Helper function for lai_move_object() and lai_copy_object().
+// Helper function for lai_move_object() and lai_clone_object().
 void lai_swap_object(lai_object_t *first, lai_object_t *second) {
     lai_object_t temp = *first;
     *first = *second;
@@ -141,7 +141,7 @@ void lai_swap_object(lai_object_t *first, lai_object_t *second) {
 
 // lai_move_object(): Moves an object: instead of making a deep copy,
 //                     the pointers are exchanged and the source object is reset to zero.
-// Param & Return: See lai_copy_object().
+// Param & Return: See lai_clone_object().
 
 void lai_move_object(lai_object_t *destination, lai_object_t *source) {
     // Move-by-swap idiom. This handles move-to-self operations correctly.
@@ -221,15 +221,15 @@ static void lai_clone_package(lai_object_t *dest, lai_object_t *src) {
     if (lai_create_pkg(dest, n))
         lai_panic("unable to allocate memory for package object.");
     for (int i = 0; i < n; i++)
-        lai_copy_object(&dest->pkg_ptr->elems[i], &src->pkg_ptr->elems[i]);
+        lai_clone_object(&dest->pkg_ptr->elems[i], &src->pkg_ptr->elems[i]);
 }
 
-// lai_copy_object(): Copies an object
+// lai_clone_object(): Copies an object
 // Param:    lai_object_t *dest - destination
 // Param:    lai_object_t *source - source
 // Return:   Nothing
 
-void lai_copy_object(lai_object_t *dest, lai_object_t *source) {
+void lai_clone_object(lai_object_t *dest, lai_object_t *source) {
     // Clone into a temporary object.
     lai_object_t temp = {0};
     switch (source->type) {
@@ -315,6 +315,73 @@ void lai_load(lai_state_t *state, lai_object_t *src, lai_object_t *object) {
     }
 }
 
+// lai_store(): Stores a copy of the object to a reference.
+void lai_store(lai_state_t *state, lai_object_t *dest, lai_object_t *object) {
+    switch(dest->type) {
+        case LAI_NULL_NAME:
+            // Stores to the null target are ignored.
+            break;
+        case LAI_STRING_INDEX:
+        {
+            char *window = dest->string_ptr->content;
+            window[dest->integer] = object->integer;
+            break;
+        }
+        case LAI_BUFFER_INDEX:
+        {
+            uint8_t *window = dest->buffer_ptr->content;
+            window[dest->integer] = object->integer;
+            break;
+        }
+        case LAI_PACKAGE_INDEX:
+        {
+            lai_object_t copy = {0};
+            lai_assign_object(&copy, object);
+            lai_exec_pkg_var_store(&copy, dest->pkg_ptr, dest->integer);
+            lai_free_object(&copy);
+            break;
+        }
+        case LAI_UNRESOLVED_NAME:
+        {
+            lai_nsnode_t *handle = lai_exec_resolve(dest->name);
+            if(!handle)
+                lai_panic("undefined reference %s", dest->name);
+            lai_store_ns(handle, object);
+            break;
+        }
+        case LAI_RESOLVED_NAME:
+            lai_store_ns(dest->handle, object);
+            break;
+        case LAI_ARG_NAME:
+            lai_assign_object(&state->arg[dest->index], object);
+            break;
+        case LAI_LOCAL_NAME:
+            lai_assign_object(&state->local[dest->index], object);
+            break;
+        case LAI_DEBUG_NAME:
+            if(laihost_handle_amldebug)
+                laihost_handle_amldebug(object);
+            else {
+                switch (object->type) {
+                    case LAI_INTEGER:
+                        lai_debug("Debug(): integer(%ld)", object->integer);
+                        break;
+                    case LAI_STRING:
+                        lai_debug("Debug(): string(\"%s\")", lai_exec_string_access(object));
+                        break;
+                    case LAI_BUFFER:
+                        lai_debug("Debug(): buffer(%X)", (size_t)lai_exec_buffer_access(object));
+                        break;
+                    default:
+                        lai_debug("Debug(): type %d", object->type);
+                }
+            }
+            break;
+        default:
+            lai_panic("object type %d is not valid for lai_store()", dest->type);
+    }
+}
+
 // Load an object (i.e., integer, string, buffer, package) or reference.
 // This is the access method used by Store().
 // Returns immediate objects and indices as-is (i.e., without load from a name).
@@ -341,7 +408,7 @@ void lai_get_objectref(lai_state_t *state, lai_object_t *src, lai_object_t *obje
 void lai_get_objectref_clone(lai_state_t *state, lai_object_t *src, lai_object_t *object) {
     lai_object_t temp = {0};
     lai_get_objectref(state, src, &temp);
-    lai_copy_object(object, &temp);
+    lai_clone_object(object, &temp);
     lai_free_object(&temp);
 }
 
@@ -359,74 +426,6 @@ void lai_get_integer(lai_state_t *state, lai_object_t *src, lai_object_t *object
     if(temp.type != LAI_INTEGER)
         lai_panic("lai_load_integer() expects an integer, not a value of type %d", temp.type);
     lai_move_object(object, &temp);
-}
-
-// lai_store_operand(): Stores a copy of the object to a reference.
-
-void lai_store_operand(lai_state_t *state, lai_object_t *target, lai_object_t *object) {
-    switch(target->type) {
-        case LAI_NULL_NAME:
-            // Stores to the null target are ignored.
-            break;
-        case LAI_STRING_INDEX:
-        {
-            char *window = target->string_ptr->content;
-            window[target->integer] = object->integer;
-            break;
-        }
-        case LAI_BUFFER_INDEX:
-        {
-            uint8_t *window = target->buffer_ptr->content;
-            window[target->integer] = object->integer;
-            break;
-        }
-        case LAI_PACKAGE_INDEX:
-        {
-            lai_object_t copy = {0};
-            lai_copy_object(&copy, object);
-            lai_exec_pkg_var_store(&copy, target->pkg_ptr, target->integer);
-            lai_free_object(&copy);
-            break;
-        }
-        case LAI_UNRESOLVED_NAME:
-        {
-            lai_nsnode_t *handle = lai_exec_resolve(target->name);
-            if(!handle)
-                lai_panic("undefined reference %s", target->name);
-            lai_store_ns(handle, object);
-            break;
-        }
-        case LAI_RESOLVED_NAME:
-            lai_store_ns(target->handle, object);
-            break;
-        case LAI_ARG_NAME:
-            lai_copy_object(&state->arg[target->index], object);
-            break;
-        case LAI_LOCAL_NAME:
-            lai_copy_object(&state->local[target->index], object);
-            break;
-        case LAI_DEBUG_NAME:
-            if(laihost_handle_amldebug)
-                laihost_handle_amldebug(object);
-            else {
-                switch (object->type) {
-                    case LAI_INTEGER:
-                        lai_debug("Debug(): integer(%ld)", object->integer);
-                        break;
-                    case LAI_STRING:
-                        lai_debug("Debug(): string(\"%s\")", lai_exec_string_access(object));
-                        break;
-                    case LAI_BUFFER:
-                        lai_debug("Debug(): buffer(%X)", (size_t)lai_exec_buffer_access(object));
-                        break;
-                    default:
-                        lai_debug("Debug(): type %d", object->type);
-                }
-            }
-            break;
-        default:
-            lai_panic("object type %d is not valid for lai_store_operand()", target->type);
-        }
 }
 
 // lai_write_buffer(): Writes to a Buffer Field

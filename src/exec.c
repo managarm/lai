@@ -174,7 +174,13 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, lai_object_t *ope
     switch (opcode) {
     case STORE_OP: {
         lai_get_objectref_clone(state, &operands[0], &result);
-        lai_store_operand(state, &operands[1], &result);
+
+        // Store a copy to the target operand.
+        // TODO: Verify that we HAVE to make a copy.
+        lai_object_t temp = {0};
+        lai_clone_object(&temp, &result);
+        lai_store(state, &operands[1], &result);
+        lai_free_object(&temp);
         break;
     }
     case NOT_OP:
@@ -184,7 +190,7 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, lai_object_t *ope
 
         result.type = LAI_INTEGER;
         result.integer = ~operand.integer;
-        lai_store_operand(state, &operands[1], &result);
+        lai_store(state, &operands[1], &result);
         break;
     }
     case ADD_OP:
@@ -196,7 +202,7 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, lai_object_t *ope
 
         result.type = LAI_INTEGER;
         result.integer = lhs.integer + rhs.integer;
-        lai_store_operand(state, &operands[2], &result);
+        lai_store(state, &operands[2], &result);
         break;
     }
     case SUBTRACT_OP:
@@ -208,7 +214,7 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, lai_object_t *ope
 
         result.type = LAI_INTEGER;
         result.integer = lhs.integer - rhs.integer;
-        lai_store_operand(state, &operands[2], &result);
+        lai_store(state, &operands[2], &result);
         break;
     }
     case MULTIPLY_OP:
@@ -220,7 +226,7 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, lai_object_t *ope
 
         result.type = LAI_INTEGER;
         result.integer = lhs.integer * rhs.integer;
-        lai_store_operand(state, &operands[2], &result);
+        lai_store(state, &operands[2], &result);
         break;
     }
     case AND_OP:
@@ -232,7 +238,7 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, lai_object_t *ope
 
         result.type = LAI_INTEGER;
         result.integer = lhs.integer & rhs.integer;
-        lai_store_operand(state, &operands[2], &result);
+        lai_store(state, &operands[2], &result);
         break;
     }
     case OR_OP:
@@ -244,7 +250,7 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, lai_object_t *ope
 
         result.type = LAI_INTEGER;
         result.integer = lhs.integer | rhs.integer;
-        lai_store_operand(state, &operands[2], &result);
+        lai_store(state, &operands[2], &result);
         break;
     }
     case XOR_OP:
@@ -256,7 +262,7 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, lai_object_t *ope
 
         result.type = LAI_INTEGER;
         result.integer = lhs.integer ^ rhs.integer;
-        lai_store_operand(state, &operands[2], &result);
+        lai_store(state, &operands[2], &result);
         break;
     }
     case SHL_OP:
@@ -268,7 +274,7 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, lai_object_t *ope
 
         result.type = LAI_INTEGER;
         result.integer = lhs.integer << rhs.integer;
-        lai_store_operand(state, &operands[2], &result);
+        lai_store(state, &operands[2], &result);
         break;
     }
     case SHR_OP:
@@ -280,7 +286,7 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, lai_object_t *ope
 
         result.type = LAI_INTEGER;
         result.integer = lhs.integer >> rhs.integer;
-        lai_store_operand(state, &operands[2], &result);
+        lai_store(state, &operands[2], &result);
         break;
     }
     case DIVIDE_OP:
@@ -296,19 +302,19 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, lai_object_t *ope
         div.type = LAI_INTEGER;
         mod.integer = lhs.integer % rhs.integer;
         div.integer = lhs.integer / rhs.integer;
-        lai_store_operand(state, &operands[2], &mod);
-        lai_store_operand(state, &operands[3], &div);
+        lai_store(state, &operands[2], &mod);
+        lai_store(state, &operands[3], &div);
         break;
     }
     case INCREMENT_OP:
         lai_get_integer(state, operands, &result);
         result.integer++;
-        lai_store_operand(state, operands, &result);
+        lai_store(state, operands, &result);
         break;
     case DECREMENT_OP:
         lai_get_integer(state, operands, &result);
         result.integer--;
-        lai_store_operand(state, operands, &result);
+        lai_store(state, operands, &result);
         break;
     case LNOT_OP:
     {
@@ -413,7 +419,8 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, lai_object_t *ope
         }
         lai_free_object(&object);
 
-        lai_store_operand(state, &operands[2], &result);
+        // TODO: Verify that we do NOT have to make a copy.
+        lai_store(state, &operands[2], &result);
         break;
     }
     case DEREF_OP:
@@ -491,7 +498,7 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, lai_object_t *ope
         if (ref.type) {
             result.type = LAI_INTEGER;
             result.integer = 1;
-            lai_store_operand(state, target, &ref);
+            lai_store(state, target, &ref);
         } else {
             result.type = LAI_INTEGER;
             result.integer = 0;
@@ -1514,7 +1521,7 @@ int lai_eval_node(lai_nsnode_t *handle, lai_state_t *state) {
     }
 
     if (handle->type == LAI_NAMESPACE_NAME) {
-        lai_copy_object(&state->retvalue, &handle->object);
+        lai_clone_object(&state->retvalue, &handle->object);
         return 0;
     } else if (handle->type == LAI_NAMESPACE_METHOD) {
         return lai_exec_method(handle, state);
