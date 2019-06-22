@@ -173,14 +173,19 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, lai_object_t *ope
     lai_object_t result = {0};
     switch (opcode) {
     case STORE_OP: {
-        lai_get_objectref_clone(state, &operands[0], &result);
+        lai_object_t objectref = {0};
+        lai_object_t out = {0};
+        lai_get_objectref(state, &operands[0], &objectref);
+
+        lai_clone_object(&result, &objectref);
 
         // Store a copy to the target operand.
         // TODO: Verify that we HAVE to make a copy.
-        lai_object_t temp = {0};
-        lai_clone_object(&temp, &result);
+        lai_clone_object(&out, &result);
         lai_store(state, &operands[1], &result);
-        lai_free_object(&temp);
+
+        lai_free_object(&objectref);
+        lai_free_object(&out);
         break;
     }
     case NOT_OP:
@@ -1549,7 +1554,10 @@ static void lai_eval_operand(lai_object_t *destination, lai_state_t *state,
     if (state->opstack_ptr != opstack + 1) // This would be an internal error.
         lai_panic("expected exactly one opstack item after operand evaluation");
     lai_object_t *result = lai_exec_get_opstack(state, opstack);
-    lai_get_objectref_clone(state, result, destination);
+    lai_object_t objectref = {0};
+    lai_get_objectref(state, result, &objectref);
+    lai_clone_object(destination, &objectref);
+    lai_free_object(&objectref);
     lai_exec_pop_opstack(state, 1);
 }
 
