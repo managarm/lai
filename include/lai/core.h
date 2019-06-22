@@ -201,18 +201,19 @@ typedef struct lai_nsnode_t
     // Allows the OS to override methods. Mainly useful for _OSI, _OS and _REV.
     int (*method_override)(lai_object_t *args, lai_object_t *result);
 
-    uint64_t indexfield_offset;    // for IndexFields, in bits
-    char indexfield_index[ACPI_MAX_NAME];    // for IndexFields
-    char indexfield_data[ACPI_MAX_NAME];    // for IndexFields
-    uint8_t indexfield_flags;    // for IndexFields
-    uint8_t indexfield_size;    // for IndexFields
-
     // TODO: Find a good mechanism for locks.
     //lai_lock_t mutex;        // for Mutex
 
     uint8_t cpu_id;            // for Processor
 
     union {
+        struct { // LAI_NAMESPACE_INDEX_FIELD.
+            uint64_t idxf_offset; // In bits.
+            struct lai_nsnode_t *idxf_index_node;
+            struct lai_nsnode_t *idxf_data_node;
+            uint8_t idxf_flags;
+            uint8_t idxf_size;
+        };
         struct { // LAI_NAMESPACE_BUFFER_FIELD.
             struct lai_nsnode_t *bf_node;
             uint64_t bf_offset; // In bits.

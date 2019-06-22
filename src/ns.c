@@ -417,6 +417,13 @@ size_t lai_create_indexfield(lai_nsnode_t *parent, void *data) {
     indexfield += lai_resolve_path(parent, indexr, indexfield);
     indexfield += lai_resolve_path(parent, datar, indexfield);
 
+    lai_nsnode_t *index_node = lai_resolve(indexr);
+    if (!index_node)
+        lai_panic("could not resolve index register of IndexField()");
+    lai_nsnode_t *data_node = lai_resolve(datar);
+    if (!data_node)
+        lai_panic("could not resolve index register of IndexField()");
+
     uint8_t flags = indexfield[0];
 
     indexfield++;            // actual field list
@@ -452,12 +459,11 @@ size_t lai_create_indexfield(lai_nsnode_t *parent, void *data) {
         indexfield += name_size;
         byte_count += name_size;
 
-        lai_strcpy(node->indexfield_data, datar);
-        lai_strcpy(node->indexfield_index, indexr);
-
-        node->indexfield_flags = flags;
-        node->indexfield_size = indexfield[0];
-        node->indexfield_offset = current_offset;
+        node->idxf_index_node = index_node;
+        node->idxf_data_node = data_node;
+        node->idxf_flags = flags;
+        node->idxf_size = indexfield[0];
+        node->idxf_offset = current_offset;
 
         current_offset += (uint64_t)(indexfield[0]);
         lai_install_nsnode(node);

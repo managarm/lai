@@ -403,44 +403,26 @@ void lai_write_field(lai_nsnode_t *field, lai_object_t *source) {
     }
 }
 
-void lai_read_indexfield(lai_object_t *destination, lai_nsnode_t *indexfield) {
-    lai_nsnode_t *field;
-    field = lai_resolve(indexfield->indexfield_index);
-    if (!field) {
-        lai_panic("undefined reference %s", indexfield->indexfield_index);
-    }
+void lai_read_indexfield(lai_object_t *dest, lai_nsnode_t *idxf) {
+    lai_nsnode_t *index_field = idxf->idxf_index_node;
+    lai_nsnode_t *data_field = idxf->idxf_data_node;
 
     lai_object_t index = {0};
     index.type = LAI_INTEGER;
-    index.integer = indexfield->indexfield_offset / 8;    // always byte-aligned
+    index.integer = idxf->idxf_offset / 8; // Always byte-aligned.
 
-    lai_write_field(field, &index);    // the index register
-
-    field = lai_resolve(indexfield->indexfield_data);
-    if (!field) {
-        lai_panic("undefined reference %s", indexfield->indexfield_data);
-    }
-
-    lai_read_field(destination, field);    // the data register
+    lai_write_field(index_field, &index); // Write index register.
+    lai_read_field(dest, data_field); // Read data register.
 }
 
-void lai_write_indexfield(lai_nsnode_t *indexfield, lai_object_t *source) {
-    lai_nsnode_t *field;
-    field = lai_resolve(indexfield->indexfield_index);
-    if (!field) {
-        lai_panic("undefined reference %s", indexfield->indexfield_index);
-    }
+void lai_write_indexfield(lai_nsnode_t *idxf, lai_object_t *src) {
+    lai_nsnode_t *index_field = idxf->idxf_index_node;
+    lai_nsnode_t *data_field = idxf->idxf_data_node;
 
     lai_object_t index = {0};
     index.type = LAI_INTEGER;
-    index.integer = indexfield->indexfield_offset / 8;    // always byte-aligned
+    index.integer = idxf->idxf_offset / 8; // Always byte-aligned.
 
-    lai_write_field(field, &index);    // the index register
-
-    field = lai_resolve(indexfield->indexfield_data);
-    if (!field) {
-        lai_panic("undefined reference %s", indexfield->indexfield_data);
-    }
-
-    lai_write_field(field, source);    // the data register
+    lai_write_field(index_field, &index); // Write index register.
+    lai_write_field(data_field, src); // Write data register.
 }
