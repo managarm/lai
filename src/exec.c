@@ -371,41 +371,42 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, lai_object_t *ope
     }
     case INDEX_OP:
     {
-        lai_object_t storage = {0};
+        lai_object_t view = {0};
         lai_object_t index = {0};
-        lai_load_object_view(state, &operands[0], &storage);
+        lai_load_object_view(state, &operands[0], &view);
         lai_load_object_clone(state, &operands[1], &index);
         int n = index.integer;
 
-        switch (storage.type) {
-            case LAI_STRING_REFERENCE:
-                if (n >= lai_exec_string_length(&storage))
+        switch (view.type) {
+            case LAI_STRING:
+                if (n >= lai_exec_string_length(&view))
                     lai_panic("string Index() out of bounds");
                 result.type = LAI_STRING_INDEX;
-                result.string_ptr = storage.string_ptr;
-                lai_rc_ref(&storage.string_ptr->rc);
+                result.string_ptr = view.string_ptr;
+                lai_rc_ref(&view.string_ptr->rc);
                 result.integer = n;
                 break;
-            case LAI_BUFFER_REFERENCE:
-                if (n >= lai_exec_buffer_size(&storage))
+            case LAI_BUFFER:
+                if (n >= lai_exec_buffer_size(&view))
                     lai_panic("buffer Index() out of bounds");
                 result.type = LAI_BUFFER_INDEX;
-                result.buffer_ptr = storage.buffer_ptr;
-                lai_rc_ref(&storage.buffer_ptr->rc);
+                result.buffer_ptr = view.buffer_ptr;
+                lai_rc_ref(&view.buffer_ptr->rc);
                 result.integer = n;
                 break;
-            case LAI_PACKAGE_REFERENCE:
-                if (n >= lai_exec_pkg_size(&storage))
+            case LAI_PACKAGE:
+                if (n >= lai_exec_pkg_size(&view))
                     lai_panic("package Index() out of bounds");
                 result.type = LAI_PACKAGE_INDEX;
-                result.pkg_ptr = storage.pkg_ptr;
+                result.pkg_ptr = view.pkg_ptr;
                 result.integer = n;
-                lai_rc_ref(&storage.pkg_ptr->rc);
+                lai_rc_ref(&view.pkg_ptr->rc);
                 break;
             default:
-                lai_panic("Index() is only defined for buffers, strings and packages");
+                lai_panic("Index() is only defined for buffers, strings and packages"
+                        " but object of type %d was given", view.type);
         }
-        lai_free_object(&storage);
+        lai_free_object(&view);
 
         lai_store_operand(state, &operands[2], &result);
         break;
