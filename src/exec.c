@@ -720,27 +720,27 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
 
         // Process names.
         if (lai_is_name(method[state->pc])) {
-            lai_object_t unresolved = {0};
-            unresolved.type = LAI_UNRESOLVED_NAME;
-            state->pc += lai_resolve_path(ctx_handle, unresolved.name, method + state->pc);
+            struct lai_name_data name = {0};
+            state->pc += lai_resolve_path(ctx_handle, name.path, method + state->pc);
 
             if (exec_result_mode == LAI_DATA_MODE || exec_result_mode == LAI_TARGET_MODE) {
                 if (debug_opcodes)
-                    lai_debug("parsing name %s [@ %d]", unresolved.name, opcode_pc);
+                    lai_debug("parsing name %s [@ %d]", name.path, opcode_pc);
 
                 lai_object_t *opstack_res = lai_exec_push_opstack_or_die(state);
-                lai_move_object(opstack_res, &unresolved);
+                opstack_res->type = LAI_UNRESOLVED_NAME;
+                lai_strcpy(opstack_res->name, name.path);
             } else {
                 LAI_ENSURE(exec_result_mode == LAI_OBJECT_MODE
                            || exec_result_mode == LAI_EXEC_MODE);
-                lai_nsnode_t *handle = lai_exec_resolve(unresolved.name);
+                lai_nsnode_t *handle = lai_exec_resolve(name.path);
                 if (!handle)
-                    lai_panic("undefined reference %s in object mode", unresolved.name);
+                    lai_panic("undefined reference %s in object mode", name.path);
 
                 lai_object_t result = {0};
                 if(handle->type == LAI_NAMESPACE_METHOD) {
                     if (debug_opcodes)
-                        lai_debug("parsing invocation %s [@ %d]", unresolved.name, opcode_pc);
+                        lai_debug("parsing invocation %s [@ %d]", name.path, opcode_pc);
 
                     lai_state_t nested_state;
                     lai_init_state(&nested_state);
@@ -753,9 +753,10 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
                     lai_finalize_state(&nested_state);
                 } else {
                     if (debug_opcodes)
-                        lai_debug("parsing name %s [@ %d]", unresolved.name, opcode_pc);
+                        lai_debug("parsing name %s [@ %d]", name.path, opcode_pc);
 
-                    lai_load_ns(handle, &result);
+                    result.type = LAI_RESOLVED_NAME;
+                    result.handle = handle;
                 }
 
                 if (exec_result_mode == LAI_OBJECT_MODE) {
@@ -763,7 +764,6 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
                     lai_move_object(opstack_res, &result);
                 }
             }
-            lai_free_object(&unresolved);
             continue;
         }
 

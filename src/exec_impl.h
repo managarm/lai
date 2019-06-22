@@ -25,14 +25,15 @@
 #define LAI_TARGET_MODE 4
 #define LAI_IMMEDIATE_WORD_MODE 5
 
+struct lai_name_data {
+    char path[ACPI_MAX_NAME];
+};
+
 // Allocate a new package.
 int lai_create_string(lai_object_t *, size_t);
 int lai_create_c_string(lai_object_t *, const char *);
 int lai_create_buffer(lai_object_t *, size_t);
 int lai_create_pkg(lai_object_t *, size_t);
-
-void lai_load_ns(lai_nsnode_t *, lai_object_t *);
-void lai_store_ns(lai_nsnode_t *, lai_object_t *);
 
 void lai_load_object_clone(lai_state_t *, lai_object_t *, lai_object_t *);
 void lai_load_object_view(lai_state_t *, lai_object_t *, lai_object_t *);

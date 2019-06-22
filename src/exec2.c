@@ -254,7 +254,7 @@ void lai_copy_object(lai_object_t *dest, lai_object_t *source) {
     }
 }
 
-void lai_load_ns(lai_nsnode_t *source, lai_object_t *object) {
+static void lai_load_ns(lai_nsnode_t *source, lai_object_t *object) {
     switch (source->type) {
         case LAI_NAMESPACE_NAME:
             lai_copy_object(object, &source->object);
@@ -272,7 +272,7 @@ void lai_load_ns(lai_nsnode_t *source, lai_object_t *object) {
     }
 }
 
-void lai_store_ns(lai_nsnode_t *target, lai_object_t *object) {
+static void lai_store_ns(lai_nsnode_t *target, lai_object_t *object) {
     switch (target->type) {
         case LAI_NAMESPACE_NAME:
             lai_copy_object(&target->object, object);
@@ -318,6 +318,9 @@ void lai_load_object_clone(lai_state_t *state, lai_object_t *source, lai_object_
             lai_load_ns(handle, object);
             break;
         }
+        case LAI_RESOLVED_NAME:
+            lai_load_ns(source->handle, object);
+            break;
         case LAI_ARG_NAME:
             lai_copy_object(object, &state->arg[source->index]);
             break;
@@ -349,6 +352,18 @@ void lai_load_object_view(lai_state_t *state, lai_object_t *object, lai_object_t
             lai_nsnode_t *node = lai_exec_resolve(object->name);
             if (!node)
                 lai_panic("node %s not found.", object->name);
+
+            if (node->type == LAI_NAMESPACE_NAME) {
+                lai_assign_object(ref, &node->object);
+            } else {
+                lai_panic("node %s type %d is not valid for lai_load_object_view()",
+                        node->path, node->type);
+            }
+            break;
+        }
+        case LAI_RESOLVED_NAME:
+        {
+            lai_nsnode_t *node = object->handle;
 
             if (node->type == LAI_NAMESPACE_NAME) {
                 lai_assign_object(ref, &node->object);
@@ -399,6 +414,9 @@ void lai_store_operand(lai_state_t *state, lai_object_t *target, lai_object_t *o
             lai_store_ns(handle, object);
             break;
         }
+        case LAI_RESOLVED_NAME:
+            lai_store_ns(target->handle, object);
+            break;
         case LAI_ARG_NAME:
             lai_copy_object(&state->arg[target->index], object);
             break;
