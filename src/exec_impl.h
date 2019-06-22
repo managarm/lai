@@ -34,8 +34,8 @@ int lai_create_pkg(lai_object_t *, size_t);
 void lai_load_ns(lai_nsnode_t *, lai_object_t *);
 void lai_store_ns(lai_nsnode_t *, lai_object_t *);
 
-void lai_alias_operand(lai_state_t *, lai_object_t *, lai_object_t *);
-void lai_load_operand(lai_state_t *, lai_object_t *, lai_object_t *);
+void lai_load_object_clone(lai_state_t *, lai_object_t *, lai_object_t *);
+void lai_load_object_view(lai_state_t *, lai_object_t *, lai_object_t *);
 void lai_store_operand(lai_state_t *, lai_object_t *, lai_object_t *);
 
 void lai_free_object(lai_object_t *);

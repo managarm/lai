@@ -321,49 +321,9 @@ void lai_store_ns(lai_nsnode_t *target, lai_object_t *object) {
     }
 }
 
-void lai_alias_operand(lai_state_t *state, lai_object_t *object, lai_object_t *ref) {
-    lai_nsnode_t *node;
-    switch (object->type) {
-        case LAI_STRING:
-            ref->type = LAI_STRING_REFERENCE;
-            ref->string_ptr = object->string_ptr;
-            lai_rc_ref(&object->string_ptr->rc);
-            break;
-        case LAI_BUFFER:
-            ref->type = LAI_BUFFER_REFERENCE;
-            ref->buffer_ptr = object->buffer_ptr;
-            lai_rc_ref(&object->buffer_ptr->rc);
-            break;
-        case LAI_PACKAGE:
-            ref->type = LAI_PACKAGE_REFERENCE;
-            ref->pkg_ptr = object->pkg_ptr;
-            lai_rc_ref(&object->pkg_ptr->rc);
-            break;
-        case LAI_ARG_NAME:
-            lai_alias_object(ref, &state->arg[object->index]);
-            break;
-        case LAI_LOCAL_NAME:
-            lai_alias_object(ref, &state->local[object->index]);
-            break;
-        case LAI_UNRESOLVED_NAME:
-            node = lai_exec_resolve(object->name);
-            if (!node)
-                lai_panic("node %s not found.", object->name);
-
-            if (node->type == LAI_NAMESPACE_NAME)
-                lai_alias_object(ref, &node->object);
-            else
-                lai_panic("node %s type %d is not valid for lai_alias_operand()", node->path, node->type);
-
-            break;
-        default:
-            lai_panic("object type %d is not valid for lai_alias_operand()", object->type);
-    }
-}
-
-// lai_load_operand(): Load an object from a reference.
-
-void lai_load_operand(lai_state_t *state, lai_object_t *source, lai_object_t *object) {
+// Load an object (i.e., integer, string buffer or package).
+// Returns an independent clone of the object.
+void lai_load_object_clone(lai_state_t *state, lai_object_t *source, lai_object_t *object) {
     switch (source->type) {
         case LAI_INTEGER:
         case LAI_BUFFER:
@@ -397,7 +357,49 @@ void lai_load_operand(lai_state_t *state, lai_object_t *source, lai_object_t *ob
             lai_copy_object(object, &state->local[source->index]);
             break;
         default:
-            lai_panic("object type %d is not valid for lai_load_operand()", source->type);
+            lai_panic("object type %d is not valid for lai_load_object_clone()", source->type);
+    }
+}
+
+// Load an object (i.e., integer, string buffer or package).
+// Returns a view of an existing object and not a clone of the object.
+void lai_load_object_view(lai_state_t *state, lai_object_t *object, lai_object_t *ref) {
+    lai_nsnode_t *node;
+    switch (object->type) {
+        case LAI_STRING:
+            ref->type = LAI_STRING_REFERENCE;
+            ref->string_ptr = object->string_ptr;
+            lai_rc_ref(&object->string_ptr->rc);
+            break;
+        case LAI_BUFFER:
+            ref->type = LAI_BUFFER_REFERENCE;
+            ref->buffer_ptr = object->buffer_ptr;
+            lai_rc_ref(&object->buffer_ptr->rc);
+            break;
+        case LAI_PACKAGE:
+            ref->type = LAI_PACKAGE_REFERENCE;
+            ref->pkg_ptr = object->pkg_ptr;
+            lai_rc_ref(&object->pkg_ptr->rc);
+            break;
+        case LAI_ARG_NAME:
+            lai_alias_object(ref, &state->arg[object->index]);
+            break;
+        case LAI_LOCAL_NAME:
+            lai_alias_object(ref, &state->local[object->index]);
+            break;
+        case LAI_UNRESOLVED_NAME:
+            node = lai_exec_resolve(object->name);
+            if (!node)
+                lai_panic("node %s not found.", object->name);
+
+            if (node->type == LAI_NAMESPACE_NAME)
+                lai_alias_object(ref, &node->object);
+            else
+                lai_panic("node %s type %d is not valid for lai_load_object_view()", node->path, node->type);
+
+            break;
+        default:
+            lai_panic("object type %d is not valid for lai_load_object_view()", object->type);
     }
 }
 
