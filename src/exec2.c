@@ -300,7 +300,7 @@ void lai_load_ns(lai_nsnode_t *source, lai_object_t *object) {
             object->handle = source;
             break;
         default:
-            lai_panic("unexpected type %d of named object in lai_load_ns()");
+            lai_panic("unexpected type %d of named object in lai_load_ns()", source->type);
     }
 }
 

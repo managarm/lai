@@ -128,11 +128,45 @@ static int lai_compare(lai_object_t *lhs, lai_object_t *rhs) {
     return lhs->integer - rhs->integer;
 }
 
-// Parse a given Type10 opcode.
-static void lai_exec_reduce(int opcode, lai_state_t *state, lai_object_t *operands,
+static void lai_exec_reduce_node(int opcode, lai_state_t *state, lai_object_t *operands) {
+    if (debug_opcodes)
+        lai_debug("lai_exec_reduce_node: opcode 0x%02X", opcode);
+    switch (opcode) {
+        case BYTEFIELD_OP:
+        case WORDFIELD_OP:
+        case DWORDFIELD_OP:
+        case QWORDFIELD_OP: {
+            lai_object_t offset = {0};
+            lai_load_operand(state, &operands[1], &offset);
+            LAI_ENSURE(operands[0].type == LAI_UNRESOLVED_NAME);
+            LAI_ENSURE(operands[2].type == LAI_UNRESOLVED_NAME);
+
+            lai_nsnode_t *node = lai_create_nsnode_or_die();
+            node->type = LAI_NAMESPACE_BUFFER_FIELD;
+            lai_strcpy(node->buffer, operands[0].name);
+            lai_strcpy(node->path, operands[2].name);
+
+            switch (opcode) {
+                case BYTEFIELD_OP: node->buffer_size = 8; break;
+                case WORDFIELD_OP: node->buffer_size = 16; break;
+                case DWORDFIELD_OP: node->buffer_size = 32; break;
+                case QWORDFIELD_OP: node->buffer_size = 64; break;
+            }
+            node->buffer_offset = offset.integer;
+
+            lai_debug("installing %s\n", node->path);
+            lai_install_nsnode(node);
+            break;
+        }
+        default:
+            lai_panic("undefined opcode in lai_exec_reduce_node: %02X", opcode);
+    }
+}
+
+static void lai_exec_reduce_op(int opcode, lai_state_t *state, lai_object_t *operands,
         lai_object_t *reduction_res) {
     if (debug_opcodes)
-        lai_debug("lai_exec_reduce: opcode 0x%02X", opcode);
+        lai_debug("lai_exec_reduce_op: opcode 0x%02X", opcode);
     lai_object_t result = {0};
     switch (opcode) {
     case STORE_OP:
@@ -472,7 +506,7 @@ static void lai_exec_reduce(int opcode, lai_state_t *state, lai_object_t *operan
     }
 
     default:
-        lai_panic("undefined opcode in lai_exec_reduce: %02X", opcode);
+        lai_panic("undefined opcode in lai_exec_reduce_op: %02X", opcode);
     }
 
     lai_move_object(reduction_res, &result);
@@ -580,13 +614,25 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
                 lai_panic("package initializer escaped out of code range");
 
             exec_result_mode = LAI_DATA_MODE;
+        } else if (item->kind == LAI_NODE_STACKITEM) {
+            int k = state->opstack_ptr - item->opstack_frame;
+            if (!item->node_arg_modes[k]) {
+                lai_object_t *operands = lai_exec_get_opstack(state, item->opstack_frame);
+                lai_exec_reduce_node(item->node_opcode, state, operands);
+                lai_exec_pop_opstack(state, k);
+
+                lai_exec_pop_stack_back(state);
+                continue;
+            }
+
+            exec_result_mode = item->node_arg_modes[k];
         } else if (item->kind == LAI_OP_STACKITEM) {
             int k = state->opstack_ptr - item->opstack_frame;
 //            lai_debug("got %d parameters", k);
             if (!item->op_arg_modes[k]) {
                 lai_object_t result = {0};
                 lai_object_t *operands = lai_exec_get_opstack(state, item->opstack_frame);
-                lai_exec_reduce(item->op_opcode, state, operands, &result);
+                lai_exec_reduce_op(item->op_opcode, state, operands, &result);
                 lai_exec_pop_opstack(state, k);
 
                 if (item->op_result_mode == LAI_OBJECT_MODE
@@ -1007,18 +1053,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             lai_eval_operand(&handle->object, state, amls, method);
             break;
         }
-        case BYTEFIELD_OP:
-            state->pc += lai_create_n_wordfield(ctx_handle, method + state->pc, 8);
-            break;
-        case WORDFIELD_OP:
-            state->pc += lai_create_n_wordfield(ctx_handle, method + state->pc, 16);
-            break;
-        case DWORDFIELD_OP:
-            state->pc += lai_create_n_wordfield(ctx_handle, method + state->pc, 32);
-            break;
-        case QWORDFIELD_OP:
-            state->pc += lai_create_n_wordfield(ctx_handle, method + state->pc, 64);
-            break;
+
         // Scope-like objects in the ACPI namespace.
         case SCOPE_OP:
         {
@@ -1121,6 +1156,22 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
         case ALIAS_OP:
             state->pc += lai_create_alias(ctx_handle, method + state->pc);
             break;
+        case BYTEFIELD_OP:
+        case WORDFIELD_OP:
+        case DWORDFIELD_OP:
+        case QWORDFIELD_OP:
+        {
+            lai_stackitem_t *node_item = lai_exec_push_stack_or_die(state);
+            node_item->kind = LAI_NODE_STACKITEM;
+            node_item->node_opcode = opcode;
+            node_item->opstack_frame = state->opstack_ptr;
+            node_item->node_arg_modes[0] = LAI_DATA_MODE;
+            node_item->node_arg_modes[1] = LAI_OBJECT_MODE;
+            node_item->node_arg_modes[2] = LAI_DATA_MODE;
+            node_item->node_arg_modes[3] = 0;
+            state->pc++;
+            break;
+        }
         case (EXTOP_PREFIX << 8) | MUTEX:
             state->pc += lai_create_mutex(ctx_handle, method + state->pc);
             break;

@@ -70,13 +70,14 @@ __attribute__((noreturn)) void lai_panic(const char *, ...);
 // Name types: unresolved names and names of certain objects.
 #define LAI_NULL_NAME          9
 #define LAI_UNRESOLVED_NAME   10
-#define LAI_ARG_NAME          11
-#define LAI_LOCAL_NAME        12
-#define LAI_DEBUG_NAME        13
+#define LAI_RESOLVED_NAME     11
+#define LAI_ARG_NAME          12
+#define LAI_LOCAL_NAME        13
+#define LAI_DEBUG_NAME        14
 // Reference types: references to object storage.
-#define LAI_STRING_REFERENCE  14
-#define LAI_BUFFER_REFERENCE  15
-#define LAI_PACKAGE_REFERENCE 16
+#define LAI_STRING_REFERENCE  15
+#define LAI_BUFFER_REFERENCE  16
+#define LAI_PACKAGE_REFERENCE 17
 
 typedef int lai_rc_t;
 
@@ -207,11 +208,12 @@ typedef struct lai_nsnode_t
 } lai_nsnode_t;
 
 #define LAI_POPULATE_CONTEXT_STACKITEM 1
-#define LAI_METHOD_CONTEXT_STACKITEM 2
-#define LAI_LOOP_STACKITEM 3
-#define LAI_COND_STACKITEM 4
-#define LAI_PKG_INITIALIZER_STACKITEM 5
-#define LAI_OP_STACKITEM 6
+#define LAI_METHOD_CONTEXT_STACKITEM   2
+#define LAI_LOOP_STACKITEM             3
+#define LAI_COND_STACKITEM             4
+#define LAI_PKG_INITIALIZER_STACKITEM  5
+#define LAI_NODE_STACKITEM             6 // Parse a namespace leaf node (i.e., not a scope).
+#define LAI_OP_STACKITEM               7 // Parse an operator.
 // This implements lai_eval_operand(). // TODO: Eventually remove
 // lai_eval_operand() by moving all parsing functionality into lai_exec_run().
 #define LAI_EVALOPERAND_STACKITEM 10
@@ -241,6 +243,10 @@ typedef struct lai_stackitem_ {
             int op_opcode;
             uint8_t op_arg_modes[8];
             uint8_t op_result_mode;
+        };
+        struct {
+            int node_opcode;
+            uint8_t node_arg_modes[8];
         };
     };
 } lai_stackitem_t;

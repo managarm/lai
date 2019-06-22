@@ -491,41 +491,6 @@ size_t lai_create_processor(lai_nsnode_t *parent, void *data) {
     return size + 2;
 }
 
-// creates an object of type such as DWORDFIELD or QWORDFIELD, where the value
-// n corresponds to the width of the type in question; for example, for a DWORDFIELD,
-// n =32.
-size_t lai_create_n_wordfield(lai_nsnode_t *parent, void *data, size_t n) {
-    uint8_t *field = (uint8_t *)data;
-    // skip over the op prefix.
-    field++;
-    size_t size = 1;
-
-    lai_nsnode_t *node = lai_create_nsnode_or_die();
-    node->type = LAI_NAMESPACE_BUFFER_FIELD;
-
-    // buffer name
-    size_t name_size = lai_resolve_path(parent, node->buffer, field);
-
-    size += name_size;
-    field += name_size;
-
-    uint64_t integer;
-    size_t integer_size = lai_parse_integer(field, &integer);
-
-    node->buffer_offset = integer * 8;
-    // the buffer is as wide as the width of the word
-    node->buffer_size = n;
-
-    size += integer_size;
-    field += integer_size;
-
-    name_size = lai_resolve_path(parent, node->path, field);
-
-    lai_install_nsnode(node);
-    size += name_size;
-    return size;
-}
-
 // Resolve a namespace object by its path
 lai_nsnode_t *lai_resolve(char *path) {
     size_t i = 0;
