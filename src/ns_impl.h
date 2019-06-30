@@ -25,5 +25,3 @@ size_t lai_create_alias(lai_nsnode_t *, void *);
 size_t lai_create_mutex(lai_nsnode_t *, void *);
 size_t lai_create_indexfield(lai_nsnode_t *, void *);
 size_t lai_create_processor(lai_nsnode_t *, void *);
-
-size_t lai_resolve_path(lai_nsnode_t *, char *, const uint8_t *);
