@@ -302,12 +302,12 @@ void lai_load(lai_state_t *state, lai_object_t *src, lai_object_t *object) {
             break;
         case LAI_UNRESOLVED_NAME:
         {
-            char name[ACPI_MAX_NAME];
-            lai_resolve_path(src->unres_ctx_handle, name, src->unres_aml);
+            struct lai_amlname amln;
+            lai_amlname_parse(&amln, src->unres_aml);
 
-            lai_nsnode_t *node = lai_exec_resolve(name);
+            lai_nsnode_t *node = lai_do_resolve(src->unres_ctx_handle, &amln);
             if (!node)
-                lai_panic("node %s not found.", name);
+                lai_panic("undefined reference %s", lai_stringify_amlname(&amln));
             lai_load_ns(node, object);
             break;
         }
@@ -347,12 +347,12 @@ void lai_store(lai_state_t *state, lai_object_t *dest, lai_object_t *object) {
         }
         case LAI_UNRESOLVED_NAME:
         {
-            char name[ACPI_MAX_NAME];
-            lai_resolve_path(dest->unres_ctx_handle, name, dest->unres_aml);
+            struct lai_amlname amln;
+            lai_amlname_parse(&amln, dest->unres_aml);
 
-            lai_nsnode_t *handle = lai_exec_resolve(name);
+            lai_nsnode_t *handle = lai_do_resolve(dest->unres_ctx_handle, &amln);
             if(!handle)
-                lai_panic("undefined reference %s", name);
+                lai_panic("undefined reference %s", lai_stringify_amlname(&amln));
             lai_store_ns(handle, object);
             break;
         }

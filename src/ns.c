@@ -488,19 +488,14 @@ size_t lai_create_field(lai_nsnode_t *parent, void *data) {
     field += pkgsize;
 
     // determine name of opregion
-    lai_nsnode_t *opregion;
-    char opregion_name[ACPI_MAX_NAME];
+    struct lai_amlname region_amln;
     size_t name_size = 0;
 
-    name_size = lai_resolve_path(parent, opregion_name, field);
+    name_size = lai_amlname_parse(&region_amln, field);
 
-    lai_nsnode_t *region_node = lai_resolve(opregion_name);
-    if (!region_node)
-        lai_panic("could not resolve region of Field()");
-
-    opregion = lai_exec_resolve(opregion_name);
-    if (!opregion) {
-        lai_debug("error parsing field for non-existant OpRegion %s, ignoring...", opregion_name);
+    lai_nsnode_t *region_node = lai_do_resolve(parent, &region_amln);
+    if (!region_node) {
+        lai_warn("error parsing field for non-existant OpRegion , ignoring...");
         return size + 2;
     }
 
@@ -544,7 +539,7 @@ size_t lai_create_field(lai_nsnode_t *parent, void *data) {
         }
 
         if(field[0] == 2) {
-            lai_warn("field for OpRegion %s: ConnectField unimplemented.", opregion->path);
+            lai_warn("field for OpRegion %s: ConnectField unimplemented.", region_node->path);
 
             field++;
             byte_count++;
@@ -663,17 +658,15 @@ size_t lai_create_indexfield(lai_nsnode_t *parent, void *data) {
     indexfield += pkgsize;
 
     // index and data
-    char indexr[ACPI_MAX_NAME], datar[ACPI_MAX_NAME];
-    memset(indexr, 0, ACPI_MAX_NAME);
-    memset(datar, 0, ACPI_MAX_NAME);
+    struct lai_amlname index_amln;
+    struct lai_amlname data_amln;
+    indexfield += lai_amlname_parse(&index_amln, indexfield);
+    indexfield += lai_amlname_parse(&data_amln, indexfield);
 
-    indexfield += lai_resolve_path(parent, indexr, indexfield);
-    indexfield += lai_resolve_path(parent, datar, indexfield);
-
-    lai_nsnode_t *index_node = lai_resolve(indexr);
+    lai_nsnode_t *index_node = lai_do_resolve(parent, &index_amln);
     if (!index_node)
         lai_panic("could not resolve index register of IndexField()");
-    lai_nsnode_t *data_node = lai_resolve(datar);
+    lai_nsnode_t *data_node = lai_do_resolve(parent, &data_amln);
     if (!data_node)
         lai_panic("could not resolve index register of IndexField()");
 

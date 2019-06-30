@@ -745,13 +745,13 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             struct lai_amlname amln;
             state->pc += lai_amlname_parse(&amln, method + state->pc);
 
-            const char *name;
+            char *debug_name;
             if (debug_opcodes)
-                name = lai_stringify_amlname(&amln);
+                debug_name = lai_stringify_amlname(&amln);
 
             if (exec_result_mode == LAI_DATA_MODE || exec_result_mode == LAI_TARGET_MODE) {
                 if (debug_opcodes)
-                    lai_debug("parsing name %s [@ %d]", name, opcode_pc);
+                    lai_debug("parsing name %s [@ %d]", debug_name, opcode_pc);
 
                 lai_object_t *opstack_res = lai_exec_push_opstack_or_die(state);
                 opstack_res->type = LAI_UNRESOLVED_NAME;
@@ -762,12 +762,13 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
                            || exec_result_mode == LAI_EXEC_MODE);
                 lai_nsnode_t *handle = lai_do_resolve(ctx_handle, &amln);
                 if (!handle)
-                    lai_panic("undefined reference %s in object mode", name);
+                    lai_panic("undefined reference %s in object mode",
+                            lai_stringify_amlname(&amln));
 
                 lai_object_t result = {0};
                 if(handle->type == LAI_NAMESPACE_METHOD) {
                     if (debug_opcodes)
-                        lai_debug("parsing invocation %s [@ %d]", name, opcode_pc);
+                        lai_debug("parsing invocation %s [@ %d]", debug_name, opcode_pc);
 
                     lai_state_t nested_state;
                     lai_init_state(&nested_state);
@@ -780,7 +781,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
                     lai_finalize_state(&nested_state);
                 } else {
                     if (debug_opcodes)
-                        lai_debug("parsing name %s [@ %d]", name, opcode_pc);
+                        lai_debug("parsing name %s [@ %d]", debug_name, opcode_pc);
 
                     result.type = LAI_RESOLVED_NAME;
                     result.handle = handle;
@@ -793,7 +794,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             }
 
             if(debug_opcodes)
-                laihost_free(name);
+                laihost_free(debug_name);
             continue;
         }
 
