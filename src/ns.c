@@ -118,7 +118,7 @@ void lai_amlname_iterate(struct lai_amlname *amln, char *out) {
     amln->it += 4;
 }
 
-char *lai_stringify_amlname(struct lai_amlname *in_amln) {
+char *lai_stringify_amlname(const struct lai_amlname *in_amln) {
     // Make a copy to avoid rendering the original object unusable.
     struct lai_amlname amln = *in_amln;
 
@@ -152,15 +152,18 @@ char *lai_stringify_amlname(struct lai_amlname *in_amln) {
     return str;
 }
 
-lai_nsnode_t *lai_do_resolve(lai_nsnode_t *ctx_handle, struct lai_amlname *amln) {
+lai_nsnode_t *lai_do_resolve(lai_nsnode_t *ctx_handle, const struct lai_amlname *in_amln) {
+    // Make a copy to avoid rendering the original object unusable.
+    struct lai_amlname amln = *in_amln;
+
     lai_nsnode_t *current = ctx_handle;
     LAI_ENSURE(current);
     LAI_ENSURE(current->type != LAI_NAMESPACE_ALIAS); // ctx_handle needs to be resolved.
 
-    if (amln->search_scopes) {
+    if (amln.search_scopes) {
         char segment[5];
-        lai_amlname_iterate(amln, segment);
-        LAI_ENSURE(lai_amlname_done(amln));
+        lai_amlname_iterate(&amln, segment);
+        LAI_ENSURE(lai_amlname_done(&amln));
         segment[4] = '\0';
 
         if(debug_resolution)
@@ -188,13 +191,13 @@ lai_nsnode_t *lai_do_resolve(lai_nsnode_t *ctx_handle, struct lai_amlname *amln)
 
         return NULL;
     } else {
-        if (amln->is_absolute) {
+        if (amln.is_absolute) {
             while (current->parent)
                 current = current->parent;
             LAI_ENSURE(current->type == LAI_NAMESPACE_ROOT);
         }
 
-        for (int i = 0; i < amln->height; i++) {
+        for (int i = 0; i < amln.height; i++) {
             if (!current->parent) {
                 LAI_ENSURE(current->type == LAI_NAMESPACE_ROOT);
                 break;
@@ -202,16 +205,16 @@ lai_nsnode_t *lai_do_resolve(lai_nsnode_t *ctx_handle, struct lai_amlname *amln)
             current = current->parent;
         }
 
-        if (lai_amlname_done(amln))
+        if (lai_amlname_done(&amln))
             return current;
 
         char path[ACPI_MAX_NAME];
         size_t n = lai_strlen(current->path);
         lai_strcpy(path, current->path);
 
-        while (!lai_amlname_done(amln)) {
+        while (!lai_amlname_done(&amln)) {
             path[n] = '.';
-            lai_amlname_iterate(amln, path + 1 + n);
+            lai_amlname_iterate(&amln, path + 1 + n);
             n += 5;
         }
         path[n] = '\0';
@@ -226,7 +229,10 @@ lai_nsnode_t *lai_do_resolve(lai_nsnode_t *ctx_handle, struct lai_amlname *amln)
 }
 
 void lai_do_resolve_new_node(lai_nsnode_t *node,
-        lai_nsnode_t *ctx_handle, struct lai_amlname *amln) {
+        lai_nsnode_t *ctx_handle, const struct lai_amlname *in_amln) {
+    // Make a copy to avoid rendering the original object unusable.
+    struct lai_amlname amln = *in_amln;
+
     lai_nsnode_t *parent = ctx_handle;
     LAI_ENSURE(parent);
     LAI_ENSURE(parent->type != LAI_NAMESPACE_ALIAS); // ctx_handle needs to be resolved.
@@ -234,13 +240,13 @@ void lai_do_resolve_new_node(lai_nsnode_t *node,
     // Note: we do not care about amln->search_scopes here.
     //       As we are creating a new name, the code below already does the correct thing.
 
-    if (amln->is_absolute) {
+    if (amln.is_absolute) {
         while (parent->parent)
             parent = parent->parent;
         LAI_ENSURE(parent->type == LAI_NAMESPACE_ROOT);
     }
 
-    for (int i = 0; i < amln->height; i++) {
+    for (int i = 0; i < amln.height; i++) {
         if (!parent->parent) {
             LAI_ENSURE(parent->type == LAI_NAMESPACE_ROOT);
             break;
@@ -249,11 +255,11 @@ void lai_do_resolve_new_node(lai_nsnode_t *node,
     }
 
     // Otherwise the new object has an empty name.
-    LAI_ENSURE(!lai_amlname_done(amln));
+    LAI_ENSURE(!lai_amlname_done(&amln));
 
     for (;;) {
         char segment[5];
-        lai_amlname_iterate(amln, segment);
+        lai_amlname_iterate(&amln, segment);
         segment[4] = '\0';
 
         char path[ACPI_MAX_NAME];
@@ -262,7 +268,7 @@ void lai_do_resolve_new_node(lai_nsnode_t *node,
         path[n] = '.';
         lai_strcpy(path + 1 + n, segment);
 
-        if (lai_amlname_done(amln)) {
+        if (lai_amlname_done(&amln)) {
             // The last segment is the name of the new node.
             lai_strcpy(node->path, path);
             node->parent = parent;

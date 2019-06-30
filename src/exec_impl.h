@@ -34,14 +34,14 @@ void lai_amlname_iterate(struct lai_amlname *amln, char *out);
 
 // Turns the AML name into a ASL-like name string.
 // Returns a pointer allocated by laihost_malloc().
-char *lai_stringify_amlname(struct lai_amlname *amln);
+char *lai_stringify_amlname(const struct lai_amlname *amln);
 
 // This will replace lai_resolve().
-lai_nsnode_t *lai_do_resolve(lai_nsnode_t *ctx_handle, struct lai_amlname *amln);
+lai_nsnode_t *lai_do_resolve(lai_nsnode_t *ctx_handle, const struct lai_amlname *amln);
 
 // Used in the implementation of lai_resolve_new_node().
 void lai_do_resolve_new_node(lai_nsnode_t *node,
-        lai_nsnode_t *ctx_handle, struct lai_amlname *amln);
+        lai_nsnode_t *ctx_handle, const struct lai_amlname *amln);
 
 // Evaluate constant data (and keep result).
 //     Primitive objects are parsed.
