@@ -118,6 +118,40 @@ void lai_amlname_iterate(struct lai_amlname *amln, char *out) {
     amln->it += 4;
 }
 
+char *lai_stringify_amlname(struct lai_amlname *in_amln) {
+    // Make a copy to avoid rendering the original object unusable.
+    struct lai_amlname amln = *in_amln;
+
+    size_t num_segs = (amln.end - amln.it) / 4;
+    size_t max_length = 1              // Leading \ for absolute paths.
+                        + amln.height // Leading ^ characters.
+                        + num_segs * 5 // Segments, seperated by dots.
+                        + 1;          // Null-terminator.
+
+    char *str = laihost_malloc(max_length);
+    if (!str)
+        lai_panic("could not allocate in lai_stringify_amlname()");
+
+    int n = 0;
+    if (amln.is_absolute)
+        str[n++] = '\\';
+    for (int i = 0; i < amln.height; i++)
+        str[n++] = '^';
+
+    if(!lai_amlname_done(&amln)) {
+        for (;;) {
+            lai_amlname_iterate(&amln, &str[n]);
+            n += 4;
+            if (lai_amlname_done(&amln))
+                break;
+            str[n++] = '.';
+        }
+    }
+    str[n++] = '\0';
+    LAI_ENSURE(n <= max_length);
+    return str;
+}
+
 lai_nsnode_t *lai_do_resolve(lai_nsnode_t *ctx_handle, struct lai_amlname *amln) {
     lai_nsnode_t *current = ctx_handle;
     LAI_ENSURE(current);

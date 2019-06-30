@@ -32,6 +32,10 @@ int lai_amlname_done(struct lai_amlname *amln);
 // out must be a char array of size >= 4.
 void lai_amlname_iterate(struct lai_amlname *amln, char *out);
 
+// Turns the AML name into a ASL-like name string.
+// Returns a pointer allocated by laihost_malloc().
+char *lai_stringify_amlname(struct lai_amlname *amln);
+
 // This will replace lai_resolve().
 lai_nsnode_t *lai_do_resolve(lai_nsnode_t *ctx_handle, struct lai_amlname *amln);
 
@@ -53,10 +57,6 @@ void lai_do_resolve_new_node(lai_nsnode_t *node,
 #define LAI_EXEC_MODE 3
 #define LAI_TARGET_MODE 4
 #define LAI_IMMEDIATE_WORD_MODE 5
-
-struct lai_name_data {
-    char path[ACPI_MAX_NAME];
-};
 
 // Allocate a new package.
 int lai_create_string(lai_object_t *, size_t);
