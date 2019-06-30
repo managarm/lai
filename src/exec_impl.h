@@ -10,6 +10,28 @@
 
 #include <lai/core.h>
 
+struct lai_amlname {
+    int is_absolute;   // Is the path absolute or not?
+    int height;        // Number of scopes to exit before resolving the name.
+                       // In other words, this is the number of ^ in front of the name.
+    int search_scopes; // Is the name searched in the scopes of all parents?
+
+    // Internal variables used by the parser.
+    const uint8_t *it;
+    const uint8_t *end;
+};
+
+// Initializes the AML name parser.
+// Use lai_amlname_done() + lai_amlname_iterate() to process the name.
+size_t lai_amlname_parse(struct lai_amlname *amln, void *data);
+
+// Returns true if there are no more segments.
+int lai_amlname_done(struct lai_amlname *amln);
+
+// Copies the next segment of the name to out.
+// out must be a char array of size >= 4.
+void lai_amlname_iterate(struct lai_amlname *amln, char *out);
+
 // Evaluate constant data (and keep result).
 //     Primitive objects are parsed.
 //     Names are left unresolved.

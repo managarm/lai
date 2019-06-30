@@ -63,6 +63,59 @@ void lai_install_nsnode(lai_nsnode_t *node) {
     lai_namespace[lai_ns_size++] = node;
 }
 
+size_t lai_amlname_parse(struct lai_amlname *amln, void *data) {
+    amln->is_absolute = 0;
+    amln->height = 0;
+
+    uint8_t *begin = data;
+    uint8_t *it = begin;
+    if (*it == '\\') {
+        // First character is \ for absolute paths.
+        amln->is_absolute = 1;
+        it++;
+    } else {
+        // Non-absolute paths can be prefixed by a number of ^.
+        while (*it == '^') {
+            amln->height++;
+            it++;
+        }
+    }
+
+    // Finally, we parse the name's prefix (which determines the number of segments).
+    int num_segs;
+    if (*it == '\0') {
+        it++;
+        num_segs = 0;
+    } else if (*it == DUAL_PREFIX) {
+        it++;
+        num_segs = 2;
+    } else if (*it == MULTI_PREFIX) {
+        it++;
+        num_segs = *it;
+        LAI_ENSURE(num_segs > 2);
+        it++;
+    } else {
+        LAI_ENSURE(lai_is_name(*it));
+        num_segs = 1;
+    }
+
+    amln->search_scopes = !amln->is_absolute && !amln->height && num_segs == 1;
+    amln->it = it;
+    amln->end = it + 4 * num_segs;
+    return amln->end - begin;
+}
+
+int lai_amlname_done(struct lai_amlname *amln) {
+    return amln->it == amln->end;
+}
+
+void lai_amlname_iterate(struct lai_amlname *amln, char *out) {
+    LAI_ENSURE(amln->it < amln->end);
+    for (int i = 0; i < 4; i++)
+        out[i] = amln->it[i];
+    amln->it += 4;
+}
+
 size_t lai_resolve_path(lai_nsnode_t *context, char *fullpath, uint8_t *path) {
     size_t name_size = 0;
     size_t multi_count = 0;
