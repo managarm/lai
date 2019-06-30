@@ -1185,9 +1185,24 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
         case METHOD_OP:
             state->pc += lai_create_method(ctx_handle, amls, method + state->pc);
             break;
-        case ALIAS_OP:
-            state->pc += lai_create_alias(ctx_handle, method + state->pc);
+        case ALIAS_OP: {
+            state->pc += 1;
+
+            struct lai_amlname target_amln;
+            struct lai_amlname dest_amln;
+            state->pc += lai_amlname_parse(&target_amln, method + state->pc);
+            state->pc += lai_amlname_parse(&dest_amln, method + state->pc);
+
+            lai_nsnode_t *node = lai_create_nsnode_or_die();
+            node->type = LAI_NAMESPACE_ALIAS;
+            node->al_target = lai_do_resolve(ctx_handle, &target_amln);
+            if (!node->al_target)
+                lai_panic("cannot resolve target %s of Alias()", lai_stringify_amlname(&target_amln));
+            lai_do_resolve_new_node(node, ctx_handle, &dest_amln);
+
+            lai_install_nsnode(node);
             break;
+        }
         case BYTEFIELD_OP:
         case WORDFIELD_OP:
         case DWORDFIELD_OP:
@@ -1204,9 +1219,19 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             state->pc++;
             break;
         }
-        case (EXTOP_PREFIX << 8) | MUTEX:
-            state->pc += lai_create_mutex(ctx_handle, method + state->pc);
+        case (EXTOP_PREFIX << 8) | MUTEX: {
+            state->pc += 2;
+            
+            struct lai_amlname amln;
+            state->pc += lai_amlname_parse(&amln, method + state->pc);
+            state->pc++; // skip over trailing 0x02
+
+            lai_nsnode_t *node = lai_create_nsnode_or_die();
+            node->type = LAI_NAMESPACE_MUTEX;
+            lai_do_resolve_new_node(node, ctx_handle, &amln);
+            lai_install_nsnode(node);
             break;
+        }
         case (EXTOP_PREFIX << 8) | EVENT:
         {
             state->pc += 2;
@@ -1217,6 +1242,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             lai_nsnode_t* node = lai_create_nsnode_or_die();
             node->type = LAI_NAMESPACE_EVENT;
             lai_do_resolve_new_node(node, ctx_handle, &amln);
+            lai_install_nsnode(node);
             break;
         }
         case (EXTOP_PREFIX << 8) | OPREGION:

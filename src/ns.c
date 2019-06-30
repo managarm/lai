@@ -563,52 +563,6 @@ size_t lai_create_method(lai_nsnode_t *parent, struct lai_aml_segment *amls, voi
     return size + 1;
 }
 
-// Create an alias in the namespace
-size_t lai_create_alias(lai_nsnode_t *parent, void *data) {
-    size_t return_size = 1;
-    uint8_t *alias = (uint8_t *)data;
-    alias++;        // skip ALIAS_OP
-
-    size_t name_size;
-
-    lai_nsnode_t *node = lai_create_nsnode_or_die();
-    node->type = LAI_NAMESPACE_ALIAS;
-    struct lai_amlname target_amln;
-    name_size = lai_amlname_parse(&target_amln, alias);
-
-    lai_nsnode_t *target_node = lai_do_resolve(parent, &target_amln);
-    if (!target_node)
-        lai_panic("cannot resolve target %s of Alias()", lai_stringify_amlname(&target_amln));
-    node->al_target = target_node;
-
-    return_size += name_size;
-    alias += name_size;
-
-    name_size = lai_resolve_new_node(node, parent, alias);
-
-    //lai_debug("alias %s for object %s", node->path, node->alias);
-
-    lai_install_nsnode(node);
-    return_size += name_size;
-    return return_size;
-}
-
-size_t lai_create_mutex(lai_nsnode_t *parent, void *data) {
-    size_t return_size = 2;
-    uint8_t *mutex = (uint8_t *)data;
-    mutex += 2;        // skip MUTEX_OP
-
-    lai_nsnode_t *node = lai_create_nsnode_or_die();
-    node->type = LAI_NAMESPACE_MUTEX;
-    size_t name_size = lai_resolve_new_node(node, parent, mutex);
-
-    return_size += name_size;
-    return_size++;
-
-    lai_install_nsnode(node);
-    return return_size;
-}
-
 size_t lai_create_indexfield(lai_nsnode_t *parent, void *data) {
     uint8_t *indexfield = (uint8_t *)data;
     indexfield += 2;        // skip INDEXFIELD_OP
