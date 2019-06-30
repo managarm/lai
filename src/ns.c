@@ -116,6 +116,63 @@ void lai_amlname_iterate(struct lai_amlname *amln, char *out) {
     amln->it += 4;
 }
 
+lai_nsnode_t *lai_do_resolve(lai_nsnode_t *ctx_handle, struct lai_amlname *amln) {
+    lai_nsnode_t *current = ctx_handle;
+    LAI_ENSURE(current);
+
+    if (amln->search_scopes) {
+        char segment[5];
+        lai_amlname_iterate(amln, segment);
+        LAI_ENSURE(lai_amlname_done(amln));
+        segment[4] = '\0';
+
+        while (current) {
+            char path[ACPI_MAX_NAME];
+            size_t n = lai_strlen(current->path);
+            lai_strcpy(path, current->path);
+            path[n] = '.';
+            lai_strcpy(path + 1 + n, segment);
+
+            lai_nsnode_t *node = lai_resolve(path);
+            if (node)
+                return node;
+            current = current->parent;
+        }
+
+        return NULL;
+    } else {
+        if (amln->is_absolute) {
+            while (current->parent)
+                current = current->parent;
+            LAI_ENSURE(current->type == LAI_NAMESPACE_ROOT);
+        }
+
+        for (int i = 0; i < amln->height; i++) {
+            if (!current->parent) {
+                LAI_ENSURE(current->type == LAI_NAMESPACE_ROOT);
+                break;
+            }
+            current = current->parent;
+        }
+
+        if (lai_amlname_done(amln))
+            return current;
+
+        char path[ACPI_MAX_NAME];
+        size_t n = lai_strlen(current->path);
+        lai_strcpy(path, current->path);
+
+        while (!lai_amlname_done(amln)) {
+            path[n] = '.';
+            lai_amlname_iterate(amln, path + 1 + n);
+            n += 5;
+        }
+        path[n] = '\0';
+
+        return lai_resolve(path);
+    }
+}
+
 void lai_do_resolve_new_node(lai_nsnode_t *node,
         lai_nsnode_t *ctx_handle, struct lai_amlname *amln) {
     // Note: we do not care about amln->search_scopes here.
@@ -248,7 +305,39 @@ lai_nsnode_t *lai_create_root(void) {
     lai_strcpy(root_node->path, "\\");
     root_node->parent = NULL;
 
-    // Create the OS-defined objects first.
+    // Create the predefined objects.
+    lai_nsnode_t *sb_node = lai_create_nsnode_or_die();
+    sb_node->type = LAI_NAMESPACE_DEVICE;
+    lai_strcpy(sb_node->path, "\\._SB_");
+    sb_node->parent = root_node;
+    lai_install_nsnode(sb_node);
+
+    lai_nsnode_t *si_node = lai_create_nsnode_or_die();
+    si_node->type = LAI_NAMESPACE_DEVICE;
+    lai_strcpy(si_node->path, "\\._SI_");
+    si_node->parent = root_node;
+    lai_install_nsnode(si_node);
+
+    lai_nsnode_t *gpe_node = lai_create_nsnode_or_die();
+    gpe_node->type = LAI_NAMESPACE_DEVICE;
+    lai_strcpy(gpe_node->path, "\\._GPE");
+    gpe_node->parent = root_node;
+    lai_install_nsnode(gpe_node);
+
+    // Create nodes for compatibility with ACPI 1.0.
+    lai_nsnode_t *pr_node = lai_create_nsnode_or_die();
+    pr_node->type = LAI_NAMESPACE_DEVICE;
+    lai_strcpy(pr_node->path, "\\._PR_");
+    pr_node->parent = root_node;
+    lai_install_nsnode(pr_node);
+
+    lai_nsnode_t *tz_node = lai_create_nsnode_or_die();
+    tz_node->type = LAI_NAMESPACE_DEVICE;
+    lai_strcpy(tz_node->path, "\\._TZ_");
+    tz_node->parent = root_node;
+    lai_install_nsnode(tz_node);
+
+    // Create the OS-defined objects.
     lai_nsnode_t *osi_node = lai_create_nsnode_or_die();
     osi_node->type = LAI_NAMESPACE_METHOD;
     lai_strcpy(osi_node->path, "\\._OSI");

@@ -50,10 +50,6 @@ __attribute__((noreturn)) void lai_panic(const char *, ...);
 #define LAI_NAMESPACE_EVENT         12
 #define LAI_NAMESPACE_POWER_RES     13
 
-// TODO: Scopes do not exist at the namespace level.
-//       This is a mistake in LAI's model. Remove LAI_NAMESPACE_SCOPE.
-#define LAI_NAMESPACE_SCOPE         14
-
 // ----------------------------------------------------------------------------
 // Data types defined by AML.
 // ----------------------------------------------------------------------------

@@ -1089,14 +1089,13 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             state->pc += lai_parse_pkgsize(method + state->pc, &encoded_size);
             state->pc += lai_amlname_parse(&amln, method + state->pc);
 
-            lai_nsnode_t *node = lai_create_nsnode_or_die();
-            node->type = LAI_NAMESPACE_SCOPE;
-            lai_do_resolve_new_node(node, ctx_handle, &amln);
-            lai_install_nsnode(node);
+            lai_nsnode_t *scoped_ctx_handle = lai_do_resolve(ctx_handle, &amln);
+            if (!scoped_ctx_handle)
+                lai_panic("could not resolve node referenced in scope");
 
             lai_stackitem_t *item = lai_exec_push_stack_or_die(state);
             item->kind = LAI_POPULATE_CONTEXT_STACKITEM;
-            item->ctx_handle = node;
+            item->ctx_handle = scoped_ctx_handle;
             item->ctx_limit = opcode_pc + encoded_size + 1;
             lai_exec_update_context(state);
             break;

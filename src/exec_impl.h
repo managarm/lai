@@ -32,6 +32,9 @@ int lai_amlname_done(struct lai_amlname *amln);
 // out must be a char array of size >= 4.
 void lai_amlname_iterate(struct lai_amlname *amln, char *out);
 
+// This will replace lai_resolve().
+lai_nsnode_t *lai_do_resolve(lai_nsnode_t *ctx_handle, struct lai_amlname *amln);
+
 // Used in the implementation of lai_resolve_new_node().
 void lai_do_resolve_new_node(lai_nsnode_t *node,
         lai_nsnode_t *ctx_handle, struct lai_amlname *amln);
