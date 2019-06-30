@@ -76,6 +76,18 @@ void lai_uninstall_nsnode(lai_nsnode_t *node) {
     }
 }
 
+lai_nsnode_t *lai_get_child(lai_nsnode_t *parent, char *name) {
+    char path[ACPI_MAX_NAME];
+    size_t n = lai_strlen(parent->fullpath);
+    lai_strcpy(path, parent->fullpath);
+    path[n++] = '.';
+    for(int i = 0; i < 4; i++)
+        path[n++] = name[i];
+    path[n++] = '\0';
+
+    return lai_legacy_resolve(path);
+}
+
 size_t lai_amlname_parse(struct lai_amlname *amln, const void *data) {
     amln->is_absolute = 0;
     amln->height = 0;
@@ -218,13 +230,7 @@ lai_nsnode_t *lai_do_resolve(lai_nsnode_t *ctx_handle, const struct lai_amlname 
             lai_debug("resolving %s by searching through scopes", segment);
 
         while (current) {
-            char path[ACPI_MAX_NAME];
-            size_t n = lai_strlen(current->fullpath);
-            lai_strcpy(path, current->fullpath);
-            path[n] = '.';
-            lai_strcpy(path + 1 + n, segment);
-
-            lai_nsnode_t *node = lai_legacy_resolve(path);
+            lai_nsnode_t *node = lai_get_child(current, segment);
             if (!node) {
                 current = current->parent;
                 continue;
@@ -258,25 +264,19 @@ lai_nsnode_t *lai_do_resolve(lai_nsnode_t *ctx_handle, const struct lai_amlname 
         if (lai_amlname_done(&amln))
             return current;
 
-        char path[ACPI_MAX_NAME];
-        size_t n = lai_strlen(current->fullpath);
-        lai_strcpy(path, current->fullpath);
-
         while (!lai_amlname_done(&amln)) {
-            path[n] = '.';
-            lai_amlname_iterate(&amln, path + 1 + n);
-            n += 5;
+            char segment[4];
+            lai_amlname_iterate(&amln, segment);
+            current = lai_get_child(current, segment);
+            if (!current)
+                return NULL;
         }
-        path[n] = '\0';
 
-        lai_nsnode_t *node = lai_legacy_resolve(path);
-        if (!node)
-            return NULL;
-        if (node->type == LAI_NAMESPACE_ALIAS) {
-            node = node->al_target;
-            LAI_ENSURE(node->type != LAI_NAMESPACE_ALIAS);
+        if (current->type == LAI_NAMESPACE_ALIAS) {
+            current = current->al_target;
+            LAI_ENSURE(current->type != LAI_NAMESPACE_ALIAS);
         }
-        return node;
+        return current;
     }
 }
 
@@ -314,20 +314,21 @@ void lai_do_resolve_new_node(lai_nsnode_t *node,
         lai_amlname_iterate(&amln, segment);
         segment[4] = '\0';
 
-        char path[ACPI_MAX_NAME];
-        size_t n = lai_strlen(parent->fullpath);
-        lai_strcpy(path, parent->fullpath);
-        path[n] = '.';
-        lai_strcpy(path + 1 + n, segment);
-
         if (lai_amlname_done(&amln)) {
+            // Construct the full path of the new object.
+            char path[ACPI_MAX_NAME];
+            size_t n = lai_strlen(parent->fullpath);
+            lai_strcpy(path, parent->fullpath);
+            path[n] = '.';
+            lai_strcpy(path + 1 + n, segment);
+
             // The last segment is the name of the new node.
             lai_strcpy(node->fullpath, path);
             lai_namecpy(node->name, segment);
             node->parent = parent;
             break;
         } else {
-            parent = lai_legacy_resolve(path);
+            parent = lai_get_child(parent, segment);
             LAI_ENSURE(parent);
             if (parent->type == LAI_NAMESPACE_ALIAS) {
                 lai_warn("resolution of new object name traverses Alias(),"
