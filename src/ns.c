@@ -16,6 +16,8 @@
 #define CODE_WINDOW            131072
 #define NAMESPACE_WINDOW       8192
 
+static int debug_resolution = 0;
+
 int lai_do_osi_method(lai_object_t *args, lai_object_t *result);
 int lai_do_os_method(lai_object_t *args, lai_object_t *result);
 int lai_do_rev_method(lai_object_t *args, lai_object_t *result);
@@ -125,6 +127,9 @@ lai_nsnode_t *lai_do_resolve(lai_nsnode_t *ctx_handle, struct lai_amlname *amln)
         lai_amlname_iterate(amln, segment);
         LAI_ENSURE(lai_amlname_done(amln));
         segment[4] = '\0';
+
+        if(debug_resolution)
+            lai_debug("resolving %s by searching through scopes", segment);
 
         while (current) {
             char path[ACPI_MAX_NAME];
