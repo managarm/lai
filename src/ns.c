@@ -63,12 +63,12 @@ void lai_install_nsnode(lai_nsnode_t *node) {
     lai_namespace[lai_ns_size++] = node;
 }
 
-size_t lai_amlname_parse(struct lai_amlname *amln, void *data) {
+size_t lai_amlname_parse(struct lai_amlname *amln, const void *data) {
     amln->is_absolute = 0;
     amln->height = 0;
 
-    uint8_t *begin = data;
-    uint8_t *it = begin;
+    const uint8_t *begin = data;
+    const uint8_t *it = begin;
     if (*it == '\\') {
         // First character is \ for absolute paths.
         amln->is_absolute = 1;
@@ -114,6 +114,61 @@ void lai_amlname_iterate(struct lai_amlname *amln, char *out) {
     for (int i = 0; i < 4; i++)
         out[i] = amln->it[i];
     amln->it += 4;
+}
+
+void lai_do_resolve_new_node(lai_nsnode_t *node,
+        lai_nsnode_t *ctx_handle, struct lai_amlname *amln) {
+    // Note: we do not care about amln->search_scopes here.
+    //       As we are creating a new name, the code below already does the correct thing.
+
+    lai_nsnode_t *parent = ctx_handle;
+    LAI_ENSURE(parent);
+
+    if (amln->is_absolute) {
+        while (parent->parent)
+            parent = parent->parent;
+        LAI_ENSURE(parent->type == LAI_NAMESPACE_ROOT);
+    }
+
+    for (int i = 0; i < amln->height; i++) {
+        if (!parent->parent) {
+            LAI_ENSURE(parent->type == LAI_NAMESPACE_ROOT);
+            break;
+        }
+        parent = parent->parent;
+    }
+
+    // Otherwise the new object has an empty name.
+    LAI_ENSURE(!lai_amlname_done(amln));
+
+    for (;;) {
+        char segment[5];
+        lai_amlname_iterate(amln, segment);
+        segment[4] = '\0';
+
+        char path[ACPI_MAX_NAME];
+        size_t n = lai_strlen(parent->path);
+        lai_strcpy(path, parent->path);
+        path[n] = '.';
+        lai_strcpy(path + 1 + n, segment);
+
+        if (lai_amlname_done(amln)) {
+            // The last segment is the name of the new node.
+            lai_strcpy(node->path, path);
+            node->parent = parent;
+            break;
+        } else {
+            parent = lai_resolve(path);
+            LAI_ENSURE(parent);
+        }
+    }
+}
+
+size_t lai_resolve_new_node(lai_nsnode_t *node, lai_nsnode_t *ctx_handle, void *data) {
+    struct lai_amlname amln;
+    size_t size = lai_amlname_parse(&amln, data);
+    lai_do_resolve_new_node(node, ctx_handle, &amln);
+    return size;
 }
 
 size_t lai_resolve_path(lai_nsnode_t *context, char *fullpath, const uint8_t *path) {
@@ -187,6 +242,40 @@ start:
     return name_size;
 }
 
+lai_nsnode_t *lai_create_root(void) {
+    lai_nsnode_t *root_node = lai_create_nsnode_or_die();
+    root_node->type = LAI_NAMESPACE_ROOT;
+    lai_strcpy(root_node->path, "\\");
+    root_node->parent = NULL;
+
+    // Create the OS-defined objects first.
+    lai_nsnode_t *osi_node = lai_create_nsnode_or_die();
+    osi_node->type = LAI_NAMESPACE_METHOD;
+    lai_strcpy(osi_node->path, "\\._OSI");
+    osi_node->parent = root_node;
+    osi_node->method_flags = 0x01;
+    osi_node->method_override = &lai_do_osi_method;
+    lai_install_nsnode(osi_node);
+
+    lai_nsnode_t *os_node = lai_create_nsnode_or_die();
+    os_node->type = LAI_NAMESPACE_METHOD;
+    lai_strcpy(os_node->path, "\\._OS_");
+    os_node->parent = root_node;
+    os_node->method_flags = 0x00;
+    os_node->method_override = &lai_do_os_method;
+    lai_install_nsnode(os_node);
+
+    lai_nsnode_t *rev_node = lai_create_nsnode_or_die();
+    rev_node->type = LAI_NAMESPACE_METHOD;
+    lai_strcpy(rev_node->path, "\\._REV");
+    rev_node->parent = root_node;
+    rev_node->method_flags = 0x00;
+    rev_node->method_override = &lai_do_rev_method;
+    lai_install_nsnode(rev_node);
+
+    return root_node;
+}
+
 // Creates the ACPI namespace. Requires the ability to scan for ACPI tables - ensure this is
 // implemented in the host operating system.
 void lai_create_namespace(void) {
@@ -203,27 +292,7 @@ void lai_create_namespace(void) {
         lai_panic("unable to find ACPI FADT.");
     }
 
-    // Create the OS-defined objects first.
-    lai_nsnode_t *osi_node = lai_create_nsnode_or_die();
-    osi_node->type = LAI_NAMESPACE_METHOD;
-    lai_strcpy(osi_node->path, "\\._OSI");
-    osi_node->method_flags = 0x01;
-    osi_node->method_override = &lai_do_osi_method;
-    lai_install_nsnode(osi_node);
-
-    lai_nsnode_t *os_node = lai_create_nsnode_or_die();
-    os_node->type = LAI_NAMESPACE_METHOD;
-    lai_strcpy(os_node->path, "\\._OS_");
-    os_node->method_flags = 0x00;
-    os_node->method_override = &lai_do_os_method;
-    lai_install_nsnode(os_node);
-
-    lai_nsnode_t *rev_node = lai_create_nsnode_or_die();
-    rev_node->type = LAI_NAMESPACE_METHOD;
-    lai_strcpy(rev_node->path, "\\._REV");
-    rev_node->method_flags = 0x00;
-    rev_node->method_override = &lai_do_rev_method;
-    lai_install_nsnode(rev_node);
+    lai_nsnode_t *root_node = lai_create_root();
 
     // Create the namespace with all the objects.
     lai_state_t state;
@@ -232,7 +301,7 @@ void lai_create_namespace(void) {
     void *dsdt_table = laihost_scan("DSDT", 0);
     void *dsdt_amls = lai_load_table(dsdt_table, 0);
     lai_init_state(&state);
-    lai_populate(NULL, dsdt_amls, &state);
+    lai_populate(root_node, dsdt_amls, &state);
     lai_finalize_state(&state);
 
     // Load all SSDTs.
@@ -241,7 +310,7 @@ void lai_create_namespace(void) {
     while ((ssdt_table = laihost_scan("SSDT", index))) {
         void *ssdt_amls = lai_load_table(ssdt_table, index);
         lai_init_state(&state);
-        lai_populate(NULL, ssdt_amls, &state);
+        lai_populate(root_node, ssdt_amls, &state);
         lai_finalize_state(&state);
         index++;
     }
@@ -253,7 +322,7 @@ void lai_create_namespace(void) {
     while ((psdt_table = laihost_scan("PSDT", index))) {
         void *psdt_amls = lai_load_table(psdt_table, index);
         lai_init_state(&state);
-        lai_populate(NULL, psdt_amls, &state);
+        lai_populate(root_node, psdt_amls, &state);
         lai_finalize_state(&state);
         index++;
     }
@@ -363,8 +432,7 @@ size_t lai_create_field(lai_nsnode_t *parent, void *data) {
 
         lai_nsnode_t *node = lai_create_nsnode_or_die();
         node->type = LAI_NAMESPACE_FIELD;
-
-        name_size = lai_resolve_path(parent, node->path, &field[0]);
+        name_size = lai_resolve_new_node(node, parent, &field[0]);
         field += name_size;
         byte_count += name_size;
 
@@ -399,7 +467,7 @@ size_t lai_create_method(lai_nsnode_t *parent, struct lai_aml_segment *amls, voi
 
     // create a namespace object for the method
     lai_nsnode_t *node = lai_create_nsnode_or_die();
-    size_t name_length = lai_resolve_path(parent, node->path, method);
+    size_t name_length = lai_resolve_new_node(node, parent, method);
 
     // get the method's flags
     method = (uint8_t *)data;
@@ -432,7 +500,7 @@ size_t lai_create_alias(lai_nsnode_t *parent, void *data) {
     return_size += name_size;
     alias += name_size;
 
-    name_size = lai_resolve_path(parent, node->path, alias);
+    name_size = lai_resolve_new_node(node, parent, alias);
 
     //lai_debug("alias %s for object %s", node->path, node->alias);
 
@@ -448,7 +516,7 @@ size_t lai_create_mutex(lai_nsnode_t *parent, void *data) {
 
     lai_nsnode_t *node = lai_create_nsnode_or_die();
     node->type = LAI_NAMESPACE_MUTEX;
-    size_t name_size = lai_resolve_path(parent, node->path, mutex);
+    size_t name_size = lai_resolve_new_node(node, parent, mutex);
 
     return_size += name_size;
     return_size++;
@@ -505,13 +573,8 @@ size_t lai_create_indexfield(lai_nsnode_t *parent, void *data) {
         //lai_debug("indexfield %c%c%c%c: size %d bits, at bit offset %d", indexfield[0], indexfield[1], indexfield[2], indexfield[3], indexfield[4], current_offset);
         lai_nsnode_t *node = lai_create_nsnode_or_die();
         node->type = LAI_NAMESPACE_INDEXFIELD;
-        // FIXME: This looks odd. Why don't we all acpins_resolve_path()?
 
-        /*memcpy(node->path, parent->path, lai_strlen(parent->path));
-        node->path[lai_strlen(parent->path)] = '.';
-        memcpy(node->path + lai_strlen(parent->path) + 1, indexfield, 4);*/
-
-        name_size = lai_resolve_path(parent, node->path, &indexfield[0]);
+        name_size = lai_resolve_new_node(node, parent, &indexfield[0]);
 
         indexfield += name_size;
         byte_count += name_size;
@@ -546,7 +609,7 @@ size_t lai_create_processor(lai_nsnode_t *parent, void *data) {
 
     lai_nsnode_t *node = lai_create_nsnode_or_die();
     node->type = LAI_NAMESPACE_PROCESSOR;
-    size_t name_size = lai_resolve_path(parent, node->path, processor);
+    size_t name_size = lai_resolve_new_node(node, parent, processor);
     processor += name_size;
 
     node->cpu_id = processor[0];

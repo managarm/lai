@@ -23,7 +23,7 @@ struct lai_amlname {
 
 // Initializes the AML name parser.
 // Use lai_amlname_done() + lai_amlname_iterate() to process the name.
-size_t lai_amlname_parse(struct lai_amlname *amln, void *data);
+size_t lai_amlname_parse(struct lai_amlname *amln, const void *data);
 
 // Returns true if there are no more segments.
 int lai_amlname_done(struct lai_amlname *amln);
@@ -31,6 +31,10 @@ int lai_amlname_done(struct lai_amlname *amln);
 // Copies the next segment of the name to out.
 // out must be a char array of size >= 4.
 void lai_amlname_iterate(struct lai_amlname *amln, char *out);
+
+// Used in the implementation of lai_resolve_new_node().
+void lai_do_resolve_new_node(lai_nsnode_t *node,
+        lai_nsnode_t *ctx_handle, struct lai_amlname *amln);
 
 // Evaluate constant data (and keep result).
 //     Primitive objects are parsed.

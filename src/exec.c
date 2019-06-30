@@ -128,7 +128,8 @@ static int lai_compare(lai_object_t *lhs, lai_object_t *rhs) {
     return lhs->integer - rhs->integer;
 }
 
-static void lai_exec_reduce_node(int opcode, lai_state_t *state, lai_object_t *operands) {
+static void lai_exec_reduce_node(int opcode, lai_state_t *state, lai_object_t *operands,
+        lai_nsnode_t *ctx_handle) {
     if (debug_opcodes)
         lai_debug("lai_exec_reduce_node: opcode 0x%02X", opcode);
     switch (opcode) {
@@ -142,13 +143,13 @@ static void lai_exec_reduce_node(int opcode, lai_state_t *state, lai_object_t *o
             LAI_ENSURE(operands[2].type == LAI_UNRESOLVED_NAME);
 
             char buffer_name[ACPI_MAX_NAME];
-            char node_name[ACPI_MAX_NAME];
+            struct lai_amlname node_amln;
             lai_resolve_path(operands[0].unres_ctx_handle, buffer_name, operands[0].unres_aml);
-            lai_resolve_path(operands[2].unres_ctx_handle, node_name, operands[2].unres_aml);
+            lai_amlname_parse(&node_amln, operands[2].unres_aml);
 
             lai_nsnode_t *node = lai_create_nsnode_or_die();
             node->type = LAI_NAMESPACE_BUFFER_FIELD;
-            lai_strcpy(node->path, node_name);
+            lai_do_resolve_new_node(node, operands[2].unres_ctx_handle, &node_amln);
 
             lai_nsnode_t *buffer_node = lai_exec_resolve(buffer_name);
             if (!buffer_node)
@@ -573,6 +574,9 @@ size_t lai_parse_integer(uint8_t *object, uint64_t *out) {
 static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state_t *state) {
     lai_stackitem_t *item;
     while ((item = lai_exec_peek_stack_back(state))) {
+        lai_stackitem_t *ctx_item = lai_exec_context(state);
+        lai_nsnode_t *ctx_handle = ctx_item->ctx_handle;
+
         // Package-size encoding (and similar) needs to know the PC of the opcode.
         // If an opcode sequence contains a pkgsize, the sequence generally ends at:
         //     opcode_pc + pkgsize + opcode size.
@@ -645,7 +649,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             int k = state->opstack_ptr - item->opstack_frame;
             if (!item->node_arg_modes[k]) {
                 lai_object_t *operands = lai_exec_get_opstack(state, item->opstack_frame);
-                lai_exec_reduce_node(item->node_opcode, state, operands);
+                lai_exec_reduce_node(item->node_opcode, state, operands, ctx_handle);
                 lai_exec_pop_opstack(state, k);
 
                 lai_exec_pop_stack_back(state);
@@ -727,9 +731,6 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
         if (state->pc >= state->limit) // This would be an interpreter bug.
             lai_panic("execution escaped out of code range (PC is 0x%x with limit 0x%x)",
                     state->pc, state->limit);
-
-        lai_stackitem_t *ctx_item = lai_exec_context(state);
-        lai_nsnode_t *ctx_handle = ctx_item->ctx_handle;
 
         if (exec_result_mode == LAI_IMMEDIATE_WORD_MODE) {
             lai_object_t *result = lai_exec_push_opstack_or_die(state);
@@ -1066,19 +1067,15 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
         {
             state->pc++;
 
-            char path[ACPI_MAX_NAME];
-            state->pc += lai_resolve_path(ctx_handle, path, method + state->pc);
+            struct lai_amlname amln;
+            state->pc += lai_amlname_parse(&amln, method + state->pc);
 
-            lai_nsnode_t *handle = lai_resolve(path);
-            if (!handle) {
-                // Create it if it does not already exist.
-                handle = lai_create_nsnode_or_die();
-                handle->type = LAI_NAMESPACE_NAME;
-                lai_strcpy(handle->path, path);
-                lai_install_nsnode(handle);
-            }
+            lai_nsnode_t *node = lai_create_nsnode_or_die();
+            node->type = LAI_NAMESPACE_NAME;
+            lai_do_resolve_new_node(node, ctx_handle, &amln);
+            lai_install_nsnode(node);
 
-            lai_eval_operand(&handle->object, state, amls, method);
+            lai_eval_operand(&node->object, state, amls, method);
             break;
         }
 
@@ -1088,13 +1085,13 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             state->pc++;
 
             size_t encoded_size;
+            struct lai_amlname amln;
             state->pc += lai_parse_pkgsize(method + state->pc, &encoded_size);
-            char name[ACPI_MAX_NAME];
-            state->pc += lai_resolve_path(ctx_handle, name, method + state->pc);
+            state->pc += lai_amlname_parse(&amln, method + state->pc);
 
             lai_nsnode_t *node = lai_create_nsnode_or_die();
             node->type = LAI_NAMESPACE_SCOPE;
-            lai_strcpy(node->path, name);
+            lai_do_resolve_new_node(node, ctx_handle, &amln);
             lai_install_nsnode(node);
 
             lai_stackitem_t *item = lai_exec_push_stack_or_die(state);
@@ -1109,13 +1106,13 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             state->pc += 2;
 
             size_t encoded_size;
+            struct lai_amlname amln;
             state->pc += lai_parse_pkgsize(method + state->pc, &encoded_size);
-            char name[ACPI_MAX_NAME];
-            state->pc += lai_resolve_path(ctx_handle, name, method + state->pc);
+            state->pc += lai_amlname_parse(&amln, method + state->pc);
 
             lai_nsnode_t *node = lai_create_nsnode_or_die();
             node->type = LAI_NAMESPACE_DEVICE;
-            lai_strcpy(node->path, name);
+            lai_do_resolve_new_node(node, ctx_handle, &amln);
             lai_install_nsnode(node);
 
             lai_stackitem_t *item = lai_exec_push_stack_or_die(state);
@@ -1133,13 +1130,13 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             state->pc += 2;
 
             size_t encoded_size;
+            struct lai_amlname amln;
             state->pc += lai_parse_pkgsize(method + state->pc, &encoded_size);
-            char name[ACPI_MAX_NAME];
-            state->pc += lai_resolve_path(ctx_handle, name, method + state->pc);
+            state->pc += lai_amlname_parse(&amln, method + state->pc);
 
             lai_nsnode_t *node = lai_create_nsnode_or_die();
             node->type = LAI_NAMESPACE_POWER_RES;
-            lai_strcpy(node->path, name);
+            lai_do_resolve_new_node(node, ctx_handle, &amln);
             lai_install_nsnode(node);
 
 //            uint8_t system_level = method[state->pc];
@@ -1160,13 +1157,13 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             state->pc += 2;
 
             size_t encoded_size;
+            struct lai_amlname amln;
             state->pc += lai_parse_pkgsize(method + state->pc, &encoded_size);
-            char name[ACPI_MAX_NAME];
-            state->pc += lai_resolve_path(ctx_handle, name, method + state->pc);
+            state->pc += lai_amlname_parse(&amln, method + state->pc);
 
             lai_nsnode_t *node = lai_create_nsnode_or_die();
             node->type = LAI_NAMESPACE_THERMALZONE;
-            lai_strcpy(node->path, name);
+            lai_do_resolve_new_node(node, ctx_handle, &amln);
             lai_install_nsnode(node);
 
             lai_stackitem_t *item = lai_exec_push_stack_or_die(state);
@@ -1206,16 +1203,21 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
         case (EXTOP_PREFIX << 8) | EVENT:
         {
             state->pc += 2;
+
+            struct lai_amlname amln;
+            state->pc += lai_amlname_parse(&amln, method + state->pc);
+
             lai_nsnode_t* node = lai_create_nsnode_or_die();
             node->type = LAI_NAMESPACE_EVENT;
-            state->pc += lai_resolve_path(ctx_handle, node->path, method + state->pc);
+            lai_do_resolve_new_node(node, ctx_handle, &amln);
             break;
         }
         case (EXTOP_PREFIX << 8) | OPREGION:
         {
             state->pc += 2;
-            char name[ACPI_MAX_NAME];
-            state->pc += lai_resolve_path(ctx_handle, name, method + state->pc);
+
+            struct lai_amlname amln;
+            state->pc += lai_amlname_parse(&amln, method + state->pc);
 
             // First byte identifies the address space (memory, I/O ports, PCI, etc.).
             int address_space = method[state->pc];
@@ -1228,7 +1230,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             lai_eval_operand(&length, state, amls, method);
 
             lai_nsnode_t *node = lai_create_nsnode_or_die();
-            lai_strcpy(node->path, name);
+            lai_do_resolve_new_node(node, ctx_handle, &amln);
             node->op_address_space = address_space;
             node->op_base = disp.integer;
             node->op_length = length.integer;

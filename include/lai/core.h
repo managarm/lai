@@ -36,9 +36,9 @@ __attribute__((noreturn)) void lai_panic(const char *, ...);
 #define ACPI_MAX_NAME               64
 #define ACPI_MAX_RESOURCES          512
 
-#define LAI_NAMESPACE_NAME          1
-#define LAI_NAMESPACE_ALIAS         2
-#define LAI_NAMESPACE_SCOPE         3
+#define LAI_NAMESPACE_ROOT          1
+#define LAI_NAMESPACE_NAME          2
+#define LAI_NAMESPACE_ALIAS         3
 #define LAI_NAMESPACE_FIELD         4
 #define LAI_NAMESPACE_METHOD        5
 #define LAI_NAMESPACE_DEVICE        6
@@ -49,6 +49,10 @@ __attribute__((noreturn)) void lai_panic(const char *, ...);
 #define LAI_NAMESPACE_THERMALZONE   11
 #define LAI_NAMESPACE_EVENT         12
 #define LAI_NAMESPACE_POWER_RES     13
+
+// TODO: Scopes do not exist at the namespace level.
+//       This is a mistake in LAI's model. Remove LAI_NAMESPACE_SCOPE.
+#define LAI_NAMESPACE_SCOPE         14
 
 // ----------------------------------------------------------------------------
 // Data types defined by AML.
@@ -184,6 +188,7 @@ typedef struct lai_nsnode_t
 {
     char path[ACPI_MAX_NAME];    // full path of object
     int type;
+    struct lai_nsnode_t *parent;
     struct lai_aml_segment *amls;
     void *pointer;            // valid for scopes, methods, etc.
     size_t size;            // valid for scopes, methods, etc.
@@ -305,6 +310,7 @@ extern volatile uint16_t lai_last_event;
 
 // The remaining of these functions are OS independent!
 // ACPI namespace functions
+lai_nsnode_t *lai_create_root(void);
 void lai_create_namespace(void);
 lai_nsnode_t *lai_resolve(char *);
 lai_nsnode_t *lai_get_device(size_t);
