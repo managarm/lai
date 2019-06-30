@@ -1537,11 +1537,8 @@ int lai_exec_method(lai_nsnode_t *method, lai_state_t *state) {
 // Return:   int - 0 on success
 
 int lai_eval_node(lai_nsnode_t *handle, lai_state_t *state) {
-    while (handle->type == LAI_NAMESPACE_ALIAS) {
-        handle = lai_resolve(handle->alias);
-        if (!handle)
-            return 1;
-    }
+    if (handle->type == LAI_NAMESPACE_ALIAS)
+        handle = handle->al_target;
 
     if (handle->type == LAI_NAMESPACE_NAME) {
         lai_clone_object(&state->retvalue, &handle->object);

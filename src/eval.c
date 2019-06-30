@@ -74,11 +74,8 @@ int lai_eval(lai_object_t *destination, char *path) {
     if (!handle)
         return 1;
 
-    while (handle->type == LAI_NAMESPACE_ALIAS) {
-        handle = lai_resolve(handle->alias);
-        if (!handle)
-            return 1;
-    }
+    if (handle->type == LAI_NAMESPACE_ALIAS)
+        handle = handle->al_target;
 
     if (handle->type == LAI_NAMESPACE_NAME) {
         lai_clone_object(destination, &handle->object);

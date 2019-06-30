@@ -189,7 +189,6 @@ typedef struct lai_nsnode_t
     void *pointer;            // valid for scopes, methods, etc.
     size_t size;            // valid for scopes, methods, etc.
 
-    char alias[ACPI_MAX_NAME];    // for Alias() only
     lai_object_t object;        // for Name()
 
     uint8_t op_address_space;    // for OpRegions only
@@ -206,6 +205,8 @@ typedef struct lai_nsnode_t
     uint8_t cpu_id;            // for Processor
 
     union {
+        struct lai_nsnode_t *al_target; // LAI_NAMESPACE_ALIAS.
+
         struct { // LAI_NAMESPACE_FIELD.
             struct lai_nsnode_t *fld_region_node;
             uint64_t fld_offset; // In bits.

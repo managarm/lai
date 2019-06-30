@@ -48,12 +48,8 @@ lai_nsnode_t *lai_exec_resolve(char *path) {
 
 resolve_alias:
     // resolve Aliases too
-    while (object->type == LAI_NAMESPACE_ALIAS)
-    {
-        object = lai_resolve(object->alias);
-        if (!object)
-            return NULL;
-    }
+    if (object->type == LAI_NAMESPACE_ALIAS)
+        object = object->al_target;
 
     return object;
 }

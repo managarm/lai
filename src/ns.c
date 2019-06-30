@@ -618,7 +618,13 @@ size_t lai_create_alias(lai_nsnode_t *parent, void *data) {
 
     lai_nsnode_t *node = lai_create_nsnode_or_die();
     node->type = LAI_NAMESPACE_ALIAS;
-    name_size = lai_resolve_path(parent, node->alias, alias);
+    struct lai_amlname target_amln;
+    name_size = lai_amlname_parse(&target_amln, alias);
+
+    lai_nsnode_t *target_node = lai_do_resolve(parent, &target_amln);
+    if (!target_node)
+        lai_panic("cannot resolve target %s of Alias()", lai_stringify_amlname(&target_amln));
+    node->al_target = target_node;
 
     return_size += name_size;
     alias += name_size;
