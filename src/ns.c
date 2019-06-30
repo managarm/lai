@@ -12,6 +12,7 @@
 #include "exec_impl.h"
 #include "libc.h"
 #include "eval.h"
+#include "util-hash.h"
 
 #define CODE_WINDOW            131072
 #define NAMESPACE_WINDOW       8192
@@ -30,6 +31,14 @@ size_t lai_ns_capacity = 0;
 acpi_fadt_t *lai_fadt;
 
 static struct lai_aml_segment *lai_load_table(void *ptr, int index);
+
+static unsigned int lai_hash_string(const char *str, size_t n) {
+    // Simple djb2 hash function. TODO: Replace by SipHash for DoS resilience.
+    unsigned int x = 5381;
+    for (size_t i = 0; i < n; i++)
+        x = ((x << 5) + x) + str[i];
+    return x;
+}
 
 lai_nsnode_t *lai_create_nsnode(void) {
     lai_nsnode_t *node = laihost_malloc(sizeof(lai_nsnode_t));
@@ -67,6 +76,13 @@ void lai_install_nsnode(lai_nsnode_t *node) {
 
     /*lai_debug("created %s", node->fullpath);*/
     lai_namespace[lai_ns_size++] = node;
+
+    // Insert the node into its parent's hash table.
+    lai_nsnode_t *parent = node->parent;
+    if (parent) {
+        int h = lai_hash_string(node->name, 4);
+        lai_hashtable_insert(&parent->children, h, node);
+    }
 }
 
 void lai_uninstall_nsnode(lai_nsnode_t *node) {
@@ -74,18 +90,32 @@ void lai_uninstall_nsnode(lai_nsnode_t *node) {
         if (lai_namespace[i] == node)
             lai_namespace[i] = NULL;
     }
+
+    // Remove the node from its parent's hash table.
+    lai_nsnode_t *parent = node->parent;
+    if (parent) {
+        int h = lai_hash_string(node->name, 4);
+        struct lai_hashtable_chain chain = LAI_HASHTABLE_CHAIN_INITIALIZER;
+        for (;;) {
+            lai_hashtable_chain_advance(&parent->children, h, &chain);
+            lai_nsnode_t *child = lai_hashtable_chain_get(&parent->children, h, &chain);
+            if (child != node)
+                continue;
+            lai_hashtable_chain_remove(&parent->children, h, &chain);
+            break;
+        }
+    }
 }
 
 lai_nsnode_t *lai_get_child(lai_nsnode_t *parent, char *name) {
-    char path[ACPI_MAX_NAME];
-    size_t n = lai_strlen(parent->fullpath);
-    lai_strcpy(path, parent->fullpath);
-    path[n++] = '.';
-    for(int i = 0; i < 4; i++)
-        path[n++] = name[i];
-    path[n++] = '\0';
-
-    return lai_legacy_resolve(path);
+    int h = lai_hash_string(name, 4);
+    struct lai_hashtable_chain chain = LAI_HASHTABLE_CHAIN_INITIALIZER;
+    while (!lai_hashtable_chain_advance(&parent->children, h, &chain)) {
+        lai_nsnode_t *child = lai_hashtable_chain_get(&parent->children, h, &chain);
+        if (!memcmp(child->name, name, 4))
+            return child;
+    }
+    return NULL;
 }
 
 size_t lai_amlname_parse(struct lai_amlname *amln, const void *data) {

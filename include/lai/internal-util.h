@@ -61,3 +61,16 @@ struct lai_list_item {
 struct lai_list {
     struct lai_list_item hook;
 };
+
+//---------------------------------------------------------------------------------------
+// Hash table data structure.
+//---------------------------------------------------------------------------------------
+
+struct lai_hashtable {
+    int elem_capacity;   // Capacity of elem_{ptr,hash}_tab.
+    int bucket_capacity; // Size of bucket_tab. *Must* be a power of 2.
+    int num_elems;       // Number of elements in the table.
+    void **elem_ptr_tab; // Stores the pointer of each element.
+    int *elem_hash_tab;  // Stores the hash of each element.
+    int *bucket_tab;     // Indexes into elem_{ptr,hash}_tab.
+};

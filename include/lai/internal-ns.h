@@ -85,5 +85,8 @@ typedef struct lai_nsnode
 
 	// Stores a list of all namespace nodes created by the same method.
     struct lai_list_item per_method_item;
+
+    // Hash table that stores the children of each node.
+    struct lai_hashtable children;
 } lai_nsnode_t;
 
