@@ -155,6 +155,7 @@ char *lai_stringify_amlname(struct lai_amlname *in_amln) {
 lai_nsnode_t *lai_do_resolve(lai_nsnode_t *ctx_handle, struct lai_amlname *amln) {
     lai_nsnode_t *current = ctx_handle;
     LAI_ENSURE(current);
+    LAI_ENSURE(current->type != LAI_NAMESPACE_ALIAS); // ctx_handle needs to be resolved.
 
     if (amln->search_scopes) {
         char segment[5];
@@ -173,9 +174,16 @@ lai_nsnode_t *lai_do_resolve(lai_nsnode_t *ctx_handle, struct lai_amlname *amln)
             lai_strcpy(path + 1 + n, segment);
 
             lai_nsnode_t *node = lai_resolve(path);
-            if (node)
-                return node;
-            current = current->parent;
+            if (!node) {
+                current = current->parent;
+                continue;
+            }
+
+            if (node->type == LAI_NAMESPACE_ALIAS) {
+                node = node->al_target;
+                LAI_ENSURE(node->type != LAI_NAMESPACE_ALIAS);
+            }
+            return node;
         }
 
         return NULL;
@@ -208,17 +216,23 @@ lai_nsnode_t *lai_do_resolve(lai_nsnode_t *ctx_handle, struct lai_amlname *amln)
         }
         path[n] = '\0';
 
-        return lai_resolve(path);
+        lai_nsnode_t *node = lai_resolve(path);
+        if (node->type == LAI_NAMESPACE_ALIAS) {
+            node = node->al_target;
+            LAI_ENSURE(node->type != LAI_NAMESPACE_ALIAS);
+        }
+        return node;
     }
 }
 
 void lai_do_resolve_new_node(lai_nsnode_t *node,
         lai_nsnode_t *ctx_handle, struct lai_amlname *amln) {
-    // Note: we do not care about amln->search_scopes here.
-    //       As we are creating a new name, the code below already does the correct thing.
-
     lai_nsnode_t *parent = ctx_handle;
     LAI_ENSURE(parent);
+    LAI_ENSURE(parent->type != LAI_NAMESPACE_ALIAS); // ctx_handle needs to be resolved.
+
+    // Note: we do not care about amln->search_scopes here.
+    //       As we are creating a new name, the code below already does the correct thing.
 
     if (amln->is_absolute) {
         while (parent->parent)
@@ -256,6 +270,12 @@ void lai_do_resolve_new_node(lai_nsnode_t *node,
         } else {
             parent = lai_resolve(path);
             LAI_ENSURE(parent);
+            if (parent->type == LAI_NAMESPACE_ALIAS) {
+                lai_warn("resolution of new object name traverses Alias(),"
+                        " this is not supported in ACPICA");
+                parent = parent->al_target;
+                LAI_ENSURE(parent->type != LAI_NAMESPACE_ALIAS);
+            }
         }
     }
 }
