@@ -8,6 +8,7 @@
 #include "libc.h"
 #include "opregion.h"
 #include "exec_impl.h"
+#include "ns_impl.h"
 
 void lai_write_buffer(lai_nsnode_t *, lai_object_t *);
 
@@ -301,9 +302,12 @@ void lai_load(lai_state_t *state, lai_object_t *src, lai_object_t *object) {
             break;
         case LAI_UNRESOLVED_NAME:
         {
-            lai_nsnode_t *node = lai_exec_resolve(src->name);
+            char name[ACPI_MAX_NAME];
+            lai_resolve_path(src->unres_ctx_handle, name, src->unres_aml);
+
+            lai_nsnode_t *node = lai_exec_resolve(name);
             if (!node)
-                lai_panic("node %s not found.", src->name);
+                lai_panic("node %s not found.", name);
             lai_load_ns(node, object);
             break;
         }
@@ -343,9 +347,12 @@ void lai_store(lai_state_t *state, lai_object_t *dest, lai_object_t *object) {
         }
         case LAI_UNRESOLVED_NAME:
         {
-            lai_nsnode_t *handle = lai_exec_resolve(dest->name);
+            char name[ACPI_MAX_NAME];
+            lai_resolve_path(dest->unres_ctx_handle, name, dest->unres_aml);
+
+            lai_nsnode_t *handle = lai_exec_resolve(name);
             if(!handle)
-                lai_panic("undefined reference %s", dest->name);
+                lai_panic("undefined reference %s", name);
             lai_store_ns(handle, object);
             break;
         }

@@ -116,7 +116,7 @@ void lai_amlname_iterate(struct lai_amlname *amln, char *out) {
     amln->it += 4;
 }
 
-size_t lai_resolve_path(lai_nsnode_t *context, char *fullpath, uint8_t *path) {
+size_t lai_resolve_path(lai_nsnode_t *context, char *fullpath, const uint8_t *path) {
     size_t name_size = 0;
     size_t multi_count = 0;
     size_t current_count = 0;

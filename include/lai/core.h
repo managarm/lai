@@ -105,9 +105,12 @@ typedef struct lai_object_t
         struct lai_string_head *string_ptr;
         struct lai_buffer_head *buffer_ptr;
         struct lai_pkg_head *pkg_ptr;
+        struct {
+            struct lai_nsnode_t *unres_ctx_handle;
+            const uint8_t *unres_aml;
+        };
     };
 
-    char name[ACPI_MAX_NAME];    // for Name References
     struct lai_nsnode_t *handle;
 
     int index;

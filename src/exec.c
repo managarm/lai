@@ -141,13 +141,18 @@ static void lai_exec_reduce_node(int opcode, lai_state_t *state, lai_object_t *o
             LAI_ENSURE(operands[0].type == LAI_UNRESOLVED_NAME);
             LAI_ENSURE(operands[2].type == LAI_UNRESOLVED_NAME);
 
+            char buffer_name[ACPI_MAX_NAME];
+            char node_name[ACPI_MAX_NAME];
+            lai_resolve_path(operands[0].unres_ctx_handle, buffer_name, operands[0].unres_aml);
+            lai_resolve_path(operands[2].unres_ctx_handle, node_name, operands[2].unres_aml);
+
             lai_nsnode_t *node = lai_create_nsnode_or_die();
             node->type = LAI_NAMESPACE_BUFFER_FIELD;
-            lai_strcpy(node->path, operands[2].name);
+            lai_strcpy(node->path, node_name);
 
-            lai_nsnode_t *buffer_node = lai_exec_resolve(operands[0].name);
+            lai_nsnode_t *buffer_node = lai_exec_resolve(buffer_name);
             if (!buffer_node)
-                lai_panic("could not resolve buffer %s", operands[0].name);
+                lai_panic("could not resolve buffer %s", buffer_name);
             node->bf_node = buffer_node;
 
             switch (opcode) {
@@ -489,7 +494,10 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, lai_object_t *ope
         switch (operand->type) {
             case LAI_UNRESOLVED_NAME:
             {
-                lai_nsnode_t *handle = lai_exec_resolve(operand->name);
+                char name[ACPI_MAX_NAME];
+                lai_resolve_path(operand->unres_ctx_handle, name, operand->unres_aml);
+
+                lai_nsnode_t *handle = lai_exec_resolve(name);
                 if (handle) {
                     ref.type = LAI_HANDLE;
                     ref.handle = handle;
@@ -742,7 +750,8 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
 
                 lai_object_t *opstack_res = lai_exec_push_opstack_or_die(state);
                 opstack_res->type = LAI_UNRESOLVED_NAME;
-                lai_strcpy(opstack_res->name, name.path);
+                opstack_res->unres_ctx_handle = ctx_handle;
+                opstack_res->unres_aml = method + opcode_pc;
             } else {
                 LAI_ENSURE(exec_result_mode == LAI_OBJECT_MODE
                            || exec_result_mode == LAI_EXEC_MODE);
