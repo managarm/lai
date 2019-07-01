@@ -1129,9 +1129,26 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             lai_exec_update_context(state);
             break;
         }
-        case (EXTOP_PREFIX << 8) | PROCESSOR:
-            state->pc += lai_create_processor(ctx_handle, method + state->pc);
+        case (EXTOP_PREFIX << 8) | PROCESSOR: {
+            state->pc += 2;            // skip over PROCESSOR_OP
+            size_t tmp_pc = state->pc;
+
+            size_t pkgsize;
+            struct lai_amlname amln;
+            tmp_pc += lai_parse_pkgsize(method + tmp_pc, &pkgsize);
+            tmp_pc += lai_amlname_parse(&amln, method + tmp_pc);
+            state->pc += pkgsize;
+
+            lai_nsnode_t *node = lai_create_nsnode_or_die();
+            node->type = LAI_NAMESPACE_PROCESSOR;
+            node->cpu_id = *(method + tmp_pc);
+
+            // TODO: parse rest of Processor() data
+
+            lai_do_resolve_new_node(node, ctx_handle, &amln);
+            lai_install_nsnode(node);
             break;
+        }
         case (EXTOP_PREFIX << 8) | POWER_RES:
         {
             state->pc += 2;
@@ -1273,9 +1290,66 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
         case (EXTOP_PREFIX << 8) | FIELD:
             state->pc += lai_create_field(ctx_handle, method + state->pc);
             break;
-        case (EXTOP_PREFIX << 8) | INDEXFIELD:
-            state->pc += lai_create_indexfield(ctx_handle, method + state->pc);
+        case (EXTOP_PREFIX << 8) | INDEXFIELD: {
+            state->pc += 2;
+
+            struct lai_amlname index_amln;
+            struct lai_amlname data_amln;
+            size_t pkgsize, end_pc = state->pc;
+
+            state->pc += lai_parse_pkgsize(method + state->pc, &pkgsize);
+            state->pc += lai_amlname_parse(&index_amln, method + state->pc);
+            state->pc += lai_amlname_parse(&data_amln, method + state->pc);
+
+            end_pc += pkgsize;
+
+            lai_nsnode_t *index_node = lai_do_resolve(ctx_handle, &index_amln);
+            lai_nsnode_t *data_node = lai_do_resolve(ctx_handle, &data_amln);
+            if (!index_node || !data_node)
+                lai_panic("could not resolve index register of IndexField()");
+
+            uint8_t access_type = *(method + state->pc);
+            state->pc++;
+
+            // parse FieldList
+            struct lai_amlname field_amln;
+            uint64_t curr_off = 0;
+            size_t skip_bits;
+            while (state->pc < end_pc) {
+                switch (*(method + state->pc)) {
+                    case 0: // ReservedField
+                        state->pc++;
+                        state->pc += lai_parse_pkgsize(method + state->pc, &skip_bits);
+                        curr_off += skip_bits;
+                        break;
+                    case 1: // AccessField
+                        state->pc++;
+                        access_type = *(method + state->pc);
+                        state->pc += 2;
+                        break;
+                    case 2: // TODO: ConnectField
+                        lai_panic("ConnectField parsing isn't implemented");
+                        break;
+                    default: // NamedField
+                        state->pc += lai_amlname_parse(&field_amln, method + state->pc);
+                        state->pc += lai_parse_pkgsize(method + state->pc, &skip_bits);
+
+                        lai_nsnode_t *node = lai_create_nsnode_or_die();
+                        node->type = LAI_NAMESPACE_INDEXFIELD;
+                        node->idxf_index_node = index_node;
+                        node->idxf_data_node = data_node;
+                        node->idxf_flags = access_type;
+                        node->idxf_size = skip_bits;
+                        node->idxf_offset = curr_off;
+                        lai_do_resolve_new_node(node, ctx_handle, &field_amln);
+                        lai_install_nsnode(node);
+
+                        curr_off += skip_bits;
+                }
+            }
+
             break;
+        }
 
         case ARG0_OP:
         case ARG1_OP:
