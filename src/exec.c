@@ -1287,9 +1287,65 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             lai_install_nsnode(node);
             break;
         }
-        case (EXTOP_PREFIX << 8) | FIELD:
-            state->pc += lai_create_field(ctx_handle, method + state->pc);
+        case (EXTOP_PREFIX << 8) | FIELD: {
+            state->pc += 2;
+
+            struct lai_amlname region_amln;
+            size_t pkgsize, end_pc = state->pc;
+
+            state->pc += lai_parse_pkgsize(method + state->pc, &pkgsize);
+            state->pc += lai_amlname_parse(&region_amln, method + state->pc);
+
+            end_pc += pkgsize;
+
+            lai_nsnode_t *region_node = lai_do_resolve(ctx_handle, &region_amln);
+            if (!region_node) {
+                lai_panic("error parsing field for non-existant OpRegion, ignoring...");
+                state->pc = end_pc;
+                break;
+            }
+
+            uint8_t access_type = *(method + state->pc);
+            state->pc++;
+
+            // parse FieldList
+            struct lai_amlname field_amln;
+            uint64_t curr_off = 0;
+            size_t skip_bits;
+            while (state->pc < end_pc) {
+                switch (*(method + state->pc)) {
+                    case 0: // ReservedField
+                        state->pc++;
+                        state->pc += lai_parse_pkgsize(method + state->pc, &skip_bits);
+                        curr_off += skip_bits;
+                        break;
+                    case 1: // AccessField
+                        state->pc++;
+                        access_type = *(method + state->pc);
+                        state->pc += 2;
+                        break;
+                    case 2: // TODO: ConnectField
+                        lai_panic("ConnectField parsing isn't implemented");
+                        break;
+                    default: // NamedField
+                        state->pc += lai_amlname_parse(&field_amln, method + state->pc);
+                        state->pc += lai_parse_pkgsize(method + state->pc, &skip_bits);
+
+                        lai_nsnode_t *node = lai_create_nsnode_or_die();
+                        node->type = LAI_NAMESPACE_FIELD;
+                        node->fld_region_node = region_node;
+                        node->fld_flags = access_type;
+                        node->fld_size = skip_bits;
+                        node->fld_offset = curr_off;
+                        lai_do_resolve_new_node(node, ctx_handle, &field_amln);
+                        lai_install_nsnode(node);
+
+                        curr_off += skip_bits;
+                }
+            }
+
             break;
+        }
         case (EXTOP_PREFIX << 8) | INDEXFIELD: {
             state->pc += 2;
 
