@@ -61,7 +61,7 @@ void lai_install_nsnode(lai_nsnode_t *node) {
         lai_ns_capacity = new_capacity;
     }
 
-    /*lai_debug("created %s", node->path);*/
+    /*lai_debug("created %s", node->fullpath);*/
     lai_namespace[lai_ns_size++] = node;
 }
 
@@ -171,8 +171,8 @@ lai_nsnode_t *lai_do_resolve(lai_nsnode_t *ctx_handle, const struct lai_amlname 
 
         while (current) {
             char path[ACPI_MAX_NAME];
-            size_t n = lai_strlen(current->path);
-            lai_strcpy(path, current->path);
+            size_t n = lai_strlen(current->fullpath);
+            lai_strcpy(path, current->fullpath);
             path[n] = '.';
             lai_strcpy(path + 1 + n, segment);
 
@@ -209,8 +209,8 @@ lai_nsnode_t *lai_do_resolve(lai_nsnode_t *ctx_handle, const struct lai_amlname 
             return current;
 
         char path[ACPI_MAX_NAME];
-        size_t n = lai_strlen(current->path);
-        lai_strcpy(path, current->path);
+        size_t n = lai_strlen(current->fullpath);
+        lai_strcpy(path, current->fullpath);
 
         while (!lai_amlname_done(&amln)) {
             path[n] = '.';
@@ -263,14 +263,14 @@ void lai_do_resolve_new_node(lai_nsnode_t *node,
         segment[4] = '\0';
 
         char path[ACPI_MAX_NAME];
-        size_t n = lai_strlen(parent->path);
-        lai_strcpy(path, parent->path);
+        size_t n = lai_strlen(parent->fullpath);
+        lai_strcpy(path, parent->fullpath);
         path[n] = '.';
         lai_strcpy(path + 1 + n, segment);
 
         if (lai_amlname_done(&amln)) {
             // The last segment is the name of the new node.
-            lai_strcpy(node->path, path);
+            lai_strcpy(node->fullpath, path);
             node->parent = parent;
             break;
         } else {
@@ -296,45 +296,45 @@ size_t lai_resolve_new_node(lai_nsnode_t *node, lai_nsnode_t *ctx_handle, void *
 lai_nsnode_t *lai_create_root(void) {
     lai_nsnode_t *root_node = lai_create_nsnode_or_die();
     root_node->type = LAI_NAMESPACE_ROOT;
-    lai_strcpy(root_node->path, "\\");
+    lai_strcpy(root_node->fullpath, "\\");
     root_node->parent = NULL;
 
     // Create the predefined objects.
     lai_nsnode_t *sb_node = lai_create_nsnode_or_die();
     sb_node->type = LAI_NAMESPACE_DEVICE;
-    lai_strcpy(sb_node->path, "\\._SB_");
+    lai_strcpy(sb_node->fullpath, "\\._SB_");
     sb_node->parent = root_node;
     lai_install_nsnode(sb_node);
 
     lai_nsnode_t *si_node = lai_create_nsnode_or_die();
     si_node->type = LAI_NAMESPACE_DEVICE;
-    lai_strcpy(si_node->path, "\\._SI_");
+    lai_strcpy(si_node->fullpath, "\\._SI_");
     si_node->parent = root_node;
     lai_install_nsnode(si_node);
 
     lai_nsnode_t *gpe_node = lai_create_nsnode_or_die();
     gpe_node->type = LAI_NAMESPACE_DEVICE;
-    lai_strcpy(gpe_node->path, "\\._GPE");
+    lai_strcpy(gpe_node->fullpath, "\\._GPE");
     gpe_node->parent = root_node;
     lai_install_nsnode(gpe_node);
 
     // Create nodes for compatibility with ACPI 1.0.
     lai_nsnode_t *pr_node = lai_create_nsnode_or_die();
     pr_node->type = LAI_NAMESPACE_DEVICE;
-    lai_strcpy(pr_node->path, "\\._PR_");
+    lai_strcpy(pr_node->fullpath, "\\._PR_");
     pr_node->parent = root_node;
     lai_install_nsnode(pr_node);
 
     lai_nsnode_t *tz_node = lai_create_nsnode_or_die();
     tz_node->type = LAI_NAMESPACE_DEVICE;
-    lai_strcpy(tz_node->path, "\\._TZ_");
+    lai_strcpy(tz_node->fullpath, "\\._TZ_");
     tz_node->parent = root_node;
     lai_install_nsnode(tz_node);
 
     // Create the OS-defined objects.
     lai_nsnode_t *osi_node = lai_create_nsnode_or_die();
     osi_node->type = LAI_NAMESPACE_METHOD;
-    lai_strcpy(osi_node->path, "\\._OSI");
+    lai_strcpy(osi_node->fullpath, "\\._OSI");
     osi_node->parent = root_node;
     osi_node->method_flags = 0x01;
     osi_node->method_override = &lai_do_osi_method;
@@ -342,7 +342,7 @@ lai_nsnode_t *lai_create_root(void) {
 
     lai_nsnode_t *os_node = lai_create_nsnode_or_die();
     os_node->type = LAI_NAMESPACE_METHOD;
-    lai_strcpy(os_node->path, "\\._OS_");
+    lai_strcpy(os_node->fullpath, "\\._OS_");
     os_node->parent = root_node;
     os_node->method_flags = 0x00;
     os_node->method_override = &lai_do_os_method;
@@ -350,7 +350,7 @@ lai_nsnode_t *lai_create_root(void) {
 
     lai_nsnode_t *rev_node = lai_create_nsnode_or_die();
     rev_node->type = LAI_NAMESPACE_METHOD;
-    lai_strcpy(rev_node->path, "\\._REV");
+    lai_strcpy(rev_node->fullpath, "\\._REV");
     rev_node->parent = root_node;
     rev_node->method_flags = 0x00;
     rev_node->method_override = &lai_do_rev_method;
@@ -466,7 +466,7 @@ lai_nsnode_t *lai_resolve(char *path) {
 
     if (path[0] == ROOT_CHAR) {
         while(i < lai_ns_size) {
-            if(!lai_strcmp(lai_namespace[i]->path, path))
+            if(!lai_strcmp(lai_namespace[i]->fullpath, path))
                 return lai_namespace[i];
             else
                 i++;
@@ -475,7 +475,7 @@ lai_nsnode_t *lai_resolve(char *path) {
         return NULL;
     } else {
         while (i < lai_ns_size) {
-            if (!memcmp(lai_namespace[i]->path + lai_strlen(lai_namespace[i]->path) - 4, path, 4))
+            if (!memcmp(lai_namespace[i]->fullpath + lai_strlen(lai_namespace[i]->fullpath) - 4, path, 4))
                 return lai_namespace[i];
             else
                 i++;
@@ -512,7 +512,7 @@ lai_nsnode_t *lai_get_deviceid(size_t index, lai_object_t *id) {
     handle = lai_get_device(j);
     while (handle) {
         // read the ID of the device
-        lai_strcpy(path, handle->path);
+        lai_strcpy(path, handle->fullpath);
         // change the device ID to hardware ID
         lai_strcpy(path + lai_strlen(path), "._HID");
         memset(&device_id, 0, sizeof(lai_object_t));
@@ -548,7 +548,7 @@ lai_nsnode_t *lai_enum(char *parent, size_t index) {
     index++;
     size_t parent_size = lai_strlen(parent);
     for (size_t i = 0; i < lai_ns_size; i++) {
-        if (!memcmp(parent, lai_namespace[i]->path, parent_size)) {
+        if (!memcmp(parent, lai_namespace[i]->fullpath, parent_size)) {
             if(!index)
                 return lai_namespace[i];
             else

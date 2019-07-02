@@ -42,7 +42,7 @@ int lai_enter_sleep(uint8_t state)
     lai_object_t slp_typa = {0};
     lai_object_t slp_typb = {0};
     int eval_status;
-    eval_status = lai_eval(&package, handle->path);
+    eval_status = lai_eval(&package, handle->fullpath);
     if(eval_status != 0)
     {
         lai_debug("sleep state S%d is not supported.", state);

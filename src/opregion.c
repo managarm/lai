@@ -27,7 +27,7 @@ void lai_read_opregion(lai_object_t *destination, lai_nsnode_t *field) {
     else if (field->type == LAI_NAMESPACE_INDEXFIELD)
         return lai_read_indexfield(destination, field);
 
-    lai_panic("undefined field read: %s", field->path);
+    lai_panic("undefined field read: %s", field->fullpath);
 }
 
 void lai_write_opregion(lai_nsnode_t *field, lai_object_t *source) {
@@ -37,7 +37,7 @@ void lai_write_opregion(lai_nsnode_t *field, lai_object_t *source) {
     else if (field->type == LAI_NAMESPACE_INDEXFIELD)
         return lai_write_indexfield(field, source);
 
-    lai_panic("undefined field write: %s", field->path);
+    lai_panic("undefined field write: %s", field->fullpath);
 }
 
 void lai_read_field(lai_object_t *destination, lai_nsnode_t *field) {
@@ -81,7 +81,7 @@ void lai_read_field(lai_object_t *destination, lai_nsnode_t *field) {
                 break;
 
             default:
-                lai_panic("undefined field flags 0x%02x: %s", field->fld_flags, field->path);
+                lai_panic("undefined field flags 0x%02x: %s", field->fld_flags, field->fullpath);
         }
     } else {
         bit_offset = field->fld_offset % 32;
@@ -109,7 +109,7 @@ void lai_read_field(lai_object_t *destination, lai_nsnode_t *field) {
                 value = (uint64_t)laihost_ind(opregion->op_base + offset) >> bit_offset;
                 break;
             default:
-                lai_panic("undefined field flags 0x%02X: %s", field->fld_flags, field->path);
+                lai_panic("undefined field flags 0x%02X: %s", field->fld_flags, field->fullpath);
         }
     } else if (opregion->op_address_space == OPREGION_MEMORY) {
         // Memory-mapped I/O
@@ -140,11 +140,11 @@ void lai_read_field(lai_object_t *destination, lai_nsnode_t *field) {
                 value = mmio_qword[0] >> bit_offset;
                 break;
             default:
-                lai_panic("undefined field flags 0x%02X: %s", field->fld_flags, field->path);
+                lai_panic("undefined field flags 0x%02X: %s", field->fld_flags, field->fullpath);
         }
     } else if (opregion->op_address_space == OPREGION_PCI) {
         // PCI bus number is in the _BBN object
-        lai_strcpy(name, opregion->path);
+        lai_strcpy(name, opregion->fullpath);
         lai_strcpy(name + lai_strlen(name) - 4, "_BBN");
         eval_status = lai_eval(&bus_number, name);
 
@@ -155,7 +155,7 @@ void lai_read_field(lai_object_t *destination, lai_nsnode_t *field) {
         }
 
         // device slot/function is in the _ADR object
-        lai_strcpy(name, opregion->path);
+        lai_strcpy(name, opregion->fullpath);
         lai_strcpy(name + lai_strlen(name) - 4, "_ADR");
         eval_status = lai_eval(&address_number, name);
 
@@ -223,7 +223,7 @@ void lai_write_field(lai_nsnode_t *field, lai_object_t *source) {
                 break;
 
             default:
-                lai_panic("undefined field flags 0x%02X: %s", field->fld_flags, field->path);
+                lai_panic("undefined field flags 0x%02X: %s", field->fld_flags, field->fullpath);
         }
     } else {
         bit_offset = field->fld_offset % 32;
@@ -251,7 +251,7 @@ void lai_write_field(lai_nsnode_t *field, lai_object_t *source) {
                 value = (uint64_t)laihost_ind(opregion->op_base + offset);
                 break;
             default:
-                lai_panic("undefined field flags 0x%02X: %s", field->fld_flags, field->path);
+                lai_panic("undefined field flags 0x%02X: %s", field->fld_flags, field->fullpath);
         }
     } else if (opregion->op_address_space == OPREGION_MEMORY) {
         // Memory-mapped I/O
@@ -282,11 +282,11 @@ void lai_write_field(lai_nsnode_t *field, lai_object_t *source) {
                 value = mmio_qword[0];
                 break;
             default:
-                lai_panic("undefined field flags 0x%02X: %s", field->fld_flags, field->path);
+                lai_panic("undefined field flags 0x%02X: %s", field->fld_flags, field->fullpath);
         }
     } else if (opregion->op_address_space == OPREGION_PCI) {
         // PCI bus number is in the _BBN object
-        lai_strcpy(name, opregion->path);
+        lai_strcpy(name, opregion->fullpath);
         lai_strcpy(name + lai_strlen(name) - 4, "_BBN");
         eval_status = lai_eval(&bus_number, name);
 
@@ -297,7 +297,7 @@ void lai_write_field(lai_nsnode_t *field, lai_object_t *source) {
         }
 
         // device slot/function is in the _ADR object
-        lai_strcpy(name, opregion->path);
+        lai_strcpy(name, opregion->fullpath);
         lai_strcpy(name + lai_strlen(name) - 4, "_ADR");
         eval_status = lai_eval(&address_number, name);
 
@@ -346,7 +346,7 @@ void lai_write_field(lai_nsnode_t *field, lai_object_t *source) {
                 laihost_outd(opregion->op_base + offset, (uint32_t)value);
                 break;
             default:
-                lai_panic("undefined field flags 0x%02X: %s", field->fld_flags, field->path);
+                lai_panic("undefined field flags 0x%02X: %s", field->fld_flags, field->fullpath);
         }
 
         // iowait() equivalent

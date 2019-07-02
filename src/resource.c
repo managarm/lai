@@ -28,7 +28,7 @@
 // read a device's resource info
 size_t lai_read_resource(lai_nsnode_t *device, acpi_resource_t *dest) {
     char crs[ACPI_MAX_NAME];
-    lai_strcpy(crs, device->path);
+    lai_strcpy(crs, device->fullpath);
     lai_strcpy(crs + lai_strlen(crs), "._CRS");    // _CRS: current resource settings
 
     lai_object_t buffer = {0};

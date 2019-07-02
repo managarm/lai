@@ -43,7 +43,7 @@ int lai_pci_route(acpi_resource_t *dest, uint8_t bus, uint8_t slot, uint8_t func
     int status;
 
     while (handle) {
-        lai_strcpy(path, handle->path);
+        lai_strcpy(path, handle->fullpath);
         lai_strcpy(path + lai_strlen(path), "._BBN");    // _BBN: Base bus number
 
         status = lai_eval(&bus_number, path);
@@ -64,7 +64,7 @@ int lai_pci_route(acpi_resource_t *dest, uint8_t bus, uint8_t slot, uint8_t func
         return 1;
 
     // read the PCI routing table
-    lai_strcpy(path, handle->path);
+    lai_strcpy(path, handle->fullpath);
     lai_strcpy(path + lai_strlen(path), "._PRT");    // _PRT: PCI Routing Table
 
     lai_object_t prt = {0};
@@ -148,7 +148,7 @@ resolve_pin:
         return 0;
     } else if (prt_entry.type == LAI_HANDLE) {
         // PCI Interrupt Link Device
-        lai_debug("PCI interrupt link is %s", prt_entry.handle->path);
+        lai_debug("PCI interrupt link is %s", prt_entry.handle->fullpath);
 
         // read the resource template of the device
         res = lai_calloc(sizeof(acpi_resource_t), ACPI_MAX_RESOURCES);

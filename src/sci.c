@@ -113,7 +113,7 @@ static int evaluate_sta(lai_nsnode_t *node) {
     int sta = 0x0F;
 
     char path[ACPI_MAX_NAME];
-    lai_strcpy(path, node->path);
+    lai_strcpy(path, node->fullpath);
     lai_strcpy(path + lai_strlen(path), "._STA");
 
     lai_nsnode_t *handle = lai_resolve(path);
@@ -143,7 +143,7 @@ static void lai_init_children(char *parent) {
 
             /* if device is present, evaluate its _INI */
             if (sta & ACPI_STA_PRESENT) {
-                lai_strcpy(path, node->path);
+                lai_strcpy(path, node->fullpath);
                 lai_strcpy(path + lai_strlen(path), "._INI");
                 handle = lai_resolve(path);
 
@@ -158,7 +158,7 @@ static void lai_init_children(char *parent) {
 
             /* if functional and/or present, enumerate the children */
             if (sta & ACPI_STA_PRESENT || sta & ACPI_STA_FUNCTION)
-                lai_init_children(node->path);
+                lai_init_children(node->fullpath);
         }
     }
 }

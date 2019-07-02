@@ -182,7 +182,7 @@ inline void lai_exec_pkg_store(lai_object_t *in, lai_object_t *pkg, size_t i) {
 
 typedef struct lai_nsnode_t
 {
-    char path[ACPI_MAX_NAME];    // full path of object
+    char fullpath[ACPI_MAX_NAME];    // full path of object
     int type;
     struct lai_nsnode_t *parent;
     struct lai_aml_segment *amls;
