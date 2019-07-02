@@ -152,6 +152,43 @@ char *lai_stringify_amlname(const struct lai_amlname *in_amln) {
     return str;
 }
 
+char *lai_stringify_node_path(lai_nsnode_t *node) {
+    // Handle the trivial case.
+    if (!node->parent) {
+        LAI_ENSURE(node->type == LAI_NAMESPACE_ROOT);
+        char *str = laihost_malloc(2);
+        if (!str)
+            lai_panic("could not allocate in lai_stringify_node_path()");
+        lai_strcpy(str, "\\");
+        return str;
+    }
+
+    lai_nsnode_t *current;
+
+    // Find the number of segments, excluding the root.
+    size_t num_segs = 0;
+    for (current = node; current->parent; current = current->parent)
+        num_segs++;
+
+    size_t length = num_segs * 5; // Leading dot (or \) and four chars per segment.
+    char *str = laihost_malloc(length + 1);
+    if (!str)
+        lai_panic("could not allocate in lai_stringify_node_path()");
+
+    // Build the string from right to left.
+    size_t n = length;
+    for (current = node; current->parent; current = current->parent) {
+        n -= 4;
+        lai_namecpy(str + n, current->name);
+        n -= 1;
+        str[n] = '.';
+    }
+    LAI_ENSURE(!n);
+    str[0] = '\\'; // Overwrites the first dot.
+    str[length] = '\0';
+    return str;
+}
+
 lai_nsnode_t *lai_do_resolve(lai_nsnode_t *ctx_handle, const struct lai_amlname *in_amln) {
     // Make a copy to avoid rendering the original object unusable.
     struct lai_amlname amln = *in_amln;
@@ -271,6 +308,7 @@ void lai_do_resolve_new_node(lai_nsnode_t *node,
         if (lai_amlname_done(&amln)) {
             // The last segment is the name of the new node.
             lai_strcpy(node->fullpath, path);
+            lai_namecpy(node->name, segment);
             node->parent = parent;
             break;
         } else {
@@ -297,24 +335,28 @@ lai_nsnode_t *lai_create_root(void) {
     lai_nsnode_t *root_node = lai_create_nsnode_or_die();
     root_node->type = LAI_NAMESPACE_ROOT;
     lai_strcpy(root_node->fullpath, "\\");
+    lai_namecpy(root_node->name, "\\___");
     root_node->parent = NULL;
 
     // Create the predefined objects.
     lai_nsnode_t *sb_node = lai_create_nsnode_or_die();
     sb_node->type = LAI_NAMESPACE_DEVICE;
     lai_strcpy(sb_node->fullpath, "\\._SB_");
+    lai_namecpy(sb_node->name, "_SB_");
     sb_node->parent = root_node;
     lai_install_nsnode(sb_node);
 
     lai_nsnode_t *si_node = lai_create_nsnode_or_die();
     si_node->type = LAI_NAMESPACE_DEVICE;
     lai_strcpy(si_node->fullpath, "\\._SI_");
+    lai_namecpy(si_node->name, "_SI_");
     si_node->parent = root_node;
     lai_install_nsnode(si_node);
 
     lai_nsnode_t *gpe_node = lai_create_nsnode_or_die();
     gpe_node->type = LAI_NAMESPACE_DEVICE;
     lai_strcpy(gpe_node->fullpath, "\\._GPE");
+    lai_namecpy(gpe_node->name, "_GPE");
     gpe_node->parent = root_node;
     lai_install_nsnode(gpe_node);
 
@@ -322,12 +364,14 @@ lai_nsnode_t *lai_create_root(void) {
     lai_nsnode_t *pr_node = lai_create_nsnode_or_die();
     pr_node->type = LAI_NAMESPACE_DEVICE;
     lai_strcpy(pr_node->fullpath, "\\._PR_");
+    lai_namecpy(pr_node->name, "_PR_");
     pr_node->parent = root_node;
     lai_install_nsnode(pr_node);
 
     lai_nsnode_t *tz_node = lai_create_nsnode_or_die();
     tz_node->type = LAI_NAMESPACE_DEVICE;
     lai_strcpy(tz_node->fullpath, "\\._TZ_");
+    lai_namecpy(tz_node->name, "_TZ_");
     tz_node->parent = root_node;
     lai_install_nsnode(tz_node);
 
@@ -335,6 +379,7 @@ lai_nsnode_t *lai_create_root(void) {
     lai_nsnode_t *osi_node = lai_create_nsnode_or_die();
     osi_node->type = LAI_NAMESPACE_METHOD;
     lai_strcpy(osi_node->fullpath, "\\._OSI");
+    lai_namecpy(osi_node->name, "_OSI");
     osi_node->parent = root_node;
     osi_node->method_flags = 0x01;
     osi_node->method_override = &lai_do_osi_method;
@@ -343,6 +388,7 @@ lai_nsnode_t *lai_create_root(void) {
     lai_nsnode_t *os_node = lai_create_nsnode_or_die();
     os_node->type = LAI_NAMESPACE_METHOD;
     lai_strcpy(os_node->fullpath, "\\._OS_");
+    lai_namecpy(os_node->name, "_OS_");
     os_node->parent = root_node;
     os_node->method_flags = 0x00;
     os_node->method_override = &lai_do_os_method;
@@ -351,6 +397,7 @@ lai_nsnode_t *lai_create_root(void) {
     lai_nsnode_t *rev_node = lai_create_nsnode_or_die();
     rev_node->type = LAI_NAMESPACE_METHOD;
     lai_strcpy(rev_node->fullpath, "\\._REV");
+    lai_namecpy(rev_node->name, "_REV");
     rev_node->parent = root_node;
     rev_node->method_flags = 0x00;
     rev_node->method_override = &lai_do_rev_method;

@@ -33,6 +33,11 @@ __attribute__((noreturn)) void lai_panic(const char *, ...);
                        __FILE__ ":" LAI_EXPAND_STRINGIFY(__LINE__) "\n"); \
     } while(0)
 
+__attribute__((always_inline))
+inline void lai_namecpy(char *dest, const char *src) {
+    memcpy(dest, src, 4);
+}
+
 #define ACPI_MAX_NAME               64
 #define ACPI_MAX_RESOURCES          512
 
@@ -182,6 +187,7 @@ inline void lai_exec_pkg_store(lai_object_t *in, lai_object_t *pkg, size_t i) {
 
 typedef struct lai_nsnode_t
 {
+    char name[4];
     char fullpath[ACPI_MAX_NAME];    // full path of object
     int type;
     struct lai_nsnode_t *parent;
@@ -309,6 +315,7 @@ extern volatile uint16_t lai_last_event;
 // ACPI namespace functions
 lai_nsnode_t *lai_create_root(void);
 void lai_create_namespace(void);
+char *lai_stringify_node_path(lai_nsnode_t *);
 lai_nsnode_t *lai_resolve(char *);
 lai_nsnode_t *lai_get_device(size_t);
 lai_nsnode_t *lai_get_deviceid(size_t, lai_object_t *);
