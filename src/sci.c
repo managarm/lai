@@ -66,7 +66,7 @@ int lai_enable_acpi(uint32_t mode) {
         lai_panic("host does not provide timer functions required by lai_enable_acpi()");
 
     /* first run \._SB_._INI */
-    handle = lai_resolve("\\._SB_._INI");
+    handle = lai_legacy_resolve("\\._SB_._INI");
     if (handle) {
         lai_init_state(&state);
         if (!lai_exec_method(handle, &state))
@@ -78,7 +78,7 @@ int lai_enable_acpi(uint32_t mode) {
     lai_init_children("\\._SB_");
 
     /* tell the firmware about the IRQ mode */
-    handle = lai_resolve("\\._PIC");
+    handle = lai_legacy_resolve("\\._PIC");
     if (handle) {
         lai_init_state(&state);
         lai_arg(&state, 0)->type = LAI_INTEGER;
@@ -116,7 +116,7 @@ static int evaluate_sta(lai_nsnode_t *node) {
     lai_strcpy(path, node->fullpath);
     lai_strcpy(path + lai_strlen(path), "._STA");
 
-    lai_nsnode_t *handle = lai_resolve(path);
+    lai_nsnode_t *handle = lai_legacy_resolve(path);
     if (handle) {
         lai_state_t state;
         lai_init_state(&state);
@@ -145,7 +145,7 @@ static void lai_init_children(char *parent) {
             if (sta & ACPI_STA_PRESENT) {
                 lai_strcpy(path, node->fullpath);
                 lai_strcpy(path + lai_strlen(path), "._INI");
-                handle = lai_resolve(path);
+                handle = lai_legacy_resolve(path);
 
                 if (handle) {
                     lai_state_t state;

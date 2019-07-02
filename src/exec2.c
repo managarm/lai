@@ -31,14 +31,14 @@ void lai_write_buffer(lai_nsnode_t *, lai_object_t *);
 
 lai_nsnode_t *lai_exec_resolve(char *path) {
     lai_nsnode_t *object;
-    object = lai_resolve(path);
+    object = lai_legacy_resolve(path);
 
     if (lai_strlen(path) == 4)
-        return lai_resolve(path);
+        return lai_legacy_resolve(path);
 
     while (!object && lai_strlen(path) > 6) {
         memmove(path + lai_strlen(path) - 9, path + lai_strlen(path) - 4, 5);
-        object = lai_resolve(path);
+        object = lai_legacy_resolve(path);
         if (object != NULL)
             goto resolve_alias;
     }

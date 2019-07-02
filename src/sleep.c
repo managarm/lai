@@ -31,7 +31,7 @@ int lai_enter_sleep(uint8_t state)
     sleep_object[2] = state + '0';
 
     // get sleeping package
-    lai_nsnode_t *handle = lai_resolve((char*)sleep_object);
+    lai_nsnode_t *handle = lai_legacy_resolve((char*)sleep_object);
     if(!handle)
     {
         lai_debug("sleep state S%d is not supported.", state);
@@ -54,7 +54,7 @@ int lai_enter_sleep(uint8_t state)
     // ACPI spec says we should call _PTS() and _GTS() before actually sleeping
     // Who knows, it might do some required firmware-specific stuff
     lai_state_t acpi_state;
-    handle = lai_resolve("_PTS");
+    handle = lai_legacy_resolve("_PTS");
 
     if(handle)
     {
@@ -69,7 +69,7 @@ int lai_enter_sleep(uint8_t state)
         lai_finalize_state(&acpi_state);
     }
 
-    handle = lai_resolve("_GTS");
+    handle = lai_legacy_resolve("_GTS");
 
     if(handle)
     {

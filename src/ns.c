@@ -213,7 +213,7 @@ lai_nsnode_t *lai_do_resolve(lai_nsnode_t *ctx_handle, const struct lai_amlname 
             path[n] = '.';
             lai_strcpy(path + 1 + n, segment);
 
-            lai_nsnode_t *node = lai_resolve(path);
+            lai_nsnode_t *node = lai_legacy_resolve(path);
             if (!node) {
                 current = current->parent;
                 continue;
@@ -256,7 +256,7 @@ lai_nsnode_t *lai_do_resolve(lai_nsnode_t *ctx_handle, const struct lai_amlname 
         }
         path[n] = '\0';
 
-        lai_nsnode_t *node = lai_resolve(path);
+        lai_nsnode_t *node = lai_legacy_resolve(path);
         if (node->type == LAI_NAMESPACE_ALIAS) {
             node = node->al_target;
             LAI_ENSURE(node->type != LAI_NAMESPACE_ALIAS);
@@ -312,7 +312,7 @@ void lai_do_resolve_new_node(lai_nsnode_t *node,
             node->parent = parent;
             break;
         } else {
-            parent = lai_resolve(path);
+            parent = lai_legacy_resolve(path);
             LAI_ENSURE(parent);
             if (parent->type == LAI_NAMESPACE_ALIAS) {
                 lai_warn("resolution of new object name traverses Alias(),"
@@ -508,7 +508,7 @@ size_t lai_create_method(lai_nsnode_t *parent, struct lai_aml_segment *amls, voi
 }
 
 // Resolve a namespace object by its path
-lai_nsnode_t *lai_resolve(char *path) {
+lai_nsnode_t *lai_legacy_resolve(char *path) {
     size_t i = 0;
 
     if (path[0] == ROOT_CHAR) {
