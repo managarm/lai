@@ -625,21 +625,30 @@ lai_nsnode_t *lai_get_deviceid(size_t index, lai_object_t *id) {
     size_t i = 0, j = 0;
 
     lai_nsnode_t *handle;
-    char path[ACPI_MAX_NAME];
-    lai_object_t device_id = {0};
 
     handle = lai_get_device(j);
     while (handle) {
-        // read the ID of the device
-        lai_strcpy(path, handle->fullpath);
-        // change the device ID to hardware ID
-        lai_strcpy(path + lai_strlen(path), "._HID");
-        memset(&device_id, 0, sizeof(lai_object_t));
-        if (lai_legacy_eval(&device_id, path)) {
-            // same principle here
-            lai_strcpy(path + lai_strlen(path) - 5, "._CID");
-            memset(&device_id, 0, sizeof(lai_object_t));
-            lai_legacy_eval(&device_id, path);
+        // Read the ID of the device.
+        lai_object_t device_id = {0};
+
+        lai_nsnode_t *hid_handle = lai_resolve_path(handle, "_HID");
+        if (hid_handle) {
+            if (lai_eval(&device_id, hid_handle)) {
+                lai_warn("could not evaluate _HID of device");
+            } else {
+                LAI_ENSURE(device_id.type);
+            }
+        }
+
+        if (!device_id.type) {
+            lai_nsnode_t *cid_handle = lai_resolve_path(handle, "_CID");
+            if (cid_handle) {
+                if (lai_eval(&device_id, cid_handle)) {
+                    lai_warn("could not evaluate _CID of device");
+                } else {
+                    LAI_ENSURE(device_id.type);
+                }
+            }
         }
 
         if (device_id.type == LAI_INTEGER && id->type == LAI_INTEGER) {
@@ -650,6 +659,7 @@ lai_nsnode_t *lai_get_deviceid(size_t index, lai_object_t *id) {
                             lai_exec_string_access(id)))
                 i++;
         }
+        lai_free_object(&device_id);
 
         if (i > index)
             return handle;
