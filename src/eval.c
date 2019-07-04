@@ -65,35 +65,6 @@ int lai_eval_package(lai_object_t *package, size_t index, lai_object_t *destinat
     return 0;
 }
 
-int lai_legacy_eval(lai_object_t *destination, char *path) {
-    lai_nsnode_t *handle;
-    char *path_copy = laihost_malloc(lai_strlen(path) + 1);
-    lai_strcpy(path_copy, path);
-    handle = lai_exec_resolve(path_copy);
-    laihost_free(path_copy);
-    if (!handle)
-        return 1;
-
-    if (handle->type == LAI_NAMESPACE_ALIAS)
-        handle = handle->al_target;
-
-    if (handle->type == LAI_NAMESPACE_NAME) {
-        lai_clone_object(destination, &handle->object);
-        return 0;
-    } else if (handle->type == LAI_NAMESPACE_METHOD) {
-        lai_state_t state;
-        lai_init_state(&state);
-        int ret;
-        if ((ret = lai_exec_method(handle, &state)))
-            return ret;
-        lai_move_object(destination, &state.retvalue);
-        lai_finalize_state(&state);
-        return 0;
-    }
-
-    return 1;
-}
-
 uint16_t bswap16(uint16_t word) {
     return (uint16_t)((word >> 8) & 0xFF) | ((word << 8) & 0xFF00);
 }

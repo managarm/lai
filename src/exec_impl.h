@@ -75,5 +75,3 @@ void lai_move_object(lai_object_t *, lai_object_t *);
 void lai_clone_object(lai_object_t *, lai_object_t *);
 
 void lai_exec_sleep(struct lai_aml_segment *, void *, lai_state_t *);
-
-lai_nsnode_t *lai_exec_resolve(char *);

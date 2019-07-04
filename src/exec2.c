@@ -25,35 +25,6 @@ void lai_write_buffer(lai_nsnode_t *, lai_object_t *);
    DefToDecimalString | DefToHexString | DefToInteger | DefToString |
    DefWait | DefXOr | UserTermObj */
 
-// lai_exec_resolve(): Resolves a name during control method execution
-// Param:    char *path - 4-char object name or full path
-// Return:    lai_nsnode_t * - pointer to namespace object, NULL on error
-
-lai_nsnode_t *lai_exec_resolve(char *path) {
-    lai_nsnode_t *object;
-    object = lai_legacy_resolve(path);
-
-    if (lai_strlen(path) == 4)
-        return lai_legacy_resolve(path);
-
-    while (!object && lai_strlen(path) > 6) {
-        memmove(path + lai_strlen(path) - 9, path + lai_strlen(path) - 4, 5);
-        object = lai_legacy_resolve(path);
-        if (object != NULL)
-            goto resolve_alias;
-    }
-
-    if (object == NULL)
-        return NULL;
-
-resolve_alias:
-    // resolve Aliases too
-    if (object->type == LAI_NAMESPACE_ALIAS)
-        object = object->al_target;
-
-    return object;
-}
-
 int lai_create_string(lai_object_t *object, size_t length) {
     object->type = LAI_STRING;
     object->string_ptr = laihost_malloc(sizeof(struct lai_string_head) + length + 1);
