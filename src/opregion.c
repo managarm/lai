@@ -52,10 +52,10 @@ void lai_read_field(lai_object_t *destination, lai_nsnode_t *field) {
     void *mmio;
 
     // these are for PCI
-    char name[ACPI_MAX_NAME];
     lai_object_t bus_number = {0};
     lai_object_t address_number = {0};
-    int eval_status;
+    int bbn_result = 0; // When _BBN is not present, we assume PCI bus 0.
+    int adr_result = 0; // When _ADR is not present, again, default to zero.
     size_t pci_byte_offset;
 
     if (opregion->op_address_space != OPREGION_PCI) {
@@ -146,33 +146,27 @@ void lai_read_field(lai_object_t *destination, lai_nsnode_t *field) {
                           lai_stringify_node_path(field));
         }
     } else if (opregion->op_address_space == OPREGION_PCI) {
-        // PCI bus number is in the _BBN object
-        lai_strcpy(name, opregion->fullpath);
-        lai_strcpy(name + lai_strlen(name) - 4, "_BBN");
-        eval_status = lai_legacy_eval(&bus_number, name);
-
-        // when the _BBN object is not present, we assume PCI bus 0
-        if (eval_status) {
-            bus_number.type = LAI_INTEGER;
-            bus_number.integer = 0;
+        // PCI bus number is in the _BBN object.
+        lai_nsnode_t *bbn_handle = lai_resolve_path(opregion, "_BBN");
+        if (bbn_handle) {
+            if (lai_eval(&bus_number, bbn_handle))
+                lai_panic("could not evaluate _BBN of OperationRegion()");
+            bbn_result = bus_number.integer;
         }
 
-        // device slot/function is in the _ADR object
-        lai_strcpy(name, opregion->fullpath);
-        lai_strcpy(name + lai_strlen(name) - 4, "_ADR");
-        eval_status = lai_legacy_eval(&address_number, name);
-
-        // when this is not present, again default to zero
-        if (eval_status) {
-            address_number.type = LAI_INTEGER;
-            address_number.type = 0;
+        // Device slot/function is in the _ADR object.
+        lai_nsnode_t *adr_handle = lai_resolve_path(opregion, "_ADR");
+        if (adr_handle) {
+            if (lai_eval(&address_number, adr_handle))
+                lai_panic("could not evaluate _ADR of OperationRegion()");
+            adr_result = bus_number.integer;
         }
 
         if (!laihost_pci_read)
             lai_panic("host does not provide PCI access functions");
-        value = laihost_pci_read((uint8_t)bus_number.integer,
-                                 (uint8_t)(address_number.integer >> 16) & 0xFF,
-                                 (uint8_t)(address_number.integer & 0xFF),
+        value = laihost_pci_read((uint8_t)bbn_result,
+                                 (uint8_t)(adr_result >> 16) & 0xFF,
+                                 (uint8_t)(adr_result & 0xFF),
                                  (offset & 0xFFFC) + opregion->op_base);
 
        value >>= bit_offset;
@@ -197,10 +191,10 @@ void lai_write_field(lai_nsnode_t *field, lai_object_t *source) {
     void *mmio;
 
     // these are for PCI
-    char name[ACPI_MAX_NAME];
     lai_object_t bus_number = {0};
     lai_object_t address_number = {0};
-    int eval_status;
+    int bbn_result = 0; // When _BBN is not present, we assume PCI bus 0.
+    int adr_result = 0; // When _ADR is not present, again, default to zero.
     size_t pci_byte_offset;
 
     if (opregion->op_address_space != OPREGION_PCI) {
@@ -291,33 +285,27 @@ void lai_write_field(lai_nsnode_t *field, lai_object_t *source) {
                           lai_stringify_node_path(field));
         }
     } else if (opregion->op_address_space == OPREGION_PCI) {
-        // PCI bus number is in the _BBN object
-        lai_strcpy(name, opregion->fullpath);
-        lai_strcpy(name + lai_strlen(name) - 4, "_BBN");
-        eval_status = lai_legacy_eval(&bus_number, name);
-
-        // when the _BBN object is not present, we assume PCI bus 0
-        if (eval_status) {
-            bus_number.type = LAI_INTEGER;
-            bus_number.integer = 0;
+        // PCI bus number is in the _BBN object.
+        lai_nsnode_t *bbn_handle = lai_resolve_path(opregion, "_BBN");
+        if (bbn_handle) {
+            if (lai_eval(&bus_number, bbn_handle))
+                lai_panic("could not evaluate _BBN of OperationRegion()");
+            bbn_result = bus_number.integer;
         }
 
-        // device slot/function is in the _ADR object
-        lai_strcpy(name, opregion->fullpath);
-        lai_strcpy(name + lai_strlen(name) - 4, "_ADR");
-        eval_status = lai_legacy_eval(&address_number, name);
-
-        // when this is not present, again default to zero
-        if (eval_status) {
-            address_number.type = LAI_INTEGER;
-            address_number.type = 0;
+        // Device slot/function is in the _ADR object.
+        lai_nsnode_t *adr_handle = lai_resolve_path(opregion, "_ADR");
+        if (adr_handle) {
+            if (lai_eval(&address_number, adr_handle))
+                lai_panic("could not evaluate _ADR of OperationRegion()");
+            adr_result = bus_number.integer;
         }
 
         if (!laihost_pci_read)
             lai_panic("host does not provide PCI access functions");
-        value = laihost_pci_read((uint8_t)bus_number.integer,
-                                 (uint8_t)(address_number.integer >> 16) & 0xFF,
-                                 (uint8_t)(address_number.integer & 0xFF),
+        value = laihost_pci_read((uint8_t)bbn_result,
+                                 (uint8_t)(adr_result >> 16) & 0xFF,
+                                 (uint8_t)(adr_result & 0xFF),
                                  (offset & 0xFFFC) + opregion->op_base);
     } else {
         lai_panic("undefined opregion address space: %d", opregion->op_address_space);
@@ -394,9 +382,9 @@ void lai_write_field(lai_nsnode_t *field, lai_object_t *source) {
     } else if (opregion->op_address_space == OPREGION_PCI) {
         if (!laihost_pci_write)
             lai_panic("host does not provide PCI access functions");
-        laihost_pci_write((uint8_t)bus_number.integer,
-                          (uint8_t)(address_number.integer >> 16) & 0xFF,
-                          (uint8_t)(address_number.integer & 0xFF),
+        laihost_pci_write((uint8_t)bbn_result,
+                          (uint8_t)(adr_result >> 16) & 0xFF,
+                          (uint8_t)(adr_result & 0xFF),
                           (offset & 0xFFFC) + opregion->op_base, (uint32_t)value);
     } else {
         lai_panic("undefined opregion address space: %d", opregion->op_address_space);
