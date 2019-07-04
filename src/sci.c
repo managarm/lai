@@ -66,11 +66,11 @@ int lai_enable_acpi(uint32_t mode) {
         lai_panic("host does not provide timer functions required by lai_enable_acpi()");
 
     /* first run \._SB_._INI */
-    handle = lai_legacy_resolve("\\._SB_._INI");
+    handle = lai_resolve_path(NULL, "\\_SB_._INI");
     if (handle) {
         lai_init_state(&state);
         if (!lai_exec_method(handle, &state))
-            lai_debug("evaluated \\._SB_._INI");
+            lai_debug("evaluated \\_SB_._INI");
         lai_finalize_state(&state);
     }
 
@@ -78,7 +78,7 @@ int lai_enable_acpi(uint32_t mode) {
     lai_init_children("\\._SB_");
 
     /* tell the firmware about the IRQ mode */
-    handle = lai_legacy_resolve("\\._PIC");
+    handle = lai_resolve_path(NULL, "\\_PIC");
     if (handle) {
         lai_init_state(&state);
         lai_arg(&state, 0)->type = LAI_INTEGER;
@@ -112,11 +112,7 @@ static int evaluate_sta(lai_nsnode_t *node) {
     // If _STA not present, assume 0x0F as ACPI spec says.
     int sta = 0x0F;
 
-    char path[ACPI_MAX_NAME];
-    lai_strcpy(path, node->fullpath);
-    lai_strcpy(path + lai_strlen(path), "._STA");
-
-    lai_nsnode_t *handle = lai_legacy_resolve(path);
+    lai_nsnode_t *handle = lai_resolve_path(node, "_STA");
     if (handle) {
         lai_state_t state;
         lai_init_state(&state);
@@ -132,7 +128,6 @@ static int evaluate_sta(lai_nsnode_t *node) {
 static void lai_init_children(char *parent) {
     lai_nsnode_t *node;
     lai_nsnode_t *handle;
-    char path[ACPI_MAX_NAME];
 
     for (size_t i = 0; i < lai_ns_size; i++) {
         node = lai_enum(parent, i);
@@ -143,15 +138,16 @@ static void lai_init_children(char *parent) {
 
             /* if device is present, evaluate its _INI */
             if (sta & ACPI_STA_PRESENT) {
-                lai_strcpy(path, node->fullpath);
-                lai_strcpy(path + lai_strlen(path), "._INI");
-                handle = lai_legacy_resolve(path);
+                handle = lai_resolve_path(node, "_INI");
 
                 if (handle) {
                     lai_state_t state;
                     lai_init_state(&state);
-                    if (!lai_exec_method(handle, &state))
+                    if (!lai_exec_method(handle, &state)) {
+                        const char *path = lai_stringify_node_path(handle);
                         lai_debug("evaluated %s", path);
+                        laihost_free(path);
+                    }
                     lai_finalize_state(&state);
                 }
             }

@@ -316,6 +316,7 @@ extern volatile uint16_t lai_last_event;
 lai_nsnode_t *lai_create_root(void);
 void lai_create_namespace(void);
 char *lai_stringify_node_path(lai_nsnode_t *);
+lai_nsnode_t *lai_resolve_path(lai_nsnode_t *, const char *);
 lai_nsnode_t *lai_legacy_resolve(char *);
 lai_nsnode_t *lai_get_device(size_t);
 lai_nsnode_t *lai_get_deviceid(size_t, lai_object_t *);
