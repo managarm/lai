@@ -46,7 +46,7 @@ int lai_pci_route(acpi_resource_t *dest, uint8_t bus, uint8_t slot, uint8_t func
         lai_strcpy(path, handle->fullpath);
         lai_strcpy(path + lai_strlen(path), "._BBN");    // _BBN: Base bus number
 
-        status = lai_eval(&bus_number, path);
+        status = lai_legacy_eval(&bus_number, path);
         if (status) {
             // when _BBN is not present, we assume bus 0
             bus_number.type = LAI_INTEGER;
@@ -80,7 +80,7 @@ int lai_pci_route(acpi_resource_t *dest, uint8_t bus, uint8_t slot, uint8_t func
         of the specified device which contains the PCI interrupt. If offset 2 is an
         integer, this field is the ACPI GSI of this PCI IRQ. */
 
-    status = lai_eval(&prt, path);
+    status = lai_legacy_eval(&prt, path);
 
     if (status)
         return 1;

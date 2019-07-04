@@ -32,7 +32,7 @@ size_t lai_read_resource(lai_nsnode_t *device, acpi_resource_t *dest) {
     lai_strcpy(crs + lai_strlen(crs), "._CRS");    // _CRS: current resource settings
 
     lai_object_t buffer = {0};
-    int status = lai_eval(&buffer, crs);
+    int status = lai_legacy_eval(&buffer, crs);
     if (status)
         return 0;
 

@@ -325,7 +325,7 @@ void lai_eisaid(lai_object_t *, char *);
 size_t lai_read_resource(lai_nsnode_t *, acpi_resource_t *);
 
 // ACPI Control Methods
-int lai_eval(lai_object_t *, char *);
+int lai_legacy_eval(lai_object_t *, char *);
 int lai_populate(lai_nsnode_t *, struct lai_aml_segment *, lai_state_t *);
 int lai_exec_method(lai_nsnode_t *, lai_state_t *);
 int lai_eval_node(lai_nsnode_t *, lai_state_t *);

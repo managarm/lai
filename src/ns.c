@@ -635,11 +635,11 @@ lai_nsnode_t *lai_get_deviceid(size_t index, lai_object_t *id) {
         // change the device ID to hardware ID
         lai_strcpy(path + lai_strlen(path), "._HID");
         memset(&device_id, 0, sizeof(lai_object_t));
-        if (lai_eval(&device_id, path)) {
+        if (lai_legacy_eval(&device_id, path)) {
             // same principle here
             lai_strcpy(path + lai_strlen(path) - 5, "._CID");
             memset(&device_id, 0, sizeof(lai_object_t));
-            lai_eval(&device_id, path);
+            lai_legacy_eval(&device_id, path);
         }
 
         if (device_id.type == LAI_INTEGER && id->type == LAI_INTEGER) {

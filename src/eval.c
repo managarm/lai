@@ -65,7 +65,7 @@ int lai_eval_package(lai_object_t *package, size_t index, lai_object_t *destinat
     return 0;
 }
 
-int lai_eval(lai_object_t *destination, char *path) {
+int lai_legacy_eval(lai_object_t *destination, char *path) {
     lai_nsnode_t *handle;
     char *path_copy = laihost_malloc(lai_strlen(path) + 1);
     lai_strcpy(path_copy, path);

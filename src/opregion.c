@@ -149,7 +149,7 @@ void lai_read_field(lai_object_t *destination, lai_nsnode_t *field) {
         // PCI bus number is in the _BBN object
         lai_strcpy(name, opregion->fullpath);
         lai_strcpy(name + lai_strlen(name) - 4, "_BBN");
-        eval_status = lai_eval(&bus_number, name);
+        eval_status = lai_legacy_eval(&bus_number, name);
 
         // when the _BBN object is not present, we assume PCI bus 0
         if (eval_status) {
@@ -160,7 +160,7 @@ void lai_read_field(lai_object_t *destination, lai_nsnode_t *field) {
         // device slot/function is in the _ADR object
         lai_strcpy(name, opregion->fullpath);
         lai_strcpy(name + lai_strlen(name) - 4, "_ADR");
-        eval_status = lai_eval(&address_number, name);
+        eval_status = lai_legacy_eval(&address_number, name);
 
         // when this is not present, again default to zero
         if (eval_status) {
@@ -294,7 +294,7 @@ void lai_write_field(lai_nsnode_t *field, lai_object_t *source) {
         // PCI bus number is in the _BBN object
         lai_strcpy(name, opregion->fullpath);
         lai_strcpy(name + lai_strlen(name) - 4, "_BBN");
-        eval_status = lai_eval(&bus_number, name);
+        eval_status = lai_legacy_eval(&bus_number, name);
 
         // when the _BBN object is not present, we assume PCI bus 0
         if (eval_status) {
@@ -305,7 +305,7 @@ void lai_write_field(lai_nsnode_t *field, lai_object_t *source) {
         // device slot/function is in the _ADR object
         lai_strcpy(name, opregion->fullpath);
         lai_strcpy(name + lai_strlen(name) - 4, "_ADR");
-        eval_status = lai_eval(&address_number, name);
+        eval_status = lai_legacy_eval(&address_number, name);
 
         // when this is not present, again default to zero
         if (eval_status) {
