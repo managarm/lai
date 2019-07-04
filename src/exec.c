@@ -1706,6 +1706,19 @@ int lai_eval_node(lai_nsnode_t *handle, lai_state_t *state) {
     return 1;
 }
 
+int lai_eval(lai_object_t *object, lai_nsnode_t *handle) {
+    LAI_ENSURE(handle);
+
+    int e;
+    lai_state_t state;
+    lai_init_state(&state);
+    e = lai_eval_node(handle, &state);
+    if (!e)
+        lai_move_object(object, lai_retvalue(&state));
+    lai_finalize_state(&state);
+    return e;
+}
+
 // Evaluates an AML expression recursively.
 // TODO: Eventually, we want to remove this function. However, this requires refactoring
 //       lai_exec_run() to avoid all kinds of recursion.

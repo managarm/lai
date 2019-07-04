@@ -34,39 +34,42 @@ int lai_pci_route(acpi_resource_t *dest, uint8_t bus, uint8_t slot, uint8_t func
     // find the PCI bus in the namespace
     lai_object_t bus_number = {0};
     lai_object_t pnp_id = {0};
-
     lai_eisaid(&pnp_id, PCI_PNP_ID);
 
-    size_t index = 0;
-    lai_nsnode_t *handle = lai_get_deviceid(index, &pnp_id);
-    char path[ACPI_MAX_NAME];
-    int status;
+    lai_nsnode_t *handle;
+    for (size_t i = 0; ; i++) {
+        handle = lai_get_deviceid(i, &pnp_id);
+        if (!handle)
+            return 1;
 
-    while (handle) {
-        lai_strcpy(path, handle->fullpath);
-        lai_strcpy(path + lai_strlen(path), "._BBN");    // _BBN: Base bus number
+        const char *node_path = lai_stringify_node_path(handle);
+        lai_debug("evaluating _BBN of %s", node_path);
+        laihost_free(node_path);
 
-        status = lai_legacy_eval(&bus_number, path);
-        if (status) {
-            // when _BBN is not present, we assume bus 0
-            bus_number.type = LAI_INTEGER;
-            bus_number.integer = 0;
+        // When _BBN is not present, we assume bus 0.
+        int bbn_result = 0;
+
+        lai_nsnode_t *bbn_handle = lai_resolve_path(handle, "_BBN");
+        if (bbn_handle) {
+            if (lai_eval(&bus_number, bbn_handle)) {
+                lai_warn("failed to evaluate _BBN");
+                continue;
+            }
+            bbn_result = bus_number.integer;
         }
 
-        if ((uint8_t)bus_number.integer == bus)
+        if (bbn_result == bus)
             break;
-
-        index++;
-        handle = lai_get_deviceid(index, &pnp_id);
     }
 
-    if (!handle)
-        return 1;
-
     // read the PCI routing table
-    lai_strcpy(path, handle->fullpath);
-    lai_strcpy(path + lai_strlen(path), "._PRT");    // _PRT: PCI Routing Table
+    lai_nsnode_t *prt_handle = lai_resolve_path(handle, "_PRT");
+    if (!prt_handle) {
+        lai_warn("host bridge has no _PRT");
+        return 1;
+    }
 
+    int status;
     lai_object_t prt = {0};
     lai_object_t prt_package = {0};
     lai_object_t prt_entry = {0};
@@ -80,10 +83,10 @@ int lai_pci_route(acpi_resource_t *dest, uint8_t bus, uint8_t slot, uint8_t func
         of the specified device which contains the PCI interrupt. If offset 2 is an
         integer, this field is the ACPI GSI of this PCI IRQ. */
 
-    status = lai_legacy_eval(&prt, path);
-
-    if (status)
+    if (lai_eval(&prt, prt_handle)) {
+        lai_warn("failed to evaluate _PRT");
         return 1;
+    }
 
     size_t i = 0;
 
@@ -173,8 +176,10 @@ resolve_pin:
         }
 
         return 0;
-    } else
+    } else {
+        lai_warn("PRT entry has unexpected type %d", prt_entry.type);
         return 1;
+    }
 }
 
 

@@ -329,6 +329,7 @@ int lai_legacy_eval(lai_object_t *, char *);
 int lai_populate(lai_nsnode_t *, struct lai_aml_segment *, lai_state_t *);
 int lai_exec_method(lai_nsnode_t *, lai_state_t *);
 int lai_eval_node(lai_nsnode_t *, lai_state_t *);
+int lai_eval(lai_object_t *, lai_nsnode_t *);
 
 // Generic Functions
 int lai_enable_acpi(uint32_t);
