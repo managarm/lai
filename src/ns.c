@@ -50,6 +50,9 @@ lai_nsnode_t *lai_create_nsnode_or_die(void) {
 
 // Installs the nsnode to the namespace.
 void lai_install_nsnode(lai_nsnode_t *node) {
+    if (lai_legacy_resolve(node->fullpath))
+        lai_panic("trying to install duplicate namespace node %s", node->fullpath);
+
     if (lai_ns_size == lai_ns_capacity) {
         size_t new_capacity = lai_ns_capacity * 2;
         if (!new_capacity)
