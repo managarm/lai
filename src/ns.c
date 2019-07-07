@@ -224,6 +224,8 @@ lai_nsnode_t *lai_do_resolve(lai_nsnode_t *ctx_handle, const struct lai_amlname 
                 node = node->al_target;
                 LAI_ENSURE(node->type != LAI_NAMESPACE_ALIAS);
             }
+            if(debug_resolution)
+                lai_debug("resolution returns %s", node->fullpath);
             return node;
         }
 
@@ -560,7 +562,6 @@ lai_nsnode_t *lai_resolve_path(lai_nsnode_t *ctx_handle, const char *path) {
         legacy_path[n] = '.';
         lai_strcpy(legacy_path + n + 1, segment);
         legacy_path[n + 5] = '\0';
-        lai_debug("calling legacy_resolve on '%s'", legacy_path);
 
         current = lai_legacy_resolve(legacy_path);
         if (!current)
@@ -577,6 +578,39 @@ lai_nsnode_t *lai_resolve_path(lai_nsnode_t *ctx_handle, const char *path) {
     }
 
     return current;
+}
+
+lai_nsnode_t *lai_resolve_search(lai_nsnode_t *ctx_handle, const char *segment) {
+    lai_nsnode_t *current = ctx_handle;
+    LAI_ENSURE(current);
+    LAI_ENSURE(current->type != LAI_NAMESPACE_ALIAS); // ctx_handle needs to be resolved.
+
+    if(debug_resolution)
+        lai_debug("resolving %s by searching through scopes", segment);
+
+    while (current) {
+        char path[ACPI_MAX_NAME];
+        size_t n = lai_strlen(current->fullpath);
+        lai_strcpy(path, current->fullpath);
+        path[n] = '.';
+        lai_strcpy(path + 1 + n, segment);
+
+        lai_nsnode_t *node = lai_legacy_resolve(path);
+        if (!node) {
+            current = current->parent;
+            continue;
+        }
+
+        if (node->type == LAI_NAMESPACE_ALIAS) {
+            node = node->al_target;
+            LAI_ENSURE(node->type != LAI_NAMESPACE_ALIAS);
+        }
+        if(debug_resolution)
+            lai_debug("resolution returns %s", node->fullpath);
+        return node;
+    }
+
+    return NULL;
 }
 
 // Resolve a namespace object by its path
