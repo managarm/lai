@@ -1813,6 +1813,8 @@ int lai_eval_vargs(lai_object_t *result, lai_nsnode_t *handle, lai_state_t *stat
     for (;;) {
         LAI_ENSURE(n < 7 && "ACPI supports at most 7 arguments");
         lai_object_t *object = va_arg(vl, lai_object_t *);
+        if (!object)
+            break;
         lai_assign_object(&args[n++], object);
     }
 
