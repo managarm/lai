@@ -270,12 +270,12 @@ typedef struct lai_stackitem_ {
         struct {
             int pkg_index;
             int pkg_end;
-            uint8_t pkg_result_mode;
+            uint8_t pkg_want_result;
         };
         struct {
             int op_opcode;
             uint8_t op_arg_modes[8];
-            uint8_t op_result_mode;
+            uint8_t op_want_result;
         };
         struct {
             int node_opcode;

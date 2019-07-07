@@ -582,9 +582,8 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
         //     opcode_pc + pkgsize + opcode size.
         int opcode_pc = state->pc;
 
-        // Whether we use the result of an expression or not.
-        // If yes, it will be pushed onto the opstack after the expression is computed.
-        int exec_result_mode = LAI_EXEC_MODE;
+        // Parse mode. Affects the parsing of certain opcode bytes.
+        int parse_mode = LAI_EXEC_MODE;
 
         if (item->kind == LAI_POPULATE_CONTEXT_STACKITEM) {
     		if (state->pc == item->ctx_limit) {
@@ -614,7 +613,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
                 return 0;
             }
 
-            exec_result_mode = LAI_OBJECT_MODE;
+            parse_mode = LAI_OBJECT_MODE;
         } else if (item->kind == LAI_PKG_INITIALIZER_STACKITEM) {
             lai_object_t *frame = lai_exec_get_opstack(state, item->opstack_frame);
             lai_object_t *package = &frame[0];
@@ -631,12 +630,8 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             LAI_ENSURE(state->opstack_ptr == item->opstack_frame + 1);
 
             if (state->pc == item->pkg_end) {
-                if (item->pkg_result_mode == LAI_EXEC_MODE)
+                if (!item->pkg_want_result)
                     lai_exec_pop_opstack(state, 1);
-                else
-                    LAI_ENSURE(item->pkg_result_mode == LAI_DATA_MODE
-                               || item->pkg_result_mode == LAI_REFERENCE_MODE
-                               || item->pkg_result_mode == LAI_OBJECT_MODE);
 
                 lai_exec_pop_stack_back(state);
                 continue;
@@ -645,7 +640,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             if (state->pc > item->pkg_end) // This would be an interpreter bug.
                 lai_panic("package initializer escaped out of code range");
 
-            exec_result_mode = LAI_DATA_MODE;
+            parse_mode = LAI_DATA_MODE;
         } else if (item->kind == LAI_NODE_STACKITEM) {
             int k = state->opstack_ptr - item->opstack_frame;
             if (!item->node_arg_modes[k]) {
@@ -657,7 +652,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
                 continue;
             }
 
-            exec_result_mode = item->node_arg_modes[k];
+            parse_mode = item->node_arg_modes[k];
         } else if (item->kind == LAI_OP_STACKITEM) {
             int k = state->opstack_ptr - item->opstack_frame;
 //            lai_debug("got %d parameters", k);
@@ -667,12 +662,10 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
                 lai_exec_reduce_op(item->op_opcode, state, operands, &result);
                 lai_exec_pop_opstack(state, k);
 
-                if (item->op_result_mode == LAI_OBJECT_MODE
-                        || item->op_result_mode == LAI_REFERENCE_MODE) {
+                if (item->op_want_result) {
                     lai_object_t *opstack_res = lai_exec_push_opstack_or_die(state);
                     lai_move_object(opstack_res, &result);
                 } else {
-                    LAI_ENSURE(item->op_result_mode == LAI_EXEC_MODE);
                     lai_free_object(&result);
                 }
 
@@ -680,7 +673,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
                 continue;
             }
 
-            exec_result_mode = item->op_arg_modes[k];
+            parse_mode = item->op_arg_modes[k];
         } else if (item->kind == LAI_LOOP_STACKITEM) {
             if (state->pc == item->loop_pred) {
                 // We are at the beginning of a loop. We check the predicate; if it is false,
@@ -733,7 +726,11 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             lai_panic("execution escaped out of code range (PC is 0x%x with limit 0x%x)",
                     state->pc, state->limit);
 
-        if (exec_result_mode == LAI_IMMEDIATE_WORD_MODE) {
+        // Whether we use the result of an expression or not.
+        // If yes, it will be pushed onto the opstack after the expression is computed.
+        int want_result = (parse_mode != LAI_EXEC_MODE);
+
+        if (parse_mode == LAI_IMMEDIATE_WORD_MODE) {
             lai_object_t *result = lai_exec_push_opstack_or_die(state);
             result->type = LAI_INTEGER;
             result->integer = (method[state->pc + 1] << 8) | method[state->pc];
@@ -750,7 +747,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             if (debug_opcodes)
                 debug_name = lai_stringify_amlname(&amln);
 
-            if (exec_result_mode == LAI_REFERENCE_MODE) {
+            if (parse_mode == LAI_REFERENCE_MODE) {
                 if (debug_opcodes)
                     lai_debug("parsing name %s [@ %d]", debug_name, opcode_pc);
 
@@ -758,7 +755,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
                 opstack_res->type = LAI_UNRESOLVED_NAME;
                 opstack_res->unres_ctx_handle = ctx_handle;
                 opstack_res->unres_aml = method + opcode_pc;
-            }else if (exec_result_mode == LAI_DATA_MODE) {
+            }else if (parse_mode == LAI_DATA_MODE) {
                 if (debug_opcodes)
                     lai_debug("parsing name %s [@ %d]", debug_name, opcode_pc);
 
@@ -767,8 +764,8 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
                 opstack_res->unres_ctx_handle = ctx_handle;
                 opstack_res->unres_aml = method + opcode_pc;
             } else {
-                LAI_ENSURE(exec_result_mode == LAI_OBJECT_MODE
-                           || exec_result_mode == LAI_EXEC_MODE);
+                LAI_ENSURE(parse_mode == LAI_OBJECT_MODE
+                           || parse_mode == LAI_EXEC_MODE);
                 lai_nsnode_t *handle = lai_do_resolve(ctx_handle, &amln);
                 if (!handle)
                     lai_panic("undefined reference %s in object mode",
@@ -796,7 +793,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
                     result.handle = handle;
                 }
 
-                if (exec_result_mode == LAI_OBJECT_MODE) {
+                if (parse_mode == LAI_OBJECT_MODE) {
                     lai_object_t *opstack_res = lai_exec_push_opstack_or_die(state);
                     lai_move_object(opstack_res, &result);
                 }
@@ -834,39 +831,39 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             break;
 
         case ZERO_OP:
-            if (exec_result_mode == LAI_DATA_MODE || exec_result_mode == LAI_OBJECT_MODE) {
+            if (parse_mode == LAI_DATA_MODE || parse_mode == LAI_OBJECT_MODE) {
                 lai_object_t *result = lai_exec_push_opstack_or_die(state);
                 result->type = LAI_INTEGER;
                 result->integer = 0;
-            } else if (exec_result_mode == LAI_REFERENCE_MODE) {
+            } else if (parse_mode == LAI_REFERENCE_MODE) {
                 // In target mode, ZERO_OP generates a null target and not an integer!
                 lai_object_t *result = lai_exec_push_opstack_or_die(state);
                 result->type = LAI_NULL_NAME;
             } else {
                 lai_warn("Zero() in execution mode has no effect");
-                LAI_ENSURE(exec_result_mode == LAI_EXEC_MODE);
+                LAI_ENSURE(parse_mode == LAI_EXEC_MODE);
             }
             state->pc++;
             break;
         case ONE_OP:
-            if (exec_result_mode == LAI_DATA_MODE || exec_result_mode == LAI_OBJECT_MODE) {
+            if (parse_mode == LAI_DATA_MODE || parse_mode == LAI_OBJECT_MODE) {
                 lai_object_t *result = lai_exec_push_opstack_or_die(state);
                 result->type = LAI_INTEGER;
                 result->integer = 1;
             } else {
                 lai_warn("One() in execution mode has no effect");
-                LAI_ENSURE(exec_result_mode == LAI_EXEC_MODE);
+                LAI_ENSURE(parse_mode == LAI_EXEC_MODE);
             }
             state->pc++;
             break;
         case ONES_OP:
-            if (exec_result_mode == LAI_DATA_MODE || exec_result_mode == LAI_OBJECT_MODE) {
+            if (parse_mode == LAI_DATA_MODE || parse_mode == LAI_OBJECT_MODE) {
                 lai_object_t *result = lai_exec_push_opstack_or_die(state);
                 result->type = LAI_INTEGER;
                 result->integer = ~((uint64_t)0);
             } else {
                 lai_warn("Ones() in execution mode has no effect");
-                LAI_ENSURE(exec_result_mode == LAI_EXEC_MODE);
+                LAI_ENSURE(parse_mode == LAI_EXEC_MODE);
             }
             state->pc++;
             break;
@@ -880,12 +877,12 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             size_t integer_size = lai_parse_integer(method + state->pc, &integer);
             if (!integer_size)
                 lai_panic("failed to parse integer opcode");
-            if (exec_result_mode == LAI_DATA_MODE || exec_result_mode == LAI_OBJECT_MODE) {
+            if (parse_mode == LAI_DATA_MODE || parse_mode == LAI_OBJECT_MODE) {
                 lai_object_t *result = lai_exec_push_opstack_or_die(state);
                 result->type = LAI_INTEGER;
                 result->integer = integer;
             } else
-                LAI_ENSURE(exec_result_mode == LAI_EXEC_MODE);
+                LAI_ENSURE(parse_mode == LAI_EXEC_MODE);
             state->pc += integer_size;
             break;
         }
@@ -899,13 +896,13 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             if (state->pc + n == state->limit)
                 lai_panic("unterminated string in AML code");
 
-            if (exec_result_mode == LAI_DATA_MODE || exec_result_mode == LAI_OBJECT_MODE) {
+            if (parse_mode == LAI_DATA_MODE || parse_mode == LAI_OBJECT_MODE) {
                 lai_object_t *opstack_res = lai_exec_push_opstack_or_die(state);
                 if(lai_create_string(opstack_res, n))
                     lai_panic("could not allocate memory for string");
                 memcpy(lai_exec_string_access(opstack_res), method + state->pc, n);
             } else
-                LAI_ENSURE(exec_result_mode == LAI_EXEC_MODE);
+                LAI_ENSURE(parse_mode == LAI_EXEC_MODE);
             state->pc += n + 1;
             break;
         }
@@ -934,11 +931,11 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             memcpy(lai_exec_buffer_access(&result), method + state->pc, initial_size);
             state->pc += initial_size;
 
-            if (exec_result_mode == LAI_DATA_MODE || exec_result_mode == LAI_OBJECT_MODE) {
+            if (parse_mode == LAI_DATA_MODE || parse_mode == LAI_OBJECT_MODE) {
                 lai_object_t *opstack_res = lai_exec_push_opstack_or_die(state);
                 lai_move_object(opstack_res, &result);
             } else
-                LAI_ENSURE(exec_result_mode == LAI_EXEC_MODE);
+                LAI_ENSURE(parse_mode == LAI_EXEC_MODE);
             lai_free_object(&result);
             break;
         }
@@ -960,7 +957,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             pkg_item->opstack_frame = state->opstack_ptr;
             pkg_item->pkg_index = 0;
             pkg_item->pkg_end = opcode_pc + encoded_size + 1;
-            pkg_item->pkg_result_mode = exec_result_mode;
+            pkg_item->pkg_want_result = want_result;
 
             lai_object_t *opstack_pkg = lai_exec_push_opstack_or_die(state);
             if (lai_create_pkg(opstack_pkg, num_ents))
@@ -1251,7 +1248,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
         }
         case (EXTOP_PREFIX << 8) | MUTEX: {
             state->pc += 2;
-            
+
             struct lai_amlname amln;
             state->pc += lai_amlname_parse(&amln, method + state->pc);
             state->pc++; // skip over trailing 0x02
@@ -1428,8 +1425,8 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
         case ARG5_OP:
         case ARG6_OP:
         {
-            if (exec_result_mode == LAI_OBJECT_MODE
-                    || exec_result_mode == LAI_REFERENCE_MODE) {
+            if (parse_mode == LAI_OBJECT_MODE
+                    || parse_mode == LAI_REFERENCE_MODE) {
                 lai_object_t *result = lai_exec_push_opstack_or_die(state);
                 result->type = LAI_ARG_NAME;
                 result->index = opcode - ARG0_OP;
@@ -1447,8 +1444,8 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
         case LOCAL6_OP:
         case LOCAL7_OP:
         {
-            if(exec_result_mode == LAI_OBJECT_MODE
-                    || exec_result_mode == LAI_REFERENCE_MODE) {
+            if(parse_mode == LAI_OBJECT_MODE
+                    || parse_mode == LAI_REFERENCE_MODE) {
                 lai_object_t *result = lai_exec_push_opstack_or_die(state);
                 result->type = LAI_LOCAL_NAME;
                 result->index = opcode - LOCAL0_OP;
@@ -1459,8 +1456,8 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
 
         case (EXTOP_PREFIX << 8) | DEBUG_OP:
         {
-            if(exec_result_mode == LAI_OBJECT_MODE
-                    || exec_result_mode == LAI_REFERENCE_MODE) {
+            if(parse_mode == LAI_OBJECT_MODE
+                    || parse_mode == LAI_REFERENCE_MODE) {
                 lai_object_t *result = lai_exec_push_opstack_or_die(state);
                 result->type = LAI_DEBUG_NAME;
             }
@@ -1478,7 +1475,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             op_item->op_arg_modes[0] = LAI_OBJECT_MODE;
             op_item->op_arg_modes[1] = LAI_REFERENCE_MODE;
             op_item->op_arg_modes[2] = 0;
-            op_item->op_result_mode = exec_result_mode;
+            op_item->op_want_result = want_result;
             state->pc++;
             break;
         }
@@ -1499,7 +1496,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             op_item->op_arg_modes[1] = LAI_OBJECT_MODE;
             op_item->op_arg_modes[2] = LAI_REFERENCE_MODE;
             op_item->op_arg_modes[3] = 0;
-            op_item->op_result_mode = exec_result_mode;
+            op_item->op_want_result = want_result;
             state->pc++;
             break;
         }
@@ -1514,7 +1511,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             op_item->op_arg_modes[2] = LAI_REFERENCE_MODE;
             op_item->op_arg_modes[3] = LAI_REFERENCE_MODE;
             op_item->op_arg_modes[4] = 0;
-            op_item->op_result_mode = exec_result_mode;
+            op_item->op_want_result = want_result;
             state->pc++;
             break;
         }
@@ -1528,7 +1525,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             op_item->opstack_frame = state->opstack_ptr;
             op_item->op_arg_modes[0] = LAI_REFERENCE_MODE;
             op_item->op_arg_modes[1] = 0;
-            op_item->op_result_mode = exec_result_mode;
+            op_item->op_want_result = want_result;
             state->pc++;
             break;
         }
@@ -1541,7 +1538,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             op_item->opstack_frame = state->opstack_ptr;
             op_item->op_arg_modes[0] = LAI_OBJECT_MODE;
             op_item->op_arg_modes[1] = 0;
-            op_item->op_result_mode = exec_result_mode;
+            op_item->op_want_result = want_result;
             state->pc++;
             break;
         }
@@ -1558,7 +1555,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             op_item->op_arg_modes[0] = LAI_OBJECT_MODE;
             op_item->op_arg_modes[1] = LAI_OBJECT_MODE;
             op_item->op_arg_modes[2] = 0;
-            op_item->op_result_mode = exec_result_mode;
+            op_item->op_want_result = want_result;
             state->pc++;
             break;
         }
@@ -1573,7 +1570,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             op_item->op_arg_modes[1] = LAI_OBJECT_MODE;
             op_item->op_arg_modes[2] = LAI_REFERENCE_MODE;
             op_item->op_arg_modes[3] = 0;
-            op_item->op_result_mode = exec_result_mode;
+            op_item->op_want_result = want_result;
             state->pc++;
             break;
         }
@@ -1586,7 +1583,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             op_item->opstack_frame = state->opstack_ptr;
             op_item->op_arg_modes[0] = LAI_OBJECT_MODE;
             op_item->op_arg_modes[1] = 0;
-            op_item->op_result_mode = exec_result_mode;
+            op_item->op_want_result = want_result;
             state->pc++;
             break;
         }
@@ -1600,7 +1597,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             op_item->op_arg_modes[0] = LAI_REFERENCE_MODE;
             op_item->op_arg_modes[1] = LAI_REFERENCE_MODE;
             op_item->op_arg_modes[2] = 0;
-            op_item->op_result_mode = exec_result_mode;
+            op_item->op_want_result = want_result;
             state->pc += 2;
             break;
         }
@@ -1613,7 +1610,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             op_item->op_arg_modes[0] = LAI_REFERENCE_MODE;
             op_item->op_arg_modes[1] = LAI_IMMEDIATE_WORD_MODE;
             op_item->op_arg_modes[2] = 0;
-            op_item->op_result_mode = exec_result_mode;
+            op_item->op_want_result = want_result;
             state->pc += 2;
             break;
         }
@@ -1625,7 +1622,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             op_item->opstack_frame = state->opstack_ptr;
             op_item->op_arg_modes[0] = LAI_REFERENCE_MODE;
             op_item->op_arg_modes[1] = 0;
-            op_item->op_result_mode = exec_result_mode;
+            op_item->op_want_result = want_result;
             state->pc += 2;
             break;
         }
