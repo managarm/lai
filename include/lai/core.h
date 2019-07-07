@@ -12,6 +12,7 @@
 #include <acpispec/resources.h>
 #include <acpispec/tables.h>
 #include <lai/host.h>
+#include <lai/internal-util.h>
 
 // Even in freestanding environments, GCC requires memcpy(), memmove(), memset()
 // and memcmp() to be present. Thus, we just use them directly.
@@ -256,6 +257,9 @@ typedef struct lai_nsnode_t
             uint64_t bf_size;   // In bits.
         };
     };
+
+	// Stores a list of all namespace nodes created by the same method.
+    struct lai_list_item per_method_item;
 } lai_nsnode_t;
 
 #define LAI_POPULATE_CONTEXT_STACKITEM 1
@@ -272,6 +276,9 @@ typedef struct lai_nsnode_t
 struct lai_invocation {
     lai_object_t arg[7];
     lai_object_t local[8];
+
+	// Stores a list of all namespace nodes created by this method.
+    struct lai_list per_method_list;
 };
 
 typedef struct lai_stackitem_ {

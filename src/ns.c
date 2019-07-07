@@ -66,6 +66,13 @@ void lai_install_nsnode(lai_nsnode_t *node) {
     lai_namespace[lai_ns_size++] = node;
 }
 
+void lai_uninstall_nsnode(lai_nsnode_t *node) {
+    for (size_t i = 0; i < lai_ns_size; i++) {
+        if (lai_namespace[i] == node)
+            lai_namespace[i] = NULL;
+    }
+}
+
 size_t lai_amlname_parse(struct lai_amlname *amln, const void *data) {
     amln->is_absolute = 0;
     amln->height = 0;
@@ -619,7 +626,7 @@ lai_nsnode_t *lai_legacy_resolve(char *path) {
 
     if (path[0] == ROOT_CHAR) {
         while(i < lai_ns_size) {
-            if(!lai_strcmp(lai_namespace[i]->fullpath, path))
+            if(lai_namespace[i] && !lai_strcmp(lai_namespace[i]->fullpath, path))
                 return lai_namespace[i];
             else
                 i++;
@@ -628,7 +635,8 @@ lai_nsnode_t *lai_legacy_resolve(char *path) {
         return NULL;
     } else {
         while (i < lai_ns_size) {
-            if (!memcmp(lai_namespace[i]->fullpath + lai_strlen(lai_namespace[i]->fullpath) - 4, path, 4))
+            if (lai_namespace[i] && !memcmp(lai_namespace[i]->fullpath
+                                            + lai_strlen(lai_namespace[i]->fullpath) - 4, path, 4))
                 return lai_namespace[i];
             else
                 i++;
@@ -642,7 +650,7 @@ lai_nsnode_t *lai_legacy_resolve(char *path) {
 lai_nsnode_t *lai_get_device(size_t index) {
     size_t i = 0, j = 0;
     while (j < lai_ns_size) {
-        if (lai_namespace[j]->type == LAI_NAMESPACE_DEVICE)
+        if (lai_namespace[i] && lai_namespace[j]->type == LAI_NAMESPACE_DEVICE)
             i++;
 
         if (i > index)
@@ -714,7 +722,7 @@ lai_nsnode_t *lai_enum(char *parent, size_t index) {
     index++;
     size_t parent_size = lai_strlen(parent);
     for (size_t i = 0; i < lai_ns_size; i++) {
-        if (!memcmp(parent, lai_namespace[i]->fullpath, parent_size)) {
+        if (lai_namespace[i] && !memcmp(parent, lai_namespace[i]->fullpath, parent_size)) {
             if(!index)
                 return lai_namespace[i];
             else
@@ -726,10 +734,10 @@ lai_nsnode_t *lai_enum(char *parent, size_t index) {
 }
 
 lai_nsnode_t *lai_ns_iterate(struct lai_ns_iterator *iter) {
-    if (iter->i < lai_ns_size) {
-        lai_nsnode_t *n = lai_namespace[iter->i];
-        iter->i++;
-        return n;
+    while (iter->i < lai_ns_size) {
+        lai_nsnode_t *n = lai_namespace[iter->i++];
+        if (n)
+            return n;
     }
 
     return NULL;
