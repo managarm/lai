@@ -721,3 +721,13 @@ lai_nsnode_t *lai_enum(char *parent, size_t index) {
 
     return NULL;
 }
+
+lai_nsnode_t *lai_ns_iterate(struct lai_ns_iterator *iter) {
+    if (iter->i < lai_ns_size) {
+        lai_nsnode_t *n = lai_namespace[iter->i];
+        iter->i++;
+        return n;
+    }
+
+    return NULL;
+}

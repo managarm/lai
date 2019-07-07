@@ -303,6 +303,12 @@ typedef struct lai_state_t
 void lai_init_state(lai_state_t *);
 void lai_finalize_state(lai_state_t *);
 
+struct lai_ns_iterator {
+    size_t i;
+};
+
+#define LAI_NS_ITERATOR_INIT {0}
+
 __attribute__((always_inline))
 inline lai_object_t *lai_retvalue(lai_state_t *state) {
     return &state->retvalue;
@@ -330,6 +336,7 @@ lai_nsnode_t *lai_get_deviceid(size_t, lai_object_t *);
 lai_nsnode_t *lai_enum(char *, size_t);
 void lai_eisaid(lai_object_t *, char *);
 size_t lai_read_resource(lai_nsnode_t *, acpi_resource_t *);
+lai_nsnode_t *lai_ns_iterate(struct lai_ns_iterator *);
 
 // Access and manipulation of lai_object_t.
 
