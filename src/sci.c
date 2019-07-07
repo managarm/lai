@@ -110,16 +110,18 @@ int lai_enable_acpi(uint32_t mode) {
 
 static int evaluate_sta(lai_nsnode_t *node) {
     // If _STA not present, assume 0x0F as ACPI spec says.
-    int sta = 0x0F;
+    uint64_t sta = 0x0F;
 
     lai_nsnode_t *handle = lai_resolve_path(node, "_STA");
     if (handle) {
-        lai_state_t state;
+        LAI_CLEANUP_STATE lai_state_t state;
         lai_init_state(&state);
-        if (lai_eval_node(handle, &state))
+
+        lai_object_t result = {0};
+        if (lai_eval(&result, handle, &state))
             lai_panic("could not evaluate _STA");
-        sta = lai_retvalue(&state)->integer;
-        lai_finalize_state(&state);
+        if(lai_obj_get_integer(&result, &sta))
+            lai_panic("_STA returned non-integer object");
     }
 
     return sta;

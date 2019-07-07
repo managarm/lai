@@ -1724,33 +1724,25 @@ int lai_exec_method(lai_nsnode_t *method, lai_state_t *state) {
     return 0;
 }
 
-// lai_eval_node(): Evaluates a named AML object.
-// Param:    lai_nsnode_t *handle - node to evaluate
-// Param:    lai_state_t *state - execution engine state
-// Return:   int - 0 on success
-
-int lai_eval_node(lai_nsnode_t *handle, lai_state_t *state) {
-    if (handle->type == LAI_NAMESPACE_ALIAS)
-        handle = handle->al_target;
-
-    if (handle->type == LAI_NAMESPACE_NAME) {
-        lai_clone_object(&state->retvalue, &handle->object);
-        return 0;
-    } else if (handle->type == LAI_NAMESPACE_METHOD) {
-        return lai_exec_method(handle, state);
-    }
-
-    return 1;
-}
-
-int lai_eval(lai_object_t *object, lai_nsnode_t *handle, lai_state_t *state) {
+// lai_eval(): Evaluates a node of the ACPI namespace (including control methods).
+int lai_eval(lai_object_t *result, lai_nsnode_t *handle, lai_state_t *state) {
     LAI_ENSURE(handle);
+    LAI_ENSURE(handle->type != LAI_NAMESPACE_ALIAS);
 
-    int e;
-    e = lai_eval_node(handle, state);
-    if (!e)
-        lai_move_object(object, lai_retvalue(state));
-    return e;
+    switch (handle->type) {
+        case LAI_NAMESPACE_NAME:
+            lai_clone_object(result, &handle->object);
+            return 0;
+        case LAI_NAMESPACE_METHOD: {
+            int e = lai_exec_method(handle, state);
+            if (!e)
+                lai_move_object(result, lai_retvalue(state));
+            return e;
+        }
+
+        default:
+            return 1;
+    }
 }
 
 // Evaluates an AML expression recursively.

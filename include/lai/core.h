@@ -375,7 +375,6 @@ lai_api_error_t lai_obj_get_handle(lai_object_t *, lai_nsnode_t **);
 // ACPI Control Methods
 int lai_populate(lai_nsnode_t *, struct lai_aml_segment *, lai_state_t *);
 int lai_exec_method(lai_nsnode_t *, lai_state_t *);
-int lai_eval_node(lai_nsnode_t *, lai_state_t *);
 int lai_eval(lai_object_t *, lai_nsnode_t *, lai_state_t *);
 
 // Generic Functions
