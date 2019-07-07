@@ -360,7 +360,7 @@ void lai_store(lai_state_t *state, lai_object_t *dest, lai_object_t *object) {
 // This is the access method used by Store().
 // Returns immediate objects and indices as-is (i.e., without load from a name).
 // Returns a view of an existing object and not a clone of the object.
-void lai_get_objectref(lai_state_t *state, lai_object_t *src, lai_object_t *object) {
+void lai_exec_get_objectref(lai_state_t *state, lai_object_t *src, lai_object_t *object) {
     switch (src->type) {
         case LAI_INTEGER:
         case LAI_STRING:
@@ -380,7 +380,7 @@ void lai_get_objectref(lai_state_t *state, lai_object_t *src, lai_object_t *obje
 
 // Load an integer.
 // Returns immediate objects as-is.
-void lai_get_integer(lai_state_t *state, lai_object_t *src, lai_object_t *object) {
+void lai_exec_get_integer(lai_state_t *state, lai_object_t *src, lai_object_t *object) {
     switch (src->type) {
         case LAI_INTEGER:
             lai_assign_object(object, src);
