@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -372,10 +373,15 @@ enum lai_object_type lai_obj_get_type(lai_object_t *object);
 lai_api_error_t lai_obj_get_integer(lai_object_t *, uint64_t *);
 lai_api_error_t lai_obj_get_handle(lai_object_t *, lai_nsnode_t **);
 
+// Evaluation of namespace nodes (including control methods).
+
+int lai_eval_args(lai_object_t *, lai_nsnode_t *, lai_state_t *, int, lai_object_t *);
+int lai_eval_largs(lai_object_t *, lai_nsnode_t *, lai_state_t *, ...);
+int lai_eval_vargs(lai_object_t *, lai_nsnode_t *, lai_state_t *, va_list);
+int lai_eval(lai_object_t *, lai_nsnode_t *, lai_state_t *);
+
 // ACPI Control Methods
 int lai_populate(lai_nsnode_t *, struct lai_aml_segment *, lai_state_t *);
-int lai_exec_method(lai_nsnode_t *, lai_state_t *);
-int lai_eval(lai_object_t *, lai_nsnode_t *, lai_state_t *);
 
 // Generic Functions
 int lai_enable_acpi(uint32_t);

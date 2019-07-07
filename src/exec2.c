@@ -119,7 +119,7 @@ void lai_move_object(lai_object_t *destination, lai_object_t *source) {
     lai_free_object(&temp);
 }
 
-static void lai_assign_object(lai_object_t *dest, lai_object_t *src) {
+void lai_assign_object(lai_object_t *dest, lai_object_t *src) {
     // Make a local shallow copy of the AML object.
     lai_object_t temp = *src;
     switch (src->type) {

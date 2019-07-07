@@ -786,14 +786,17 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
                     if (debug_opcodes)
                         lai_debug("parsing invocation %s [@ %d]", debug_name, opcode_pc);
 
+                    lai_object_t args[7];
+                    memset(args, 0, sizeof(lai_object_t) * 7);
+
                     lai_state_t nested_state;
                     lai_init_state(&nested_state);
                     int argc = handle->method_flags & METHOD_ARGC_MASK;
                     for(int i = 0; i < argc; i++)
-                        lai_eval_operand(&nested_state.arg[i], state, amls, method);
+                        lai_eval_operand(&args[i], state, amls, method);
 
                     lai_object_t result = {0};
-                    lai_exec_method(handle, &nested_state);
+                    lai_exec_method(handle, &nested_state, argc, args);
                     lai_move_object(&result, &nested_state.retvalue);
                     lai_finalize_state(&nested_state);
 
@@ -1678,16 +1681,16 @@ int lai_populate(lai_nsnode_t *parent, struct lai_aml_segment *amls, lai_state_t
     return 0;
 }
 
-// lai_exec_method(): Finds and executes a control method
-// Param:    lai_nsnode_t *method - method to execute
-// Param:    lai_state_t *state - execution engine state
-// Return:    int - 0 on success
-
-int lai_exec_method(lai_nsnode_t *method, lai_state_t *state) {
+// lai_exec_method(): Executes a control method.
+int lai_exec_method(lai_nsnode_t *method, lai_state_t *state, int n, lai_object_t *args) {
     // Check for OS-defined methods.
+    // TODO: Verify the number of argument to the overridden method.
     if (method->method_override)
-        return method->method_override(state->arg, &state->retvalue);
+        return method->method_override(args, &state->retvalue);
     LAI_ENSURE(method->amls);
+
+    for (int i = 0; i < n; i++)
+        lai_move_object(lai_arg(state, i), &args[i]);
 
     // Okay, by here it's a real method.
     //lai_debug("execute control method %s", method->path);
@@ -1724,18 +1727,31 @@ int lai_exec_method(lai_nsnode_t *method, lai_state_t *state) {
     return 0;
 }
 
-// lai_eval(): Evaluates a node of the ACPI namespace (including control methods).
-int lai_eval(lai_object_t *result, lai_nsnode_t *handle, lai_state_t *state) {
+// lai_eval_args(): Evaluates a node of the ACPI namespace (including control methods).
+int lai_eval_args(lai_object_t *result, lai_nsnode_t *handle, lai_state_t *state,
+        int n, lai_object_t *args) {
     LAI_ENSURE(handle);
     LAI_ENSURE(handle->type != LAI_NAMESPACE_ALIAS);
 
     switch (handle->type) {
         case LAI_NAMESPACE_NAME:
-            lai_clone_object(result, &handle->object);
+            if (n) {
+                lai_warn("non-empty argument list given when evaluating Name()");
+                return 1;
+            }
+            if (result)
+                lai_clone_object(result, &handle->object);
             return 0;
         case LAI_NAMESPACE_METHOD: {
-            int e = lai_exec_method(handle, state);
-            if (!e)
+            // We take a copy of the arguments as lai_exec_method() will move them.
+            lai_object_t args_copy[7];
+            memset(args_copy, 0, sizeof(lai_object_t) * 7);
+
+            for (int i = 0; i < n; i++)
+                lai_clone_object(&args_copy[i], &args[i]);
+
+            int e = lai_exec_method(handle, state, n, args_copy);
+            if (!e && result)
                 lai_move_object(result, lai_retvalue(state));
             return e;
         }
@@ -1743,6 +1759,32 @@ int lai_eval(lai_object_t *result, lai_nsnode_t *handle, lai_state_t *state) {
         default:
             return 1;
     }
+}
+
+int lai_eval_vargs(lai_object_t *result, lai_nsnode_t *handle, lai_state_t *state, va_list vl) {
+    int n = 0;
+    lai_object_t args[7];
+    memset(args, 0, sizeof(lai_object_t) * 7);
+
+    for (;;) {
+        LAI_ENSURE(n < 7 && "ACPI supports at most 7 arguments");
+        lai_object_t *object = va_arg(vl, lai_object_t *);
+        lai_assign_object(&args[n++], object);
+    }
+
+    return lai_eval_args(result, handle, state, n, args);
+}
+
+int lai_eval_largs(lai_object_t *result, lai_nsnode_t *handle, lai_state_t *state, ...) {
+    va_list vl;
+    va_start(vl, state);
+    int e = lai_eval_vargs(result, handle, state, vl);
+    va_end(vl);
+    return e;
+}
+
+int lai_eval(lai_object_t *result, lai_nsnode_t *handle, lai_state_t *state) {
+    return lai_eval_args(result, handle, state, 0, NULL);
 }
 
 // Evaluates an AML expression recursively.

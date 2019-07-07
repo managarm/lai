@@ -69,7 +69,7 @@ int lai_enable_acpi(uint32_t mode) {
     handle = lai_resolve_path(NULL, "\\_SB_._INI");
     if (handle) {
         lai_init_state(&state);
-        if (!lai_exec_method(handle, &state))
+        if (!lai_eval(NULL, handle, &state))
             lai_debug("evaluated \\_SB_._INI");
         lai_finalize_state(&state);
     }
@@ -81,10 +81,12 @@ int lai_enable_acpi(uint32_t mode) {
     handle = lai_resolve_path(NULL, "\\_PIC");
     if (handle) {
         lai_init_state(&state);
-        lai_arg(&state, 0)->type = LAI_INTEGER;
-        lai_arg(&state, 0)->integer = mode;
 
-        if (!lai_exec_method(handle, &state))
+        lai_object_t mode_object = {0};
+        mode_object.type = LAI_INTEGER;
+        mode_object.integer = mode;
+
+        if (!lai_eval_largs(NULL, handle, &state, &mode_object, NULL))
             lai_debug("evaluated \\._PIC(%d)", mode);
         lai_finalize_state(&state);
     }
@@ -145,7 +147,7 @@ static void lai_init_children(char *parent) {
                 if (handle) {
                     lai_state_t state;
                     lai_init_state(&state);
-                    if (!lai_exec_method(handle, &state)) {
+                    if (!lai_eval(NULL, handle, &state)) {
                         const char *path = lai_stringify_node_path(handle);
                         lai_debug("evaluated %s", path);
                         laihost_free(path);

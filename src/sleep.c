@@ -63,11 +63,12 @@ int lai_enter_sleep(uint8_t sleep_state)
         lai_init_state(&state);
 
         // pass the sleeping type as an argument
-        lai_arg(&state, 0)->type = LAI_INTEGER;
-        lai_arg(&state, 0)->integer = (uint64_t)sleep_state & 0xFF;
+        lai_object_t sleep_object = {0};
+        sleep_object.type = LAI_INTEGER;
+        sleep_object.integer = sleep_state & 0xFF;
 
         lai_debug("execute _PTS(%d)", sleep_state);
-        lai_exec_method(handle, &state);
+        lai_eval_largs(NULL, handle, &state, &sleep_object, NULL);
         lai_finalize_state(&state);
     }
 
@@ -77,11 +78,12 @@ int lai_enter_sleep(uint8_t sleep_state)
         lai_init_state(&state);
 
         // pass the sleeping type as an argument
-        lai_arg(&state, 0)->type = LAI_INTEGER;
-        lai_arg(&state, 0)->integer = (uint64_t)sleep_state & 0xFF;
+        lai_object_t sleep_object = {0};
+        sleep_object.type = LAI_INTEGER;
+        sleep_object.integer = sleep_state & 0xFF;
 
         lai_debug("execute _GTS(%d)", sleep_state);
-        lai_exec_method(handle, &state);
+        lai_eval_largs(NULL, handle, &state, &sleep_object, NULL);
         lai_finalize_state(&state);
     }
 
