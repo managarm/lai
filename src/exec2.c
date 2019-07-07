@@ -262,10 +262,12 @@ static void lai_store_ns(lai_nsnode_t *target, lai_object_t *object) {
 void lai_load(lai_state_t *state, struct lai_operand *src, lai_object_t *object) {
     switch (src->tag) {
         case LAI_ARG_NAME:
-            lai_assign_object(object, &state->arg[src->index]);
+            LAI_ENSURE(state->invocation);
+            lai_assign_object(object, &state->invocation->arg[src->index]);
             break;
         case LAI_LOCAL_NAME:
-            lai_assign_object(object, &state->local[src->index]);
+            LAI_ENSURE(state->invocation);
+            lai_assign_object(object, &state->invocation->local[src->index]);
             break;
         case LAI_UNRESOLVED_NAME:
         {
@@ -333,10 +335,12 @@ void lai_store(lai_state_t *state, struct lai_operand *dest, lai_object_t *objec
             lai_store_ns(dest->handle, object);
             break;
         case LAI_ARG_NAME:
-            lai_assign_object(&state->arg[dest->index], object);
+            LAI_ENSURE(state->invocation);
+            lai_assign_object(&state->invocation->arg[dest->index], object);
             break;
         case LAI_LOCAL_NAME:
-            lai_assign_object(&state->local[dest->index], object);
+            LAI_ENSURE(state->invocation);
+            lai_assign_object(&state->invocation->local[dest->index], object);
             break;
         case LAI_DEBUG_NAME:
             if(laihost_handle_amldebug)

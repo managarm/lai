@@ -34,14 +34,8 @@ void lai_init_state(lai_state_t *state) {
 // Finalize the interpreter state. Frees all memory owned by the state.
 
 void lai_finalize_state(lai_state_t *state) {
+    LAI_ENSURE(!state->invocation);
     lai_free_object(&state->retvalue);
-    for (int i = 0; i < 7; i++) {
-        lai_free_object(&state->arg[i]);
-    }
-
-    for (int i = 0; i < 8; i++) {
-        lai_free_object(&state->local[i]);
-    }
 }
 
 // Pushes a new item to the opstack and returns it.
@@ -1689,8 +1683,14 @@ int lai_exec_method(lai_nsnode_t *method, lai_state_t *state, int n, lai_object_
         return method->method_override(args, &state->retvalue);
     LAI_ENSURE(method->amls);
 
+    LAI_ENSURE(!state->invocation);
+    state->invocation = laihost_malloc(sizeof(struct lai_invocation));
+    if (!state->invocation)
+        lai_panic("could not allocate memory for method invocation");
+    memset(state->invocation, 0, sizeof(struct lai_invocation));
+
     for (int i = 0; i < n; i++)
-        lai_move_object(lai_arg(state, i), &args[i]);
+        lai_move_object(&state->invocation->arg[i], &args[i]);
 
     // Okay, by here it's a real method.
     //lai_debug("execute control method %s", method->path);
@@ -1704,6 +1704,13 @@ int lai_exec_method(lai_nsnode_t *method, lai_state_t *state, int n, lai_object_
     int status = lai_exec_run(method->amls, method->pointer, state);
     if (status)
         return status;
+
+    for (int i = 0; i < 7; i++)
+        lai_free_object(&state->invocation->arg[i]);
+    for (int i = 0; i < 8; i++)
+        lai_free_object(&state->invocation->local[i]);
+    laihost_free(state->invocation);
+    state->invocation = NULL;
 
     /*lai_debug("%s finished, ", method->path);
 

@@ -269,6 +269,11 @@ typedef struct lai_nsnode_t
 // lai_eval_operand() by moving all parsing functionality into lai_exec_run().
 #define LAI_EVALOPERAND_STACKITEM 10
 
+struct lai_invocation {
+    lai_object_t arg[7];
+    lai_object_t local[8];
+};
+
 typedef struct lai_stackitem_ {
     int kind;
     int opstack_frame;
@@ -307,8 +312,7 @@ typedef struct lai_state_t
     int pc;
     int limit;
     lai_object_t retvalue;
-    lai_object_t arg[7];
-    lai_object_t local[8];
+    struct lai_invocation *invocation;
 
     // Stack to track the current execution state.
     int stack_ptr;
@@ -332,11 +336,6 @@ struct lai_ns_iterator {
 __attribute__((always_inline))
 inline lai_object_t *lai_retvalue(lai_state_t *state) {
     return &state->retvalue;
-}
-
-__attribute__((always_inline))
-inline lai_object_t *lai_arg(lai_state_t *state, int n) {
-    return &state->arg[n];
 }
 
 extern acpi_fadt_t *lai_fadt;
