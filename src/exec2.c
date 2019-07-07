@@ -392,7 +392,7 @@ enum lai_object_type lai_obj_get_type(lai_object_t *object) {
 
         case LAI_HANDLE:
             return lai_object_type_of_node(object->handle);
-        case LAI_UNRESOLVED_NAME: {
+        case LAI_LAZY_HANDLE: {
             struct lai_amlname amln;
             lai_amlname_parse(&amln, object->unres_aml);
 
@@ -463,7 +463,7 @@ lai_api_error_t lai_obj_get_handle(lai_object_t *object, lai_nsnode_t **out) {
         case LAI_HANDLE:
             *out = object->handle;
             return LAI_ERROR_NONE;
-        case LAI_UNRESOLVED_NAME: {
+        case LAI_LAZY_HANDLE: {
             struct lai_amlname amln;
             lai_amlname_parse(&amln, object->unres_aml);
 

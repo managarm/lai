@@ -70,20 +70,21 @@ typedef enum lai_api_error {
 #define LAI_PACKAGE            4
 // Handle type: this is used to represent device (and other) namespace nodes.
 #define LAI_HANDLE             5
+#define LAI_LAZY_HANDLE        6
 // Reference types: obtained from RefOp() or Index().
-#define LAI_STRING_INDEX       6
-#define LAI_BUFFER_INDEX       7
-#define LAI_PACKAGE_INDEX      8
+#define LAI_STRING_INDEX       7
+#define LAI_BUFFER_INDEX       8
+#define LAI_PACKAGE_INDEX      9
 // ----------------------------------------------------------------------------
 // Internal data types of the interpreter.
 // ----------------------------------------------------------------------------
 // Name types: unresolved names and names of certain objects.
-#define LAI_NULL_NAME          9
-#define LAI_UNRESOLVED_NAME   10
-#define LAI_RESOLVED_NAME     11
-#define LAI_ARG_NAME          12
-#define LAI_LOCAL_NAME        13
-#define LAI_DEBUG_NAME        14
+#define LAI_NULL_NAME         10
+#define LAI_UNRESOLVED_NAME   11
+#define LAI_RESOLVED_NAME     12
+#define LAI_ARG_NAME          13
+#define LAI_LOCAL_NAME        14
+#define LAI_DEBUG_NAME        15
 
 typedef int lai_rc_t;
 
