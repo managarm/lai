@@ -75,16 +75,6 @@ typedef enum lai_api_error {
 #define LAI_STRING_INDEX       7
 #define LAI_BUFFER_INDEX       8
 #define LAI_PACKAGE_INDEX      9
-// ----------------------------------------------------------------------------
-// Internal data types of the interpreter.
-// ----------------------------------------------------------------------------
-// Name types: unresolved names and names of certain objects.
-#define LAI_NULL_NAME         10
-#define LAI_UNRESOLVED_NAME   11
-#define LAI_RESOLVED_NAME     12
-#define LAI_ARG_NAME          13
-#define LAI_LOCAL_NAME        14
-#define LAI_DEBUG_NAME        15
 
 typedef int lai_rc_t;
 
@@ -191,6 +181,33 @@ inline void lai_exec_pkg_store(lai_object_t *in, lai_object_t *pkg, size_t i) {
     return lai_exec_pkg_var_store(in, pkg->pkg_ptr, i);
 }
 
+// ----------------------------------------------------------------------------
+// Tags for struct lai_operand.
+// ----------------------------------------------------------------------------
+// Name types: unresolved names and names of certain objects.
+#define LAI_OPERAND_OBJECT    1
+#define LAI_NULL_NAME         2
+#define LAI_UNRESOLVED_NAME   3
+#define LAI_RESOLVED_NAME     4
+#define LAI_ARG_NAME          5
+#define LAI_LOCAL_NAME        6
+#define LAI_DEBUG_NAME        7
+
+// While struct lai_object can store all AML *objects*, this struct can store all expressions
+// that occur as operands in AML. In particular, this includes objects and references to names.
+struct lai_operand {
+    int tag;
+    union {
+        lai_object_t object;
+        int index; // Index of ARGx and LOCALx.
+        struct {
+            struct lai_nsnode_t *unres_ctx_handle;
+            const uint8_t *unres_aml;
+        };
+        struct lai_nsnode_t *handle;
+    };
+};
+
 typedef struct lai_nsnode_t
 {
     char name[4];
@@ -296,7 +313,7 @@ typedef struct lai_state_t
     int stack_ptr;
     int opstack_ptr;
     lai_stackitem_t stack[16];
-    lai_object_t opstack[16];
+    struct lai_operand opstack[16];
     int context_ptr; // Index of the last CONTEXT_STACKITEM.
 } lai_state_t;
 

@@ -259,8 +259,8 @@ static void lai_store_ns(lai_nsnode_t *target, lai_object_t *object) {
 
 // Loads from a name.
 // Returns a view of an existing object and not a clone of the object.
-void lai_load(lai_state_t *state, lai_object_t *src, lai_object_t *object) {
-    switch (src->type) {
+void lai_load(lai_state_t *state, struct lai_operand *src, lai_object_t *object) {
+    switch (src->tag) {
         case LAI_ARG_NAME:
             lai_assign_object(object, &state->arg[src->index]);
             break;
@@ -282,36 +282,42 @@ void lai_load(lai_state_t *state, lai_object_t *src, lai_object_t *object) {
             lai_load_ns(src->handle, object);
             break;
         default:
-            lai_panic("object type %d is not valid for lai_load()", src->type);
+            lai_panic("tag %d is not valid for lai_load()", src->tag);
     }
 }
 
 // lai_store(): Stores a copy of the object to a reference.
-void lai_store(lai_state_t *state, lai_object_t *dest, lai_object_t *object) {
-    switch(dest->type) {
+void lai_store(lai_state_t *state, struct lai_operand *dest, lai_object_t *object) {
+    // First, handle stores to AML references (returned by Index() and friends).
+    if (dest->tag == LAI_OPERAND_OBJECT) {
+        switch (dest->object.type) {
+            case LAI_STRING_INDEX: {
+                char *window = dest->object.string_ptr->content;
+                window[dest->object.integer] = object->integer;
+                break;
+            }
+            case LAI_BUFFER_INDEX: {
+                uint8_t *window = dest->object.buffer_ptr->content;
+                window[dest->object.integer] = object->integer;
+                break;
+            }
+            case LAI_PACKAGE_INDEX: {
+                lai_object_t copy = {0};
+                lai_assign_object(&copy, object);
+                lai_exec_pkg_var_store(&copy, dest->object.pkg_ptr, dest->object.integer);
+                lai_free_object(&copy);
+                break;
+            }
+            default:
+                lai_panic("unexpected object type %d for lai_store()", dest->object.type);
+        }
+        return;
+    }
+
+    switch (dest->tag) {
         case LAI_NULL_NAME:
             // Stores to the null target are ignored.
             break;
-        case LAI_STRING_INDEX:
-        {
-            char *window = dest->string_ptr->content;
-            window[dest->integer] = object->integer;
-            break;
-        }
-        case LAI_BUFFER_INDEX:
-        {
-            uint8_t *window = dest->buffer_ptr->content;
-            window[dest->integer] = object->integer;
-            break;
-        }
-        case LAI_PACKAGE_INDEX:
-        {
-            lai_object_t copy = {0};
-            lai_assign_object(&copy, object);
-            lai_exec_pkg_var_store(&copy, dest->pkg_ptr, dest->integer);
-            lai_free_object(&copy);
-            break;
-        }
         case LAI_UNRESOLVED_NAME:
         {
             struct lai_amlname amln;
@@ -352,7 +358,7 @@ void lai_store(lai_state_t *state, lai_object_t *dest, lai_object_t *object) {
             }
             break;
         default:
-            lai_panic("object type %d is not valid for lai_store()", dest->type);
+            lai_panic("tag %d is not valid for lai_store()", dest->tag);
     }
 }
 
@@ -411,35 +417,25 @@ enum lai_object_type lai_obj_get_type(lai_object_t *object) {
 // This is the access method used by Store().
 // Returns immediate objects and indices as-is (i.e., without load from a name).
 // Returns a view of an existing object and not a clone of the object.
-void lai_exec_get_objectref(lai_state_t *state, lai_object_t *src, lai_object_t *object) {
-    switch (src->type) {
-        case LAI_INTEGER:
-        case LAI_STRING:
-        case LAI_BUFFER:
-        case LAI_PACKAGE:
-        case LAI_STRING_INDEX:
-        case LAI_BUFFER_INDEX:
-        case LAI_PACKAGE_INDEX:
-            lai_assign_object(object, src);
-            return;
-    }
-
+void lai_exec_get_objectref(lai_state_t *state, struct lai_operand *src, lai_object_t *object) {
     lai_object_t temp = {0};
-    lai_load(state, src, &temp);
+    if (src->tag == LAI_OPERAND_OBJECT) {
+        lai_assign_object(&temp, &src->object);
+    } else {
+        lai_load(state, src, &temp);
+    }
     lai_move_object(object, &temp);
 }
 
 // Load an integer.
 // Returns immediate objects as-is.
-void lai_exec_get_integer(lai_state_t *state, lai_object_t *src, lai_object_t *object) {
-    switch (src->type) {
-        case LAI_INTEGER:
-            lai_assign_object(object, src);
-            return;
-    }
-
+void lai_exec_get_integer(lai_state_t *state, struct lai_operand *src, lai_object_t *object) {
     lai_object_t temp = {0};
-    lai_load(state, src, &temp);
+    if (src->tag == LAI_OPERAND_OBJECT) {
+        lai_assign_object(&temp, &src->object);
+    } else {
+        lai_load(state, src, &temp);
+    }
     if(temp.type != LAI_INTEGER)
         lai_panic("lai_load_integer() expects an integer, not a value of type %d", temp.type);
     lai_move_object(object, &temp);

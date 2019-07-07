@@ -45,17 +45,17 @@ void lai_finalize_state(lai_state_t *state) {
 }
 
 // Pushes a new item to the opstack and returns it.
-static lai_object_t *lai_exec_push_opstack_or_die(lai_state_t *state) {
+static struct lai_operand *lai_exec_push_opstack_or_die(lai_state_t *state) {
     if (state->opstack_ptr == 16)
         lai_panic("operand stack overflow");
-    lai_object_t *object = &state->opstack[state->opstack_ptr];
-    memset(object, 0, sizeof(lai_object_t));
+    struct lai_operand *object = &state->opstack[state->opstack_ptr];
+    memset(object, 0, sizeof(struct lai_operand));
     state->opstack_ptr++;
     return object;
 }
 
 // Returns the n-th item from the opstack.
-static lai_object_t *lai_exec_get_opstack(lai_state_t *state, int n) {
+static struct lai_operand *lai_exec_get_opstack(lai_state_t *state, int n) {
     if (n >= state->opstack_ptr)
         lai_panic("opstack access out of bounds"); // This is an internal execution error.
     return &state->opstack[n];
@@ -63,8 +63,11 @@ static lai_object_t *lai_exec_get_opstack(lai_state_t *state, int n) {
 
 // Removes n items from the opstack.
 static void lai_exec_pop_opstack(lai_state_t *state, int n) {
-    for (int k = 0; k < n; k++)
-        lai_free_object(&state->opstack[state->opstack_ptr - k - 1]);
+    for (int k = 0; k < n; k++) {
+        struct lai_operand *operand = &state->opstack[state->opstack_ptr - k - 1];
+        if (operand->tag == LAI_OPERAND_OBJECT)
+            lai_free_object(&operand->object);
+    }
     state->opstack_ptr -= n;
 }
 
@@ -128,7 +131,7 @@ static int lai_compare(lai_object_t *lhs, lai_object_t *rhs) {
     return lhs->integer - rhs->integer;
 }
 
-static void lai_exec_reduce_node(int opcode, lai_state_t *state, lai_object_t *operands,
+static void lai_exec_reduce_node(int opcode, lai_state_t *state, struct lai_operand *operands,
         lai_nsnode_t *ctx_handle) {
     if (debug_opcodes)
         lai_debug("lai_exec_reduce_node: opcode 0x%02X", opcode);
@@ -139,8 +142,8 @@ static void lai_exec_reduce_node(int opcode, lai_state_t *state, lai_object_t *o
         case QWORDFIELD_OP: {
             lai_object_t offset = {0};
             lai_exec_get_integer(state, &operands[1], &offset);
-            LAI_ENSURE(operands[0].type == LAI_UNRESOLVED_NAME);
-            LAI_ENSURE(operands[2].type == LAI_UNRESOLVED_NAME);
+            LAI_ENSURE(operands[0].tag == LAI_UNRESOLVED_NAME);
+            LAI_ENSURE(operands[2].tag == LAI_UNRESOLVED_NAME);
 
             struct lai_amlname buffer_amln;
             struct lai_amlname node_amln;
@@ -172,7 +175,7 @@ static void lai_exec_reduce_node(int opcode, lai_state_t *state, lai_object_t *o
     }
 }
 
-static void lai_exec_reduce_op(int opcode, lai_state_t *state, lai_object_t *operands,
+static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operand *operands,
         lai_object_t *reduction_res) {
     if (debug_opcodes)
         lai_debug("lai_exec_reduce_op: opcode 0x%02X", opcode);
@@ -487,12 +490,12 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, lai_object_t *ope
     }
     case (EXTOP_PREFIX << 8) | CONDREF_OP:
     {
-        lai_object_t *operand = &operands[0];
-        lai_object_t *target = &operands[1];
+        struct lai_operand *operand = &operands[0];
+        struct lai_operand *target = &operands[1];
 
         // TODO: The resolution code should be shared with REF_OP.
         lai_object_t ref = {0};
-        switch (operand->type) {
+        switch (operand->tag) {
             case LAI_UNRESOLVED_NAME:
             {
                 struct lai_amlname amln;
@@ -599,9 +602,10 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
     		if (state->pc == state->limit) {
     			if (state->opstack_ptr) // This is an internal error.
     				lai_panic("opstack is not empty before return");
-    			lai_object_t *result = lai_exec_push_opstack_or_die(state);
-    			result->type = LAI_INTEGER;
-    			result->integer = 0;
+                struct lai_operand *result = lai_exec_push_opstack_or_die(state);
+                result->tag = LAI_OPERAND_OBJECT;
+                result->object.type = LAI_INTEGER;
+                result->object.integer = 0;
 
     			lai_exec_pop_stack_back(state);
                 lai_exec_update_context(state);
@@ -615,15 +619,19 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
 
             parse_mode = LAI_OBJECT_MODE;
         } else if (item->kind == LAI_PKG_INITIALIZER_STACKITEM) {
-            lai_object_t *frame = lai_exec_get_opstack(state, item->opstack_frame);
-            lai_object_t *package = &frame[0];
-            lai_object_t *initializer = &frame[1];
-            if (state->opstack_ptr == item->opstack_frame + 2) {
-                if (item->pkg_index == lai_exec_pkg_size(package))
-                    lai_panic("package initializer overflows its size");
-                LAI_ENSURE(item->pkg_index < lai_exec_pkg_size(package));
+            struct lai_operand *frame = lai_exec_get_opstack(state, item->opstack_frame);
 
-                lai_exec_pkg_store(initializer, package, item->pkg_index);
+            if (state->opstack_ptr == item->opstack_frame + 2) {
+                struct lai_operand *package = &frame[0];
+                LAI_ENSURE(package->tag == LAI_OPERAND_OBJECT);
+                struct lai_operand *initializer = &frame[1];
+                LAI_ENSURE(initializer->tag == LAI_OPERAND_OBJECT);
+
+                if (item->pkg_index == lai_exec_pkg_size(&package->object))
+                    lai_panic("package initializer overflows its size");
+                LAI_ENSURE(item->pkg_index < lai_exec_pkg_size(&package->object));
+
+                lai_exec_pkg_store(&initializer->object, &package->object, item->pkg_index);
                 item->pkg_index++;
                 lai_exec_pop_opstack(state, 1);
             }
@@ -644,7 +652,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
         } else if (item->kind == LAI_NODE_STACKITEM) {
             int k = state->opstack_ptr - item->opstack_frame;
             if (!item->node_arg_modes[k]) {
-                lai_object_t *operands = lai_exec_get_opstack(state, item->opstack_frame);
+                struct lai_operand *operands = lai_exec_get_opstack(state, item->opstack_frame);
                 lai_exec_reduce_node(item->node_opcode, state, operands, ctx_handle);
                 lai_exec_pop_opstack(state, k);
 
@@ -658,13 +666,14 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
 //            lai_debug("got %d parameters", k);
             if (!item->op_arg_modes[k]) {
                 lai_object_t result = {0};
-                lai_object_t *operands = lai_exec_get_opstack(state, item->opstack_frame);
+                struct lai_operand *operands = lai_exec_get_opstack(state, item->opstack_frame);
                 lai_exec_reduce_op(item->op_opcode, state, operands, &result);
                 lai_exec_pop_opstack(state, k);
 
                 if (item->op_want_result) {
-                    lai_object_t *opstack_res = lai_exec_push_opstack_or_die(state);
-                    lai_move_object(opstack_res, &result);
+                    struct lai_operand *opstack_res = lai_exec_push_opstack_or_die(state);
+                    opstack_res->tag = LAI_OPERAND_OBJECT;
+                    lai_move_object(&opstack_res->object, &result);
                 } else {
                     lai_free_object(&result);
                 }
@@ -731,9 +740,10 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
         int want_result = (parse_mode != LAI_EXEC_MODE);
 
         if (parse_mode == LAI_IMMEDIATE_WORD_MODE) {
-            lai_object_t *result = lai_exec_push_opstack_or_die(state);
-            result->type = LAI_INTEGER;
-            result->integer = (method[state->pc + 1] << 8) | method[state->pc];
+            struct lai_operand *result = lai_exec_push_opstack_or_die(state);
+            result->tag = LAI_OPERAND_OBJECT;
+            result->object.type = LAI_INTEGER;
+            result->object.integer = (method[state->pc + 1] << 8) | method[state->pc];
             state->pc += 2;
             continue;
         }
@@ -751,18 +761,19 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
                 if (debug_opcodes)
                     lai_debug("parsing name %s [@ %d]", debug_name, opcode_pc);
 
-                lai_object_t *opstack_res = lai_exec_push_opstack_or_die(state);
-                opstack_res->type = LAI_UNRESOLVED_NAME;
+                struct lai_operand *opstack_res = lai_exec_push_opstack_or_die(state);
+                opstack_res->tag = LAI_UNRESOLVED_NAME;
                 opstack_res->unres_ctx_handle = ctx_handle;
                 opstack_res->unres_aml = method + opcode_pc;
             }else if (parse_mode == LAI_DATA_MODE) {
                 if (debug_opcodes)
                     lai_debug("parsing name %s [@ %d]", debug_name, opcode_pc);
 
-                lai_object_t *opstack_res = lai_exec_push_opstack_or_die(state);
-                opstack_res->type = LAI_LAZY_HANDLE;
-                opstack_res->unres_ctx_handle = ctx_handle;
-                opstack_res->unres_aml = method + opcode_pc;
+                struct lai_operand *opstack_res = lai_exec_push_opstack_or_die(state);
+                opstack_res->tag = LAI_OPERAND_OBJECT;
+                opstack_res->object.type = LAI_LAZY_HANDLE;
+                opstack_res->object.unres_ctx_handle = ctx_handle;
+                opstack_res->object.unres_aml = method + opcode_pc;
             } else {
                 LAI_ENSURE(parse_mode == LAI_OBJECT_MODE
                            || parse_mode == LAI_EXEC_MODE);
@@ -771,7 +782,6 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
                     lai_panic("undefined reference %s in object mode",
                             lai_stringify_amlname(&amln));
 
-                lai_object_t result = {0};
                 if(handle->type == LAI_NAMESPACE_METHOD) {
                     if (debug_opcodes)
                         lai_debug("parsing invocation %s [@ %d]", debug_name, opcode_pc);
@@ -782,20 +792,26 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
                     for(int i = 0; i < argc; i++)
                         lai_eval_operand(&nested_state.arg[i], state, amls, method);
 
+                    lai_object_t result = {0};
                     lai_exec_method(handle, &nested_state);
                     lai_move_object(&result, &nested_state.retvalue);
                     lai_finalize_state(&nested_state);
+
+                    if (want_result) {
+                        struct lai_operand *opstack_res = lai_exec_push_opstack_or_die(state);
+                        opstack_res->tag = LAI_OPERAND_OBJECT;
+                        lai_move_object(&opstack_res->object, &result);
+                    }
+                    lai_free_object(&result);
                 } else {
                     if (debug_opcodes)
                         lai_debug("parsing name %s [@ %d]", debug_name, opcode_pc);
 
-                    result.type = LAI_RESOLVED_NAME;
-                    result.handle = handle;
-                }
-
-                if (parse_mode == LAI_OBJECT_MODE) {
-                    lai_object_t *opstack_res = lai_exec_push_opstack_or_die(state);
-                    lai_move_object(opstack_res, &result);
+                    if (want_result) {
+                        struct lai_operand *opstack_res = lai_exec_push_opstack_or_die(state);
+                        opstack_res->tag = LAI_RESOLVED_NAME;
+                        opstack_res->handle = handle;
+                    }
                 }
             }
 
@@ -832,13 +848,14 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
 
         case ZERO_OP:
             if (parse_mode == LAI_DATA_MODE || parse_mode == LAI_OBJECT_MODE) {
-                lai_object_t *result = lai_exec_push_opstack_or_die(state);
-                result->type = LAI_INTEGER;
-                result->integer = 0;
+                struct lai_operand *result = lai_exec_push_opstack_or_die(state);
+                result->tag = LAI_OPERAND_OBJECT;
+                result->object.type = LAI_INTEGER;
+                result->object.integer = 0;
             } else if (parse_mode == LAI_REFERENCE_MODE) {
                 // In target mode, ZERO_OP generates a null target and not an integer!
-                lai_object_t *result = lai_exec_push_opstack_or_die(state);
-                result->type = LAI_NULL_NAME;
+                struct lai_operand *result = lai_exec_push_opstack_or_die(state);
+                result->tag = LAI_NULL_NAME;
             } else {
                 lai_warn("Zero() in execution mode has no effect");
                 LAI_ENSURE(parse_mode == LAI_EXEC_MODE);
@@ -847,9 +864,10 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             break;
         case ONE_OP:
             if (parse_mode == LAI_DATA_MODE || parse_mode == LAI_OBJECT_MODE) {
-                lai_object_t *result = lai_exec_push_opstack_or_die(state);
-                result->type = LAI_INTEGER;
-                result->integer = 1;
+                struct lai_operand *result = lai_exec_push_opstack_or_die(state);
+                result->tag = LAI_OPERAND_OBJECT;
+                result->object.type = LAI_INTEGER;
+                result->object.integer = 1;
             } else {
                 lai_warn("One() in execution mode has no effect");
                 LAI_ENSURE(parse_mode == LAI_EXEC_MODE);
@@ -858,9 +876,10 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             break;
         case ONES_OP:
             if (parse_mode == LAI_DATA_MODE || parse_mode == LAI_OBJECT_MODE) {
-                lai_object_t *result = lai_exec_push_opstack_or_die(state);
-                result->type = LAI_INTEGER;
-                result->integer = ~((uint64_t)0);
+                struct lai_operand *result = lai_exec_push_opstack_or_die(state);
+                result->tag = LAI_OPERAND_OBJECT;
+                result->object.type = LAI_INTEGER;
+                result->object.integer = ~((uint64_t)0);
             } else {
                 lai_warn("Ones() in execution mode has no effect");
                 LAI_ENSURE(parse_mode == LAI_EXEC_MODE);
@@ -878,9 +897,10 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             if (!integer_size)
                 lai_panic("failed to parse integer opcode");
             if (parse_mode == LAI_DATA_MODE || parse_mode == LAI_OBJECT_MODE) {
-                lai_object_t *result = lai_exec_push_opstack_or_die(state);
-                result->type = LAI_INTEGER;
-                result->integer = integer;
+                struct lai_operand *result = lai_exec_push_opstack_or_die(state);
+                result->tag = LAI_OPERAND_OBJECT;
+                result->object.type = LAI_INTEGER;
+                result->object.integer = integer;
             } else
                 LAI_ENSURE(parse_mode == LAI_EXEC_MODE);
             state->pc += integer_size;
@@ -897,10 +917,11 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
                 lai_panic("unterminated string in AML code");
 
             if (parse_mode == LAI_DATA_MODE || parse_mode == LAI_OBJECT_MODE) {
-                lai_object_t *opstack_res = lai_exec_push_opstack_or_die(state);
-                if(lai_create_string(opstack_res, n))
+                struct lai_operand *opstack_res = lai_exec_push_opstack_or_die(state);
+                opstack_res->tag = LAI_OPERAND_OBJECT;
+                if(lai_create_string(&opstack_res->object, n))
                     lai_panic("could not allocate memory for string");
-                memcpy(lai_exec_string_access(opstack_res), method + state->pc, n);
+                memcpy(lai_exec_string_access(&opstack_res->object), method + state->pc, n);
             } else
                 LAI_ENSURE(parse_mode == LAI_EXEC_MODE);
             state->pc += n + 1;
@@ -932,8 +953,9 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             state->pc += initial_size;
 
             if (parse_mode == LAI_DATA_MODE || parse_mode == LAI_OBJECT_MODE) {
-                lai_object_t *opstack_res = lai_exec_push_opstack_or_die(state);
-                lai_move_object(opstack_res, &result);
+                struct lai_operand *opstack_res = lai_exec_push_opstack_or_die(state);
+                opstack_res->tag = LAI_OPERAND_OBJECT;
+                lai_move_object(&opstack_res->object, &result);
             } else
                 LAI_ENSURE(parse_mode == LAI_EXEC_MODE);
             lai_free_object(&result);
@@ -959,8 +981,9 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             pkg_item->pkg_end = opcode_pc + encoded_size + 1;
             pkg_item->pkg_want_result = want_result;
 
-            lai_object_t *opstack_pkg = lai_exec_push_opstack_or_die(state);
-            if (lai_create_pkg(opstack_pkg, num_ents))
+            struct lai_operand *opstack_pkg = lai_exec_push_opstack_or_die(state);
+            opstack_pkg->tag = LAI_OPERAND_OBJECT;
+            if (lai_create_pkg(&opstack_pkg->object, num_ents))
                 lai_panic("could not allocate memory for package");
             break;
         }
@@ -993,8 +1016,9 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             // Remove the method stack item and push the return value.
             if (state->opstack_ptr) // This is an internal error.
                 lai_panic("opstack is not empty before return");
-            lai_object_t *opstack_res = lai_exec_push_opstack_or_die(state);
-            lai_move_object(opstack_res, &result);
+            struct lai_operand *opstack_res = lai_exec_push_opstack_or_die(state);
+            opstack_res->tag = LAI_OPERAND_OBJECT;
+            lai_move_object(&opstack_res->object, &result);
 
             lai_exec_pop_stack(state, j + 1);
             lai_exec_update_context(state);
@@ -1427,8 +1451,8 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
         {
             if (parse_mode == LAI_OBJECT_MODE
                     || parse_mode == LAI_REFERENCE_MODE) {
-                lai_object_t *result = lai_exec_push_opstack_or_die(state);
-                result->type = LAI_ARG_NAME;
+                struct lai_operand *result = lai_exec_push_opstack_or_die(state);
+                result->tag = LAI_ARG_NAME;
                 result->index = opcode - ARG0_OP;
             }
             state->pc++;
@@ -1446,8 +1470,8 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
         {
             if(parse_mode == LAI_OBJECT_MODE
                     || parse_mode == LAI_REFERENCE_MODE) {
-                lai_object_t *result = lai_exec_push_opstack_or_die(state);
-                result->type = LAI_LOCAL_NAME;
+                struct lai_operand *result = lai_exec_push_opstack_or_die(state);
+                result->tag = LAI_LOCAL_NAME;
                 result->index = opcode - LOCAL0_OP;
             }
             state->pc++;
@@ -1458,8 +1482,8 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
         {
             if(parse_mode == LAI_OBJECT_MODE
                     || parse_mode == LAI_REFERENCE_MODE) {
-                lai_object_t *result = lai_exec_push_opstack_or_die(state);
-                result->type = LAI_DEBUG_NAME;
+                struct lai_operand *result = lai_exec_push_opstack_or_die(state);
+                result->tag = LAI_DEBUG_NAME;
             }
             state->pc += 2;
             break;
@@ -1691,8 +1715,11 @@ int lai_exec_method(lai_nsnode_t *method, lai_state_t *state) {
 
     if (state->opstack_ptr != 1) // This would be an internal error.
         lai_panic("expected exactly one return value after method invocation");
-    lai_object_t *result = lai_exec_get_opstack(state, 0);
-    lai_move_object(&state->retvalue, result);
+    struct lai_operand *result = lai_exec_get_opstack(state, 0);
+    lai_object_t objectref = {0};
+    lai_exec_get_objectref(state, result, &objectref);
+    lai_clone_object(&state->retvalue, &objectref);
+    lai_free_object(&objectref);
     lai_exec_pop_opstack(state, 1);
     return 0;
 }
@@ -1747,7 +1774,7 @@ static void lai_eval_operand(lai_object_t *destination, lai_state_t *state,
 
     if (state->opstack_ptr != opstack + 1) // This would be an internal error.
         lai_panic("expected exactly one opstack item after operand evaluation");
-    lai_object_t *result = lai_exec_get_opstack(state, opstack);
+    struct lai_operand *result = lai_exec_get_opstack(state, opstack);
     lai_object_t objectref = {0};
     lai_exec_get_objectref(state, result, &objectref);
     lai_clone_object(destination, &objectref);
