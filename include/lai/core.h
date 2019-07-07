@@ -41,6 +41,11 @@ inline void lai_namecpy(char *dest, const char *src) {
 #define ACPI_MAX_NAME               64
 #define ACPI_MAX_RESOURCES          512
 
+typedef enum lai_api_error {
+    LAI_ERROR_NONE,
+    LAI_ERROR_TYPE_MISMATCH,
+} lai_api_error_t;
+
 #define LAI_NAMESPACE_ROOT          1
 #define LAI_NAMESPACE_NAME          2
 #define LAI_NAMESPACE_ALIAS         3
@@ -56,7 +61,7 @@ inline void lai_namecpy(char *dest, const char *src) {
 #define LAI_NAMESPACE_POWER_RES     13
 
 // ----------------------------------------------------------------------------
-// Data types defined by AML.
+// Types for lai_object_t.
 // ----------------------------------------------------------------------------
 // Value types: integer, string, buffer, package.
 #define LAI_INTEGER            1
@@ -324,6 +329,21 @@ lai_nsnode_t *lai_get_deviceid(size_t, lai_object_t *);
 lai_nsnode_t *lai_enum(char *, size_t);
 void lai_eisaid(lai_object_t *, char *);
 size_t lai_read_resource(lai_nsnode_t *, acpi_resource_t *);
+
+// Access and manipulation of lai_object_t.
+
+enum lai_object_type {
+    LAI_TYPE_NONE,
+    LAI_TYPE_INTEGER,
+    LAI_TYPE_STRING,
+    LAI_TYPE_BUFFER,
+    LAI_TYPE_PACKAGE,
+    LAI_TYPE_DEVICE,
+};
+
+enum lai_object_type lai_obj_get_type(lai_object_t *object);
+lai_api_error_t lai_obj_get_integer(lai_object_t *, uint64_t *);
+lai_api_error_t lai_obj_get_handle(lai_object_t *, lai_nsnode_t **);
 
 // ACPI Control Methods
 int lai_populate(lai_nsnode_t *, struct lai_aml_segment *, lai_state_t *);

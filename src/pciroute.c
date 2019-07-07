@@ -130,32 +130,37 @@ int lai_pci_route(acpi_resource_t *dest, uint8_t bus, uint8_t slot, uint8_t func
 resolve_pin:
     // here we've found what we need
     // is it a link device or a GSI?
-    status = lai_eval_package(&prt_package, 2, &prt_entry);
-    if (status != 0)
+    if (lai_eval_package(&prt_package, 2, &prt_entry))
         return 1;
 
     acpi_resource_t *res;
     size_t res_count;
 
-    if (prt_entry.type == LAI_INTEGER) {
-        // GSI
-        status = lai_eval_package(&prt_package, 3, &prt_entry);
-        if(status != 0)
+    int prt_entry_type = lai_obj_get_type(&prt_entry);
+    if (prt_entry_type == LAI_TYPE_INTEGER) {
+        // Direct routing to a GSI.
+        uint64_t gsi;
+        if (lai_eval_package(&prt_package, 3, &prt_entry))
+            return 1;
+        if (lai_obj_get_integer(&prt_entry, &gsi))
             return 1;
 
         dest->type = ACPI_RESOURCE_IRQ;
-        dest->base = prt_entry.integer;
+        dest->base = gsi;
         dest->irq_flags = ACPI_IRQ_LEVEL | ACPI_IRQ_ACTIVE_HIGH | ACPI_IRQ_SHARED;
 
         lai_debug("PCI device %X:%X:%X is using IRQ %d", bus, slot, function, (int)dest->base);
         return 0;
-    } else if (prt_entry.type == LAI_HANDLE) {
-        // PCI Interrupt Link Device
-        lai_debug("PCI interrupt link is %s", prt_entry.handle->fullpath);
+    } else if (prt_entry_type == LAI_TYPE_DEVICE) {
+        // GSI is determined by an Interrupt Link Device.
+        lai_nsnode_t *link_handle;
+        if (lai_obj_get_handle(&prt_entry, &link_handle))
+            return 1;
+        lai_debug("PCI interrupt link is %s", link_handle->fullpath);
 
         // read the resource template of the device
         res = lai_calloc(sizeof(acpi_resource_t), ACPI_MAX_RESOURCES);
-        res_count = lai_read_resource(prt_entry.handle, res);
+        res_count = lai_read_resource(link_handle, res);
 
         if (!res_count)
             return 1;
@@ -177,7 +182,7 @@ resolve_pin:
 
         return 0;
     } else {
-        lai_warn("PRT entry has unexpected type %d", prt_entry.type);
+        lai_warn("PRT entry has unexpected type %d", prt_entry_type);
         return 1;
     }
 }

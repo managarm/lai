@@ -356,6 +356,57 @@ void lai_store(lai_state_t *state, lai_object_t *dest, lai_object_t *object) {
     }
 }
 
+static enum lai_object_type lai_object_type_of_objref(lai_object_t *object) {
+    switch (object->type) {
+        case LAI_INTEGER:
+            return LAI_TYPE_INTEGER;
+        case LAI_STRING:
+            return LAI_TYPE_STRING;
+        case LAI_BUFFER:
+            return LAI_TYPE_BUFFER;
+        case LAI_PACKAGE:
+            return LAI_TYPE_PACKAGE;
+
+        default:
+            lai_panic("unexpected object type %d in lai_object_type_of_objref()", object->type);
+    }
+}
+
+static enum lai_object_type lai_object_type_of_node(lai_nsnode_t *handle) {
+    switch (handle->type) {
+        case LAI_NAMESPACE_DEVICE:
+            return LAI_TYPE_DEVICE;
+
+        default:
+            lai_panic("unexpected node type %d in lai_object_type_of_node()", handle->type);
+    }
+}
+
+enum lai_object_type lai_obj_get_type(lai_object_t *object) {
+    switch (object->type) {
+        case LAI_INTEGER:
+        case LAI_STRING:
+        case LAI_BUFFER:
+        case LAI_PACKAGE:
+            return lai_object_type_of_objref(object);
+
+        case LAI_HANDLE:
+            return lai_object_type_of_node(object->handle);
+        case LAI_UNRESOLVED_NAME: {
+            struct lai_amlname amln;
+            lai_amlname_parse(&amln, object->unres_aml);
+
+            lai_nsnode_t *handle = lai_do_resolve(object->unres_ctx_handle, &amln);
+            if(!handle)
+                lai_panic("undefined reference %s", lai_stringify_amlname(&amln));
+            return lai_object_type_of_node(handle);
+        }
+
+        default:
+            lai_panic("unexpected object type %d for lai_obj_get_type()", object->type);
+    }
+}
+
 // Load an object (i.e., integer, string, buffer, package) or reference.
 // This is the access method used by Store().
 // Returns immediate objects and indices as-is (i.e., without load from a name).
@@ -392,6 +443,42 @@ void lai_exec_get_integer(lai_state_t *state, lai_object_t *src, lai_object_t *o
     if(temp.type != LAI_INTEGER)
         lai_panic("lai_load_integer() expects an integer, not a value of type %d", temp.type);
     lai_move_object(object, &temp);
+}
+
+lai_api_error_t lai_obj_get_integer(lai_object_t *object, uint64_t *out) {
+    switch (object->type) {
+        case LAI_INTEGER:
+            *out = object->integer;
+            return LAI_ERROR_NONE;
+
+        default:
+            lai_warn("lai_obj_get_integer() expects an integer, not a value of type %d",
+                      object->type);
+            return LAI_ERROR_TYPE_MISMATCH;
+    }
+}
+
+lai_api_error_t lai_obj_get_handle(lai_object_t *object, lai_nsnode_t **out) {
+    switch (object->type) {
+        case LAI_HANDLE:
+            *out = object->handle;
+            return LAI_ERROR_NONE;
+        case LAI_UNRESOLVED_NAME: {
+            struct lai_amlname amln;
+            lai_amlname_parse(&amln, object->unres_aml);
+
+            lai_nsnode_t *handle = lai_do_resolve(object->unres_ctx_handle, &amln);
+            if(!handle)
+                lai_panic("undefined reference %s", lai_stringify_amlname(&amln));
+            *out = handle;
+            return LAI_ERROR_NONE;
+        }
+
+        default:
+            lai_warn("lai_obj_get_handle() expects a handle type, not a value of type %d",
+                      object->type);
+            return LAI_ERROR_TYPE_MISMATCH;
+    }
 }
 
 // lai_write_buffer(): Writes to a Buffer Field
