@@ -320,6 +320,8 @@ typedef struct lai_state_t
 void lai_init_state(lai_state_t *);
 void lai_finalize_state(lai_state_t *);
 
+#define LAI_CLEANUP_STATE __attribute__((cleanup(lai_finalize_state)))
+
 struct lai_ns_iterator {
     size_t i;
 };
@@ -374,7 +376,7 @@ lai_api_error_t lai_obj_get_handle(lai_object_t *, lai_nsnode_t **);
 int lai_populate(lai_nsnode_t *, struct lai_aml_segment *, lai_state_t *);
 int lai_exec_method(lai_nsnode_t *, lai_state_t *);
 int lai_eval_node(lai_nsnode_t *, lai_state_t *);
-int lai_eval(lai_object_t *, lai_nsnode_t *);
+int lai_eval(lai_object_t *, lai_nsnode_t *, lai_state_t *);
 
 // Generic Functions
 int lai_enable_acpi(uint32_t);

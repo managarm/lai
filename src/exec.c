@@ -1743,16 +1743,13 @@ int lai_eval_node(lai_nsnode_t *handle, lai_state_t *state) {
     return 1;
 }
 
-int lai_eval(lai_object_t *object, lai_nsnode_t *handle) {
+int lai_eval(lai_object_t *object, lai_nsnode_t *handle, lai_state_t *state) {
     LAI_ENSURE(handle);
 
     int e;
-    lai_state_t state;
-    lai_init_state(&state);
-    e = lai_eval_node(handle, &state);
+    e = lai_eval_node(handle, state);
     if (!e)
-        lai_move_object(object, lai_retvalue(&state));
-    lai_finalize_state(&state);
+        lai_move_object(object, lai_retvalue(state));
     return e;
 }
 

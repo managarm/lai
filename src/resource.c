@@ -27,12 +27,15 @@
 
 // read a device's resource info
 size_t lai_read_resource(lai_nsnode_t *device, acpi_resource_t *dest) {
+    LAI_CLEANUP_STATE lai_state_t state;
+    lai_init_state(&state);
+
 	lai_nsnode_t *crs_handle = lai_resolve_path(device, "_CRS");
 	if (!crs_handle)
 		return 0;
 
     lai_object_t buffer = {0};
-    int status = lai_eval(&buffer, crs_handle);
+    int status = lai_eval(&buffer, crs_handle, &state);
     if (status)
         return 0;
 

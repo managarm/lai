@@ -16,13 +16,16 @@
 // Param:    uint8_t state - 0-5 to correspond with states S0-S5
 // Return:    int - 0 on success
 
-int lai_enter_sleep(uint8_t state)
+int lai_enter_sleep(uint8_t sleep_state)
 {
     if(!laihost_inw || !laihost_outw)
         lai_panic("lai_enter_sleep() requires port I/O");
 
+    LAI_CLEANUP_STATE lai_state_t state;
+    lai_init_state(&state);
+
     const char *sleep_object;
-    switch (state) {
+    switch (sleep_state) {
         case 0: sleep_object = "\\_S0"; break;
         case 1: sleep_object = "\\_S1"; break;
         case 2: sleep_object = "\\_S2"; break;
@@ -30,13 +33,13 @@ int lai_enter_sleep(uint8_t state)
         case 4: sleep_object = "\\_S4"; break;
         case 5: sleep_object = "\\_S5"; break;
         default:
-            lai_panic("undefined sleep state S%d", state);
+            lai_panic("undefined sleep state S%d", sleep_state);
     }
 
     // get sleeping package
     lai_nsnode_t *handle = lai_resolve_path(NULL, sleep_object);
     if(!handle) {
-        lai_debug("sleep state S%d is not supported.", state);
+        lai_debug("sleep state S%d is not supported.", sleep_state);
         return 1;
     }
 
@@ -44,43 +47,42 @@ int lai_enter_sleep(uint8_t state)
     lai_object_t slp_typa = {0};
     lai_object_t slp_typb = {0};
     int eval_status;
-    eval_status = lai_eval(&package, handle);
+    eval_status = lai_eval(&package, handle, &state);
     if(eval_status) {
-        lai_debug("sleep state S%d is not supported.", state);
+        lai_debug("sleep state S%d is not supported.", sleep_state);
         return 1;
     }
 
-    lai_debug("entering sleep state S%d...", state);
+    lai_debug("entering sleep state S%d...", sleep_state);
 
     // ACPI spec says we should call _PTS() and _GTS() before actually sleeping
     // Who knows, it might do some required firmware-specific stuff
-    lai_state_t acpi_state;
     handle = lai_resolve_path(NULL, "\\_PTS");
 
     if(handle) {
-        lai_init_state(&acpi_state);
+        lai_init_state(&state);
 
         // pass the sleeping type as an argument
-        lai_arg(&acpi_state, 0)->type = LAI_INTEGER;
-        lai_arg(&acpi_state, 0)->integer = (uint64_t)state & 0xFF;
+        lai_arg(&state, 0)->type = LAI_INTEGER;
+        lai_arg(&state, 0)->integer = (uint64_t)sleep_state & 0xFF;
 
-        lai_debug("execute _PTS(%d)", state);
-        lai_exec_method(handle, &acpi_state);
-        lai_finalize_state(&acpi_state);
+        lai_debug("execute _PTS(%d)", sleep_state);
+        lai_exec_method(handle, &state);
+        lai_finalize_state(&state);
     }
 
     handle = lai_resolve_path(NULL, "\\_GTS");
 
     if(handle) {
-        lai_init_state(&acpi_state);
+        lai_init_state(&state);
 
         // pass the sleeping type as an argument
-        lai_arg(&acpi_state, 0)->type = LAI_INTEGER;
-        lai_arg(&acpi_state, 0)->integer = (uint64_t)state & 0xFF;
+        lai_arg(&state, 0)->type = LAI_INTEGER;
+        lai_arg(&state, 0)->integer = (uint64_t)sleep_state & 0xFF;
 
-        lai_debug("execute _GTS(%d)", state);
-        lai_exec_method(handle, &acpi_state);
-        lai_finalize_state(&acpi_state);
+        lai_debug("execute _GTS(%d)", sleep_state);
+        lai_exec_method(handle, &state);
+        lai_finalize_state(&state);
     }
 
     lai_eval_package(&package, 0, &slp_typa);

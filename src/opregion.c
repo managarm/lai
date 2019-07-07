@@ -146,10 +146,13 @@ void lai_read_field(lai_object_t *destination, lai_nsnode_t *field) {
                           lai_stringify_node_path(field));
         }
     } else if (opregion->op_address_space == OPREGION_PCI) {
+        LAI_CLEANUP_STATE lai_state_t state;
+        lai_init_state(&state);
+
         // PCI bus number is in the _BBN object.
         lai_nsnode_t *bbn_handle = lai_resolve_search(opregion, "_BBN");
         if (bbn_handle) {
-            if (lai_eval(&bus_number, bbn_handle))
+            if (lai_eval(&bus_number, bbn_handle, &state))
                 lai_panic("could not evaluate _BBN of OperationRegion()");
             bbn_result = bus_number.integer;
         }
@@ -157,7 +160,7 @@ void lai_read_field(lai_object_t *destination, lai_nsnode_t *field) {
         // Device slot/function is in the _ADR object.
         lai_nsnode_t *adr_handle = lai_resolve_search(opregion, "_ADR");
         if (adr_handle) {
-            if (lai_eval(&address_number, adr_handle))
+            if (lai_eval(&address_number, adr_handle, &state))
                 lai_panic("could not evaluate _ADR of OperationRegion()");
             adr_result = bus_number.integer;
         }
@@ -285,10 +288,13 @@ void lai_write_field(lai_nsnode_t *field, lai_object_t *source) {
                           lai_stringify_node_path(field));
         }
     } else if (opregion->op_address_space == OPREGION_PCI) {
+        LAI_CLEANUP_STATE lai_state_t state;
+        lai_init_state(&state);
+
         // PCI bus number is in the _BBN object.
         lai_nsnode_t *bbn_handle = lai_resolve_search(opregion, "_BBN");
         if (bbn_handle) {
-            if (lai_eval(&bus_number, bbn_handle))
+            if (lai_eval(&bus_number, bbn_handle, &state))
                 lai_panic("could not evaluate _BBN of OperationRegion()");
             bbn_result = bus_number.integer;
         }
@@ -296,7 +302,7 @@ void lai_write_field(lai_nsnode_t *field, lai_object_t *source) {
         // Device slot/function is in the _ADR object.
         lai_nsnode_t *adr_handle = lai_resolve_search(opregion, "_ADR");
         if (adr_handle) {
-            if (lai_eval(&address_number, adr_handle))
+            if (lai_eval(&address_number, adr_handle, &state))
                 lai_panic("could not evaluate _ADR of OperationRegion()");
             adr_result = bus_number.integer;
         }

@@ -22,6 +22,8 @@
 // a given bus, slot, function combination.
 int lai_pci_route(acpi_resource_t *dest, uint8_t bus, uint8_t slot, uint8_t function) {
     //lai_debug("attempt to resolve PCI IRQ for device %X:%X:%X", bus, slot, function);
+    LAI_CLEANUP_STATE lai_state_t state;
+    lai_init_state(&state);
 
     // determine the interrupt pin
     uint8_t pin = (uint8_t)(laihost_pci_read(bus, slot, function, 0x3C) >> 8);
@@ -51,7 +53,7 @@ int lai_pci_route(acpi_resource_t *dest, uint8_t bus, uint8_t slot, uint8_t func
 
         lai_nsnode_t *bbn_handle = lai_resolve_path(handle, "_BBN");
         if (bbn_handle) {
-            if (lai_eval(&bus_number, bbn_handle)) {
+            if (lai_eval(&bus_number, bbn_handle, &state)) {
                 lai_warn("failed to evaluate _BBN");
                 continue;
             }
@@ -83,7 +85,7 @@ int lai_pci_route(acpi_resource_t *dest, uint8_t bus, uint8_t slot, uint8_t func
         of the specified device which contains the PCI interrupt. If offset 2 is an
         integer, this field is the ACPI GSI of this PCI IRQ. */
 
-    if (lai_eval(&prt, prt_handle)) {
+    if (lai_eval(&prt, prt_handle, &state)) {
         lai_warn("failed to evaluate _PRT");
         return 1;
     }

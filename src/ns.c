@@ -656,6 +656,9 @@ lai_nsnode_t *lai_get_device(size_t index) {
 
 // search for a device by its id and index.
 lai_nsnode_t *lai_get_deviceid(size_t index, lai_object_t *id) {
+    LAI_CLEANUP_STATE lai_state_t state;
+    lai_init_state(&state);
+
     size_t i = 0, j = 0;
 
     lai_nsnode_t *handle;
@@ -667,7 +670,7 @@ lai_nsnode_t *lai_get_deviceid(size_t index, lai_object_t *id) {
 
         lai_nsnode_t *hid_handle = lai_resolve_path(handle, "_HID");
         if (hid_handle) {
-            if (lai_eval(&device_id, hid_handle)) {
+            if (lai_eval(&device_id, hid_handle, &state)) {
                 lai_warn("could not evaluate _HID of device");
             } else {
                 LAI_ENSURE(device_id.type);
@@ -677,7 +680,7 @@ lai_nsnode_t *lai_get_deviceid(size_t index, lai_object_t *id) {
         if (!device_id.type) {
             lai_nsnode_t *cid_handle = lai_resolve_path(handle, "_CID");
             if (cid_handle) {
-                if (lai_eval(&device_id, cid_handle)) {
+                if (lai_eval(&device_id, cid_handle, &state)) {
                     lai_warn("could not evaluate _CID of device");
                 } else {
                     LAI_ENSURE(device_id.type);
