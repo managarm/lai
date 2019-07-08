@@ -358,7 +358,7 @@ lai_nsnode_t *lai_resolve_path(lai_nsnode_t *, const char *);
 lai_nsnode_t *lai_resolve_search(lai_nsnode_t *, const char *);
 lai_nsnode_t *lai_legacy_resolve(char *);
 lai_nsnode_t *lai_get_device(size_t);
-lai_nsnode_t *lai_get_deviceid(size_t, lai_object_t *);
+int lai_check_device_pnp_id(lai_nsnode_t *, lai_object_t *, lai_state_t *);
 lai_nsnode_t *lai_enum(char *, size_t);
 void lai_eisaid(lai_object_t *, char *);
 size_t lai_read_resource(lai_nsnode_t *, acpi_resource_t *);

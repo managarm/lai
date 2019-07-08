@@ -665,58 +665,47 @@ lai_nsnode_t *lai_get_device(size_t index) {
     return NULL;
 }
 
-// search for a device by its id and index.
-lai_nsnode_t *lai_get_deviceid(size_t index, lai_object_t *id) {
-    LAI_CLEANUP_STATE lai_state_t state;
-    lai_init_state(&state);
+int lai_check_device_pnp_id(lai_nsnode_t *dev, lai_object_t *pnp_id,
+                            lai_state_t *state) {
 
-    size_t i = 0, j = 0;
+    lai_object_t id = {0};
+    int ret = 1;
 
-    lai_nsnode_t *handle;
-
-    handle = lai_get_device(j);
-    while (handle) {
-        // Read the ID of the device.
-        lai_object_t device_id = {0};
-
-        lai_nsnode_t *hid_handle = lai_resolve_path(handle, "_HID");
-        if (hid_handle) {
-            if (lai_eval(&device_id, hid_handle, &state)) {
-                lai_warn("could not evaluate _HID of device");
-            } else {
-                LAI_ENSURE(device_id.type);
-            }
+    lai_nsnode_t *hid_handle = lai_resolve_path(dev, "_HID");
+    if (hid_handle) {
+        if (lai_eval(&id, hid_handle, state)) {
+            lai_warn("could not evaluate _HID of device");
+        } else {
+            LAI_ENSURE(id.type);
         }
-
-        if (!device_id.type) {
-            lai_nsnode_t *cid_handle = lai_resolve_path(handle, "_CID");
-            if (cid_handle) {
-                if (lai_eval(&device_id, cid_handle, &state)) {
-                    lai_warn("could not evaluate _CID of device");
-                } else {
-                    LAI_ENSURE(device_id.type);
-                }
-            }
-        }
-
-        if (device_id.type == LAI_INTEGER && id->type == LAI_INTEGER) {
-            if (device_id.integer == id->integer)
-                i++;
-        } else if (device_id.type == LAI_STRING && id->type == LAI_STRING) {
-            if (!lai_strcmp(lai_exec_string_access(&device_id),
-                            lai_exec_string_access(id)))
-                i++;
-        }
-        lai_free_object(&device_id);
-
-        if (i > index)
-            return handle;
-
-        j++;
-        handle = lai_get_device(j);
     }
 
-    return NULL;
+    if (!id.type) {
+        lai_nsnode_t *cid_handle = lai_resolve_path(dev, "_CID");
+        if (cid_handle) {
+            if (lai_eval(&id, cid_handle, state)) {
+                lai_warn("could not evaluate _CID of device");
+                return 1;
+            } else {
+                LAI_ENSURE(id.type);
+            }
+        }
+    }
+
+
+    if (id.type == LAI_INTEGER && pnp_id->type == LAI_INTEGER) {
+        if (id.integer == pnp_id->integer) {
+            ret = 0;
+        }
+    } else if (id.type == LAI_STRING && pnp_id->type == LAI_STRING) {
+        if (!lai_strcmp(lai_exec_string_access(&id),
+                         lai_exec_string_access(pnp_id))) {    
+            ret = 0;
+        }
+    }
+
+    lai_free_object(&id);
+    return ret;
 }
 
 // determine the node in the ACPI namespace corresponding to a given path,

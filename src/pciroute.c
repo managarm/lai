@@ -17,6 +17,7 @@
 #include "eval.h"
 
 #define PCI_PNP_ID        "PNP0A03"
+#define PCIE_PNP_ID        "PNP0A08"
 
 // This function resolves PCI IRQ routing for a specific device corresponding to
 // a given bus, slot, function combination.
@@ -35,34 +36,41 @@ int lai_pci_route(acpi_resource_t *dest, uint8_t bus, uint8_t slot, uint8_t func
     pin--;
     // find the PCI bus in the namespace
     lai_object_t bus_number = {0};
-    lai_object_t pnp_id = {0};
-    lai_eisaid(&pnp_id, PCI_PNP_ID);
+    lai_object_t pci_pnp_id = {0};
+    lai_object_t pcie_pnp_id = {0};
+    lai_eisaid(&pci_pnp_id, PCI_PNP_ID);
+    lai_eisaid(&pcie_pnp_id, PCIE_PNP_ID);
 
-    lai_nsnode_t *handle;
-    for (size_t i = 0; ; i++) {
-        handle = lai_get_deviceid(i, &pnp_id);
-        if (!handle)
-            return 1;
+    lai_nsnode_t *handle = NULL;
 
-        const char *node_path = lai_stringify_node_path(handle);
-        lai_debug("evaluating _BBN of %s", node_path);
-        laihost_free(node_path);
+    struct lai_ns_iterator iter = LAI_NS_ITERATOR_INIT;
+    lai_nsnode_t *node;
+    while ((node = lai_ns_iterate(&iter))) {
 
-        // When _BBN is not present, we assume bus 0.
-        int bbn_result = 0;
+        if (lai_check_device_pnp_id(node, &pci_pnp_id, &state) &&
+                lai_check_device_pnp_id(node, &pcie_pnp_id, &state)) {
+            continue;
+        }
 
-        lai_nsnode_t *bbn_handle = lai_resolve_path(handle, "_BBN");
+        uint64_t bbn_result = 0;
+
+        lai_nsnode_t *bbn_handle = lai_resolve_path(node, "_BBN");
         if (bbn_handle) {
             if (lai_eval(&bus_number, bbn_handle, &state)) {
                 lai_warn("failed to evaluate _BBN");
                 continue;
             }
-            bbn_result = bus_number.integer;
+            lai_obj_get_integer(&bus_number, &bbn_result);
         }
 
-        if (bbn_result == bus)
+        if (bbn_result == bus) {
+            handle = node;
             break;
+        }
     }
+
+    if (!handle)
+        return 1;
 
     // read the PCI routing table
     lai_nsnode_t *prt_handle = lai_resolve_path(handle, "_PRT");
