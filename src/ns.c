@@ -18,9 +18,9 @@
 
 static int debug_resolution = 0;
 
-int lai_do_osi_method(lai_object_t *args, lai_object_t *result);
-int lai_do_os_method(lai_object_t *args, lai_object_t *result);
-int lai_do_rev_method(lai_object_t *args, lai_object_t *result);
+int lai_do_osi_method(lai_variable_t *args, lai_variable_t *result);
+int lai_do_os_method(lai_variable_t *args, lai_variable_t *result);
+int lai_do_rev_method(lai_variable_t *args, lai_variable_t *result);
 
 lai_nsnode_t *lai_root_node;
 lai_nsnode_t **lai_namespace;
@@ -665,10 +665,10 @@ lai_nsnode_t *lai_get_device(size_t index) {
     return NULL;
 }
 
-int lai_check_device_pnp_id(lai_nsnode_t *dev, lai_object_t *pnp_id,
+int lai_check_device_pnp_id(lai_nsnode_t *dev, lai_variable_t *pnp_id,
                             lai_state_t *state) {
 
-    lai_object_t id = {0};
+    lai_variable_t id = {0};
     int ret = 1;
 
     lai_nsnode_t *hid_handle = lai_resolve_path(dev, "_HID");

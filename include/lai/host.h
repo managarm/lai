@@ -10,8 +10,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-struct lai_object_t;
-typedef struct lai_object_t lai_object_t;
+struct lai_variable_t;
+typedef struct lai_variable_t lai_variable_t;
 
 #define LAI_DEBUG_LOG 1
 #define LAI_WARN_LOG 2
@@ -36,5 +36,5 @@ __attribute__((weak)) void laihost_pci_write(uint8_t, uint8_t, uint8_t, uint16_t
 __attribute__((weak)) uint32_t laihost_pci_read(uint8_t, uint8_t, uint8_t, uint16_t);
 __attribute__((weak)) void laihost_sleep(uint64_t);
 
-__attribute__((weak)) void laihost_handle_amldebug(lai_object_t *);
+__attribute__((weak)) void laihost_handle_amldebug(lai_variable_t *);
 

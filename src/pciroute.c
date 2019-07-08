@@ -35,9 +35,9 @@ int lai_pci_route(acpi_resource_t *dest, uint8_t bus, uint8_t slot, uint8_t func
     // subtract 1 to arrive at the correct pin number.
     pin--;
     // find the PCI bus in the namespace
-    lai_object_t bus_number = {0};
-    lai_object_t pci_pnp_id = {0};
-    lai_object_t pcie_pnp_id = {0};
+    lai_variable_t bus_number = {0};
+    lai_variable_t pci_pnp_id = {0};
+    lai_variable_t pcie_pnp_id = {0};
     lai_eisaid(&pci_pnp_id, PCI_PNP_ID);
     lai_eisaid(&pcie_pnp_id, PCIE_PNP_ID);
 
@@ -80,9 +80,9 @@ int lai_pci_route(acpi_resource_t *dest, uint8_t bus, uint8_t slot, uint8_t func
     }
 
     int status;
-    lai_object_t prt = {0};
-    lai_object_t prt_package = {0};
-    lai_object_t prt_entry = {0};
+    lai_variable_t prt = {0};
+    lai_variable_t prt_package = {0};
+    lai_variable_t prt_entry = {0};
 
     /* _PRT is a package of packages. Each package within the PRT is in the following format:
        0: Integer:    Address of device. Low WORD = function, high WORD = slot

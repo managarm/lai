@@ -63,7 +63,7 @@ typedef enum lai_api_error {
 #define LAI_NAMESPACE_POWER_RES     13
 
 // ----------------------------------------------------------------------------
-// Types for lai_object_t.
+// Types for lai_variable_t.
 // ----------------------------------------------------------------------------
 // Value types: integer, string, buffer, package.
 #define LAI_INTEGER            1
@@ -99,7 +99,7 @@ struct lai_aml_segment {
     size_t index;
 };
 
-typedef struct lai_object_t
+typedef struct lai_variable_t
 {
     int type;
     uint64_t integer;        // for Name()
@@ -117,7 +117,7 @@ typedef struct lai_object_t
     struct lai_nsnode_t *handle;
 
     int index;
-} lai_object_t;
+} lai_variable_t;
 
 struct lai_string_head {
     lai_rc_t rc;
@@ -133,52 +133,52 @@ struct lai_buffer_head {
 struct lai_pkg_head {
     lai_rc_t rc;
     unsigned int size;
-    struct lai_object_t elems[];
+    struct lai_variable_t elems[];
 };
 
 // Allows access to the contents of a string.
 __attribute__((always_inline))
-inline char *lai_exec_string_access(lai_object_t *str) {
+inline char *lai_exec_string_access(lai_variable_t *str) {
     LAI_ENSURE(str->type == LAI_STRING);
     return str->string_ptr->content;
 }
 
 // Returns the size of a string.
-size_t lai_exec_string_length(lai_object_t *str);
+size_t lai_exec_string_length(lai_variable_t *str);
 
 // Returns the size of a buffer.
 __attribute__((always_inline))
-inline size_t lai_exec_buffer_size(lai_object_t *buffer) {
+inline size_t lai_exec_buffer_size(lai_variable_t *buffer) {
     LAI_ENSURE(buffer->type == LAI_BUFFER);
     return buffer->buffer_ptr->size;
 }
 
 // Allows access to the contents of a buffer.
 __attribute__((always_inline))
-inline void *lai_exec_buffer_access(lai_object_t *buffer) {
+inline void *lai_exec_buffer_access(lai_variable_t *buffer) {
     LAI_ENSURE(buffer->type == LAI_BUFFER);
     return buffer->buffer_ptr->content;
 }
 
 // Returns the size of a package.
 __attribute__((always_inline))
-inline size_t lai_exec_pkg_size(lai_object_t *object) {
+inline size_t lai_exec_pkg_size(lai_variable_t *object) {
     // TODO: Ensure that this is a package.
     return object->pkg_ptr->size;
 }
 
 // Helper functions for lai_exec_pkg_load()/lai_exec_pkg_store(), for internal interpreter use.
-void lai_exec_pkg_var_load(lai_object_t *out, struct lai_pkg_head *head, size_t i);
-void lai_exec_pkg_var_store(lai_object_t *in, struct lai_pkg_head *head, size_t i);
+void lai_exec_pkg_var_load(lai_variable_t *out, struct lai_pkg_head *head, size_t i);
+void lai_exec_pkg_var_store(lai_variable_t *in, struct lai_pkg_head *head, size_t i);
 
 // Load/store values from/to packages.
 __attribute__((always_inline))
-inline void lai_exec_pkg_load(lai_object_t *out, lai_object_t *pkg, size_t i) {
+inline void lai_exec_pkg_load(lai_variable_t *out, lai_variable_t *pkg, size_t i) {
     LAI_ENSURE(pkg->type == LAI_PACKAGE);
     return lai_exec_pkg_var_load(out, pkg->pkg_ptr, i);
 }
 __attribute__((always_inline))
-inline void lai_exec_pkg_store(lai_object_t *in, lai_object_t *pkg, size_t i) {
+inline void lai_exec_pkg_store(lai_variable_t *in, lai_variable_t *pkg, size_t i) {
     LAI_ENSURE(pkg->type == LAI_PACKAGE);
     return lai_exec_pkg_var_store(in, pkg->pkg_ptr, i);
 }
@@ -200,7 +200,7 @@ inline void lai_exec_pkg_store(lai_object_t *in, lai_object_t *pkg, size_t i) {
 struct lai_operand {
     int tag;
     union {
-        lai_object_t object;
+        lai_variable_t object;
         int index; // Index of ARGx and LOCALx.
         struct {
             struct lai_nsnode_t *unres_ctx_handle;
@@ -220,7 +220,7 @@ typedef struct lai_nsnode_t
     void *pointer;            // valid for scopes, methods, etc.
     size_t size;            // valid for scopes, methods, etc.
 
-    lai_object_t object;        // for Name()
+    lai_variable_t object;        // for Name()
 
     uint8_t op_address_space;    // for OpRegions only
     uint64_t op_base;        // for OpRegions only
@@ -228,7 +228,7 @@ typedef struct lai_nsnode_t
 
     uint8_t method_flags;        // for Methods only, includes ARG_COUNT in lowest three bits
     // Allows the OS to override methods. Mainly useful for _OSI, _OS and _REV.
-    int (*method_override)(lai_object_t *args, lai_object_t *result);
+    int (*method_override)(lai_variable_t *args, lai_variable_t *result);
 
     // TODO: Find a good mechanism for locks.
     //lai_lock_t mutex;        // for Mutex
@@ -274,8 +274,8 @@ typedef struct lai_nsnode_t
 #define LAI_EVALOPERAND_STACKITEM 10
 
 struct lai_invocation {
-    lai_object_t arg[7];
-    lai_object_t local[8];
+    lai_variable_t arg[7];
+    lai_variable_t local[8];
 
 	// Stores a list of all namespace nodes created by this method.
     struct lai_list per_method_list;
@@ -318,7 +318,7 @@ typedef struct lai_state_t
 {
     int pc;
     int limit;
-    lai_object_t retvalue;
+    lai_variable_t retvalue;
     struct lai_invocation *invocation;
 
     // Stack to track the current execution state.
@@ -341,7 +341,7 @@ struct lai_ns_iterator {
 #define LAI_NS_ITERATOR_INIT {0}
 
 __attribute__((always_inline))
-inline lai_object_t *lai_retvalue(lai_state_t *state) {
+inline lai_variable_t *lai_retvalue(lai_state_t *state) {
     return &state->retvalue;
 }
 
@@ -358,15 +358,15 @@ lai_nsnode_t *lai_resolve_path(lai_nsnode_t *, const char *);
 lai_nsnode_t *lai_resolve_search(lai_nsnode_t *, const char *);
 lai_nsnode_t *lai_legacy_resolve(char *);
 lai_nsnode_t *lai_get_device(size_t);
-int lai_check_device_pnp_id(lai_nsnode_t *, lai_object_t *, lai_state_t *);
+int lai_check_device_pnp_id(lai_nsnode_t *, lai_variable_t *, lai_state_t *);
 lai_nsnode_t *lai_enum(char *, size_t);
-void lai_eisaid(lai_object_t *, char *);
+void lai_eisaid(lai_variable_t *, char *);
 size_t lai_read_resource(lai_nsnode_t *, acpi_resource_t *);
 lai_nsnode_t *lai_ns_iterate(struct lai_ns_iterator *);
 
-// Access and manipulation of lai_object_t.
+// Access and manipulation of lai_variable_t.
 
-enum lai_object_type {
+enum lai_variable_type {
     LAI_TYPE_NONE,
     LAI_TYPE_INTEGER,
     LAI_TYPE_STRING,
@@ -375,16 +375,16 @@ enum lai_object_type {
     LAI_TYPE_DEVICE,
 };
 
-enum lai_object_type lai_obj_get_type(lai_object_t *object);
-lai_api_error_t lai_obj_get_integer(lai_object_t *, uint64_t *);
-lai_api_error_t lai_obj_get_handle(lai_object_t *, lai_nsnode_t **);
+enum lai_variable_type lai_obj_get_type(lai_variable_t *object);
+lai_api_error_t lai_obj_get_integer(lai_variable_t *, uint64_t *);
+lai_api_error_t lai_obj_get_handle(lai_variable_t *, lai_nsnode_t **);
 
 // Evaluation of namespace nodes (including control methods).
 
-int lai_eval_args(lai_object_t *, lai_nsnode_t *, lai_state_t *, int, lai_object_t *);
-int lai_eval_largs(lai_object_t *, lai_nsnode_t *, lai_state_t *, ...);
-int lai_eval_vargs(lai_object_t *, lai_nsnode_t *, lai_state_t *, va_list);
-int lai_eval(lai_object_t *, lai_nsnode_t *, lai_state_t *);
+int lai_eval_args(lai_variable_t *, lai_nsnode_t *, lai_state_t *, int, lai_variable_t *);
+int lai_eval_largs(lai_variable_t *, lai_nsnode_t *, lai_state_t *, ...);
+int lai_eval_vargs(lai_variable_t *, lai_nsnode_t *, lai_state_t *, va_list);
+int lai_eval(lai_variable_t *, lai_nsnode_t *, lai_state_t *);
 
 // ACPI Control Methods
 int lai_populate(lai_nsnode_t *, struct lai_aml_segment *, lai_state_t *);

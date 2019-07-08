@@ -20,7 +20,7 @@ static int debug_opcodes = 0;
    DefLoad | DefNoop | DefNotify | DefRelease | DefReset | DefReturn |
    DefSignal | DefSleep | DefStall | DefUnload | DefWhile */
 
-static void lai_eval_operand(lai_object_t *destination, lai_state_t *state,
+static void lai_eval_operand(lai_variable_t *destination, lai_state_t *state,
         struct lai_aml_segment *amls, uint8_t *code);
 
 // Prepare the interpreter state for a control method call.
@@ -119,7 +119,7 @@ static void lai_exec_update_context(lai_state_t *state) {
     state->context_ptr = state->stack_ptr - j;
 }
 
-static int lai_compare(lai_object_t *lhs, lai_object_t *rhs) {
+static int lai_compare(lai_variable_t *lhs, lai_variable_t *rhs) {
     // TODO: Allow comparsions of strings and buffers as in the spec.
     if (lhs->type != LAI_INTEGER || rhs->type != LAI_INTEGER)
         lai_panic("comparsion of object type %d with type %d is not implemented",
@@ -136,7 +136,7 @@ static void lai_exec_reduce_node(int opcode, lai_state_t *state, struct lai_oper
         case WORDFIELD_OP:
         case DWORDFIELD_OP:
         case QWORDFIELD_OP: {
-            lai_object_t offset = {0};
+            lai_variable_t offset = {0};
             lai_exec_get_integer(state, &operands[1], &offset);
             LAI_ENSURE(operands[0].tag == LAI_UNRESOLVED_NAME);
             LAI_ENSURE(operands[2].tag == LAI_UNRESOLVED_NAME);
@@ -174,14 +174,14 @@ static void lai_exec_reduce_node(int opcode, lai_state_t *state, struct lai_oper
 }
 
 static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operand *operands,
-        lai_object_t *reduction_res) {
+        lai_variable_t *reduction_res) {
     if (debug_opcodes)
         lai_debug("lai_exec_reduce_op: opcode 0x%02X", opcode);
-    lai_object_t result = {0};
+    lai_variable_t result = {0};
     switch (opcode) {
     case STORE_OP: {
-        lai_object_t objectref = {0};
-        lai_object_t out = {0};
+        lai_variable_t objectref = {0};
+        lai_variable_t out = {0};
         lai_exec_get_objectref(state, &operands[0], &objectref);
 
         lai_clone_object(&result, &objectref);
@@ -197,7 +197,7 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
     }
     case NOT_OP:
     {
-        lai_object_t operand = {0};
+        lai_variable_t operand = {0};
         lai_exec_get_integer(state, operands, &operand);
 
         result.type = LAI_INTEGER;
@@ -207,8 +207,8 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
     }
     case ADD_OP:
     {
-        lai_object_t lhs = {0};
-        lai_object_t rhs = {0};
+        lai_variable_t lhs = {0};
+        lai_variable_t rhs = {0};
         lai_exec_get_integer(state, &operands[0], &lhs);
         lai_exec_get_integer(state, &operands[1], &rhs);
 
@@ -219,8 +219,8 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
     }
     case SUBTRACT_OP:
     {
-        lai_object_t lhs = {0};
-        lai_object_t rhs = {0};
+        lai_variable_t lhs = {0};
+        lai_variable_t rhs = {0};
         lai_exec_get_integer(state, &operands[0], &lhs);
         lai_exec_get_integer(state, &operands[1], &rhs);
 
@@ -231,8 +231,8 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
     }
     case MULTIPLY_OP:
     {
-        lai_object_t lhs = {0};
-        lai_object_t rhs = {0};
+        lai_variable_t lhs = {0};
+        lai_variable_t rhs = {0};
         lai_exec_get_integer(state, &operands[0], &lhs);
         lai_exec_get_integer(state, &operands[1], &rhs);
 
@@ -243,8 +243,8 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
     }
     case AND_OP:
     {
-        lai_object_t lhs = {0};
-        lai_object_t rhs = {0};
+        lai_variable_t lhs = {0};
+        lai_variable_t rhs = {0};
         lai_exec_get_integer(state, &operands[0], &lhs);
         lai_exec_get_integer(state, &operands[1], &rhs);
 
@@ -255,8 +255,8 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
     }
     case OR_OP:
     {
-        lai_object_t lhs = {0};
-        lai_object_t rhs = {0};
+        lai_variable_t lhs = {0};
+        lai_variable_t rhs = {0};
         lai_exec_get_integer(state, &operands[0], &lhs);
         lai_exec_get_integer(state, &operands[1], &rhs);
 
@@ -267,8 +267,8 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
     }
     case XOR_OP:
     {
-        lai_object_t lhs = {0};
-        lai_object_t rhs = {0};
+        lai_variable_t lhs = {0};
+        lai_variable_t rhs = {0};
         lai_exec_get_integer(state, &operands[0], &lhs);
         lai_exec_get_integer(state, &operands[1], &rhs);
 
@@ -279,8 +279,8 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
     }
     case SHL_OP:
     {
-        lai_object_t lhs = {0};
-        lai_object_t rhs = {0};
+        lai_variable_t lhs = {0};
+        lai_variable_t rhs = {0};
         lai_exec_get_integer(state, &operands[0], &lhs);
         lai_exec_get_integer(state, &operands[1], &rhs);
 
@@ -291,8 +291,8 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
     }
     case SHR_OP:
     {
-        lai_object_t lhs = {0};
-        lai_object_t rhs = {0};
+        lai_variable_t lhs = {0};
+        lai_variable_t rhs = {0};
         lai_exec_get_integer(state, &operands[0], &lhs);
         lai_exec_get_integer(state, &operands[1], &rhs);
 
@@ -303,13 +303,13 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
     }
     case DIVIDE_OP:
     {
-        lai_object_t lhs = {0};
-        lai_object_t rhs = {0};
+        lai_variable_t lhs = {0};
+        lai_variable_t rhs = {0};
         lai_exec_get_integer(state, &operands[0], &lhs);
         lai_exec_get_integer(state, &operands[1], &rhs);
 
-        lai_object_t mod = {0};
-        lai_object_t div = {0};
+        lai_variable_t mod = {0};
+        lai_variable_t div = {0};
         mod.type = LAI_INTEGER;
         div.type = LAI_INTEGER;
         mod.integer = lhs.integer % rhs.integer;
@@ -330,7 +330,7 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
         break;
     case LNOT_OP:
     {
-        lai_object_t operand = {0};
+        lai_variable_t operand = {0};
         lai_exec_get_integer(state, operands, &operand);
 
         result.type = LAI_INTEGER;
@@ -339,8 +339,8 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
     }
     case LAND_OP:
     {
-        lai_object_t lhs = {0};
-        lai_object_t rhs = {0};
+        lai_variable_t lhs = {0};
+        lai_variable_t rhs = {0};
         lai_exec_get_integer(state, &operands[0], &lhs);
         lai_exec_get_integer(state, &operands[1], &rhs);
 
@@ -350,8 +350,8 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
     }
     case LOR_OP:
     {
-        lai_object_t lhs = {0};
-        lai_object_t rhs = {0};
+        lai_variable_t lhs = {0};
+        lai_variable_t rhs = {0};
         lai_exec_get_integer(state, &operands[0], &lhs);
         lai_exec_get_integer(state, &operands[1], &rhs);
 
@@ -361,8 +361,8 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
     }
     case LEQUAL_OP:
     {
-        lai_object_t lhs = {0};
-        lai_object_t rhs = {0};
+        lai_variable_t lhs = {0};
+        lai_variable_t rhs = {0};
         lai_exec_get_integer(state, &operands[0], &lhs);
         lai_exec_get_integer(state, &operands[1], &rhs);
 
@@ -372,8 +372,8 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
     }
     case LLESS_OP:
     {
-        lai_object_t lhs = {0};
-        lai_object_t rhs = {0};
+        lai_variable_t lhs = {0};
+        lai_variable_t rhs = {0};
         lai_exec_get_integer(state, &operands[0], &lhs);
         lai_exec_get_integer(state, &operands[1], &rhs);
 
@@ -383,8 +383,8 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
     }
     case LGREATER_OP:
     {
-        lai_object_t lhs = {0};
-        lai_object_t rhs = {0};
+        lai_variable_t lhs = {0};
+        lai_variable_t rhs = {0};
         lai_exec_get_integer(state, &operands[0], &lhs);
         lai_exec_get_integer(state, &operands[1], &rhs);
 
@@ -394,8 +394,8 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
     }
     case INDEX_OP:
     {
-        lai_object_t object = {0};
-        lai_object_t index = {0};
+        lai_variable_t object = {0};
+        lai_variable_t index = {0};
         lai_exec_get_objectref(state, &operands[0], &object);
         lai_exec_get_integer(state, &operands[1], &index);
         int n = index.integer;
@@ -437,7 +437,7 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
     }
     case DEREF_OP:
     {
-        lai_object_t ref = {0};
+        lai_variable_t ref = {0};
         lai_exec_get_objectref(state, &operands[0], &ref);
 
         switch (ref.type) {
@@ -464,7 +464,7 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
     }
     case SIZEOF_OP:
     {
-        lai_object_t object = {0};
+        lai_variable_t object = {0};
         lai_exec_get_objectref(state, &operands[0], &object);
 
         switch (object.type) {
@@ -492,7 +492,7 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
         struct lai_operand *target = &operands[1];
 
         // TODO: The resolution code should be shared with REF_OP.
-        lai_object_t ref = {0};
+        lai_variable_t ref = {0};
         switch (operand->tag) {
             case LAI_UNRESOLVED_NAME:
             {
@@ -663,7 +663,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             int k = state->opstack_ptr - item->opstack_frame;
 //            lai_debug("got %d parameters", k);
             if (!item->op_arg_modes[k]) {
-                lai_object_t result = {0};
+                lai_variable_t result = {0};
                 struct lai_operand *operands = lai_exec_get_opstack(state, item->opstack_frame);
                 lai_exec_reduce_op(item->op_opcode, state, operands, &result);
                 lai_exec_pop_opstack(state, k);
@@ -685,7 +685,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             if (state->pc == item->loop_pred) {
                 // We are at the beginning of a loop. We check the predicate; if it is false,
                 // we jump to the end of the loop and remove the stack item.
-                lai_object_t predicate = {0};
+                lai_variable_t predicate = {0};
                 lai_eval_operand(&predicate, state, amls, method);
                 if (!predicate.integer) {
                     state->pc = item->loop_end;
@@ -784,8 +784,8 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
                     if (debug_opcodes)
                         lai_debug("parsing invocation %s [@ %d]", debug_name, opcode_pc);
 
-                    lai_object_t args[7];
-                    memset(args, 0, sizeof(lai_object_t) * 7);
+                    lai_variable_t args[7];
+                    memset(args, 0, sizeof(lai_variable_t) * 7);
 
                     lai_state_t nested_state;
                     lai_init_state(&nested_state);
@@ -793,7 +793,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
                     for(int i = 0; i < argc; i++)
                         lai_eval_operand(&args[i], state, amls, method);
 
-                    lai_object_t result = {0};
+                    lai_variable_t result = {0};
                     lai_exec_method(handle, &nested_state, argc, args);
                     lai_move_object(&result, &nested_state.retvalue);
                     lai_finalize_state(&nested_state);
@@ -938,10 +938,10 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             state->pc += lai_parse_pkgsize(method + state->pc, &encoded_size);
 
             // The size of the buffer in bytes.
-            lai_object_t buffer_size = {0};
+            lai_variable_t buffer_size = {0};
             lai_eval_operand(&buffer_size, state, amls, method);
 
-            lai_object_t result = {0};
+            lai_variable_t result = {0};
             if (lai_create_buffer(&result, buffer_size.integer))
                  lai_panic("failed to allocate memory for AML buffer");
 
@@ -998,7 +998,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
         case RETURN_OP:
         {
             state->pc++;
-            lai_object_t result = {0};
+            lai_variable_t result = {0};
             lai_eval_operand(&result, state, amls, method);
 
             // Find the last LAI_METHOD_CONTEXT_STACKITEM on the stack.
@@ -1088,7 +1088,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             state->pc += lai_parse_pkgsize(method + state->pc, &if_size);
 
             // Evaluate the predicate
-            lai_object_t predicate = {0};
+            lai_variable_t predicate = {0};
             lai_eval_operand(&predicate, state, amls, method);
 
             lai_stackitem_t *cond_item = lai_exec_push_stack_or_die(state);
@@ -1325,8 +1325,8 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             state->pc++;
 
             // Now, parse the offset and length of the opregion.
-            lai_object_t disp = {0};
-            lai_object_t length = {0};
+            lai_variable_t disp = {0};
+            lai_variable_t length = {0};
             lai_eval_operand(&disp, state, amls, method);
             lai_eval_operand(&length, state, amls, method);
 
@@ -1704,7 +1704,7 @@ int lai_populate(lai_nsnode_t *parent, struct lai_aml_segment *amls, lai_state_t
 }
 
 // lai_exec_method(): Executes a control method.
-int lai_exec_method(lai_nsnode_t *method, lai_state_t *state, int n, lai_object_t *args) {
+int lai_exec_method(lai_nsnode_t *method, lai_state_t *state, int n, lai_variable_t *args) {
     // Check for OS-defined methods.
     // TODO: Verify the number of argument to the overridden method.
     if (method->method_override)
@@ -1763,7 +1763,7 @@ int lai_exec_method(lai_nsnode_t *method, lai_state_t *state, int n, lai_object_
     if (state->opstack_ptr != 1) // This would be an internal error.
         lai_panic("expected exactly one return value after method invocation");
     struct lai_operand *result = lai_exec_get_opstack(state, 0);
-    lai_object_t objectref = {0};
+    lai_variable_t objectref = {0};
     lai_exec_get_objectref(state, result, &objectref);
     lai_clone_object(&state->retvalue, &objectref);
     lai_free_object(&objectref);
@@ -1772,8 +1772,8 @@ int lai_exec_method(lai_nsnode_t *method, lai_state_t *state, int n, lai_object_
 }
 
 // lai_eval_args(): Evaluates a node of the ACPI namespace (including control methods).
-int lai_eval_args(lai_object_t *result, lai_nsnode_t *handle, lai_state_t *state,
-        int n, lai_object_t *args) {
+int lai_eval_args(lai_variable_t *result, lai_nsnode_t *handle, lai_state_t *state,
+        int n, lai_variable_t *args) {
     LAI_ENSURE(handle);
     LAI_ENSURE(handle->type != LAI_NAMESPACE_ALIAS);
 
@@ -1788,8 +1788,8 @@ int lai_eval_args(lai_object_t *result, lai_nsnode_t *handle, lai_state_t *state
             return 0;
         case LAI_NAMESPACE_METHOD: {
             // We take a copy of the arguments as lai_exec_method() will move them.
-            lai_object_t args_copy[7];
-            memset(args_copy, 0, sizeof(lai_object_t) * 7);
+            lai_variable_t args_copy[7];
+            memset(args_copy, 0, sizeof(lai_variable_t) * 7);
 
             for (int i = 0; i < n; i++)
                 lai_clone_object(&args_copy[i], &args[i]);
@@ -1805,14 +1805,14 @@ int lai_eval_args(lai_object_t *result, lai_nsnode_t *handle, lai_state_t *state
     }
 }
 
-int lai_eval_vargs(lai_object_t *result, lai_nsnode_t *handle, lai_state_t *state, va_list vl) {
+int lai_eval_vargs(lai_variable_t *result, lai_nsnode_t *handle, lai_state_t *state, va_list vl) {
     int n = 0;
-    lai_object_t args[7];
-    memset(args, 0, sizeof(lai_object_t) * 7);
+    lai_variable_t args[7];
+    memset(args, 0, sizeof(lai_variable_t) * 7);
 
     for (;;) {
         LAI_ENSURE(n < 7 && "ACPI supports at most 7 arguments");
-        lai_object_t *object = va_arg(vl, lai_object_t *);
+        lai_variable_t *object = va_arg(vl, lai_variable_t *);
         if (!object)
             break;
         lai_assign_object(&args[n++], object);
@@ -1821,7 +1821,7 @@ int lai_eval_vargs(lai_object_t *result, lai_nsnode_t *handle, lai_state_t *stat
     return lai_eval_args(result, handle, state, n, args);
 }
 
-int lai_eval_largs(lai_object_t *result, lai_nsnode_t *handle, lai_state_t *state, ...) {
+int lai_eval_largs(lai_variable_t *result, lai_nsnode_t *handle, lai_state_t *state, ...) {
     va_list vl;
     va_start(vl, state);
     int e = lai_eval_vargs(result, handle, state, vl);
@@ -1829,7 +1829,7 @@ int lai_eval_largs(lai_object_t *result, lai_nsnode_t *handle, lai_state_t *stat
     return e;
 }
 
-int lai_eval(lai_object_t *result, lai_nsnode_t *handle, lai_state_t *state) {
+int lai_eval(lai_variable_t *result, lai_nsnode_t *handle, lai_state_t *state) {
     return lai_eval_args(result, handle, state, 0, NULL);
 }
 
@@ -1837,7 +1837,7 @@ int lai_eval(lai_object_t *result, lai_nsnode_t *handle, lai_state_t *state) {
 // TODO: Eventually, we want to remove this function. However, this requires refactoring
 //       lai_exec_run() to avoid all kinds of recursion.
 
-static void lai_eval_operand(lai_object_t *destination, lai_state_t *state,
+static void lai_eval_operand(lai_variable_t *destination, lai_state_t *state,
         struct lai_aml_segment *amls, uint8_t *code) {
     int opstack = state->opstack_ptr;
 
@@ -1852,7 +1852,7 @@ static void lai_eval_operand(lai_object_t *destination, lai_state_t *state,
     if (state->opstack_ptr != opstack + 1) // This would be an internal error.
         lai_panic("expected exactly one opstack item after operand evaluation");
     struct lai_operand *result = lai_exec_get_opstack(state, opstack);
-    lai_object_t objectref = {0};
+    lai_variable_t objectref = {0};
     lai_exec_get_objectref(state, result, &objectref);
     lai_clone_object(destination, &objectref);
     lai_free_object(&objectref);
@@ -1866,7 +1866,7 @@ static void lai_eval_operand(lai_object_t *destination, lai_state_t *state,
 void lai_exec_sleep(struct lai_aml_segment *amls, void *code, lai_state_t *state) {
     state->pc += 2; // Skip EXTOP_PREFIX and SLEEP_OP.
 
-    lai_object_t time = {0};
+    lai_variable_t time = {0};
     lai_eval_operand(&time, state, amls, code);
 
     if (!time.integer)

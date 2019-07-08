@@ -34,7 +34,7 @@ size_t lai_read_resource(lai_nsnode_t *device, acpi_resource_t *dest) {
 	if (!crs_handle)
 		return 0;
 
-    lai_object_t buffer = {0};
+    lai_variable_t buffer = {0};
     int status = lai_eval(&buffer, crs_handle, &state);
     if (status)
         return 0;

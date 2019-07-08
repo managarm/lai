@@ -51,7 +51,7 @@ size_t lai_parse_pkgsize(uint8_t *data, size_t *destination) {
     return (size_t)(bytecount + 1);
 }
 
-int lai_eval_package(lai_object_t *package, size_t index, lai_object_t *destination) {
+int lai_eval_package(lai_variable_t *package, size_t index, lai_variable_t *destination) {
     if (package->type != LAI_PACKAGE) {
         lai_warn("attempt to evaluate non-package object.");
         return 1;
@@ -87,7 +87,7 @@ uint8_t char_to_hex(char character) {
     return 0;
 }
 
-void lai_eisaid(lai_object_t *object, char *id) {
+void lai_eisaid(lai_variable_t *object, char *id) {
     size_t n = lai_strlen(id);
     if (lai_strlen(id) != 7) {
         if(lai_create_string(object, n))

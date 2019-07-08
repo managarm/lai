@@ -10,7 +10,7 @@
 #include "exec_impl.h"
 #include "ns_impl.h"
 
-void lai_write_buffer(lai_nsnode_t *, lai_object_t *);
+void lai_write_buffer(lai_nsnode_t *, lai_variable_t *);
 
 /* ACPI Control Method Execution */
 /* Type2Opcode := DefAcquire | DefAdd | DefAnd | DefBuffer | DefConcat |
@@ -25,7 +25,7 @@ void lai_write_buffer(lai_nsnode_t *, lai_object_t *);
    DefToDecimalString | DefToHexString | DefToInteger | DefToString |
    DefWait | DefXOr | UserTermObj */
 
-int lai_create_string(lai_object_t *object, size_t length) {
+int lai_create_string(lai_variable_t *object, size_t length) {
     object->type = LAI_STRING;
     object->string_ptr = laihost_malloc(sizeof(struct lai_string_head) + length + 1);
     if (!object->string_ptr)
@@ -35,7 +35,7 @@ int lai_create_string(lai_object_t *object, size_t length) {
     return 0;
 }
 
-int lai_create_c_string(lai_object_t *object, const char *s) {
+int lai_create_c_string(lai_variable_t *object, const char *s) {
     size_t n = lai_strlen(s);
     int e;
     e = lai_create_string(object, n);
@@ -45,7 +45,7 @@ int lai_create_c_string(lai_object_t *object, const char *s) {
     return 0;
 }
 
-int lai_create_buffer(lai_object_t *object, size_t size) {
+int lai_create_buffer(lai_variable_t *object, size_t size) {
     object->type = LAI_BUFFER;
     object->buffer_ptr = laihost_malloc(sizeof(struct lai_buffer_head) + size);
     if (!object->buffer_ptr)
@@ -56,29 +56,29 @@ int lai_create_buffer(lai_object_t *object, size_t size) {
     return 0;
 }
 
-int lai_create_pkg(lai_object_t *object, size_t n) {
+int lai_create_pkg(lai_variable_t *object, size_t n) {
     object->type = LAI_PACKAGE;
     object->pkg_ptr = laihost_malloc(sizeof(struct lai_pkg_head)
-            + n * sizeof(lai_object_t));
+            + n * sizeof(lai_variable_t));
     if (!object->pkg_ptr)
         return 1;
     object->pkg_ptr->rc = 1;
     object->pkg_ptr->size = n;
-    memset(object->pkg_ptr->elems, 0, n * sizeof(lai_object_t));
+    memset(object->pkg_ptr->elems, 0, n * sizeof(lai_variable_t));
     return 0;
 }
 
 // laihost_free_package(): Frees a package object and all its children
-// Param:   lai_object_t *object
+// Param:   lai_variable_t *object
 // Return:  Nothing
 
-static void laihost_free_package(lai_object_t *object) {
+static void laihost_free_package(lai_variable_t *object) {
     for(int i = 0; i < object->pkg_ptr->size; i++)
         lai_free_object(&object->pkg_ptr->elems[i]);
     laihost_free(object->pkg_ptr);
 }
 
-void lai_free_object(lai_object_t *object) {
+void lai_free_object(lai_variable_t *object) {
     switch (object->type) {
         case LAI_STRING:
         case LAI_STRING_INDEX:
@@ -97,12 +97,12 @@ void lai_free_object(lai_object_t *object) {
             break;
     }
 
-    memset(object, 0, sizeof(lai_object_t));
+    memset(object, 0, sizeof(lai_variable_t));
 }
 
 // Helper function for lai_move_object() and lai_clone_object().
-void lai_swap_object(lai_object_t *first, lai_object_t *second) {
-    lai_object_t temp = *first;
+void lai_swap_object(lai_variable_t *first, lai_variable_t *second) {
+    lai_variable_t temp = *first;
     *first = *second;
     *second = temp;
 }
@@ -111,17 +111,17 @@ void lai_swap_object(lai_object_t *first, lai_object_t *second) {
 //                     the pointers are exchanged and the source object is reset to zero.
 // Param & Return: See lai_clone_object().
 
-void lai_move_object(lai_object_t *destination, lai_object_t *source) {
+void lai_move_object(lai_variable_t *destination, lai_variable_t *source) {
     // Move-by-swap idiom. This handles move-to-self operations correctly.
-    lai_object_t temp = {0};
+    lai_variable_t temp = {0};
     lai_swap_object(&temp, source);
     lai_swap_object(&temp, destination);
     lai_free_object(&temp);
 }
 
-void lai_assign_object(lai_object_t *dest, lai_object_t *src) {
+void lai_assign_object(lai_variable_t *dest, lai_variable_t *src) {
     // Make a local shallow copy of the AML object.
-    lai_object_t temp = *src;
+    lai_variable_t temp = *src;
     switch (src->type) {
         case LAI_STRING:
         case LAI_STRING_INDEX:
@@ -140,27 +140,27 @@ void lai_assign_object(lai_object_t *dest, lai_object_t *src) {
     lai_move_object(dest, &temp);
 }
 
-size_t lai_exec_string_length(lai_object_t *str) {
+size_t lai_exec_string_length(lai_variable_t *str) {
     LAI_ENSURE(str->type == LAI_STRING);
     return lai_strlen(str->string_ptr->content);
 }
 
 // Note: This function exists to enable better GC and proper locking in the future.
-void lai_exec_pkg_var_load(lai_object_t *out, struct lai_pkg_head *head, size_t i) {
+void lai_exec_pkg_var_load(lai_variable_t *out, struct lai_pkg_head *head, size_t i) {
     lai_assign_object(out, &head->elems[i]);
 }
 
 // Note: This function exists to enable better GC and proper locking in the future.
-void lai_exec_pkg_var_store(lai_object_t *in, struct lai_pkg_head *head, size_t i) {
+void lai_exec_pkg_var_store(lai_variable_t *in, struct lai_pkg_head *head, size_t i) {
     lai_assign_object(&head->elems[i], in);
 }
 
 // lai_clone_buffer(): Clones a buffer object
-// Param:    lai_object_t *dest - destination
-// Param:    lai_object_t *source - source
+// Param:    lai_variable_t *dest - destination
+// Param:    lai_variable_t *source - source
 // Return:   Nothing
 
-static void lai_clone_buffer(lai_object_t *dest, lai_object_t *source) {
+static void lai_clone_buffer(lai_variable_t *dest, lai_variable_t *source) {
     size_t size = lai_exec_buffer_size(source);
     if (lai_create_buffer(dest, size))
         lai_panic("unable to allocate memory for buffer object.");
@@ -168,11 +168,11 @@ static void lai_clone_buffer(lai_object_t *dest, lai_object_t *source) {
 }
 
 // lai_clone_string(): Clones a string object
-// Param:    lai_object_t *dest - destination
-// Param:    lai_object_t *source - source
+// Param:    lai_variable_t *dest - destination
+// Param:    lai_variable_t *source - source
 // Return:   Nothing
 
-static void lai_clone_string(lai_object_t *dest, lai_object_t *source) {
+static void lai_clone_string(lai_variable_t *dest, lai_variable_t *source) {
     size_t n = lai_exec_string_length(source);
     if (lai_create_string(dest, n))
         lai_panic("unable to allocate memory for string object.");
@@ -180,11 +180,11 @@ static void lai_clone_string(lai_object_t *dest, lai_object_t *source) {
 }
 
 // lai_clone_package(): Clones a package object
-// Param:    lai_object_t *dest - destination
-// Param:    lai_object_t *source - source
+// Param:    lai_variable_t *dest - destination
+// Param:    lai_variable_t *source - source
 // Return:   Nothing
 
-static void lai_clone_package(lai_object_t *dest, lai_object_t *src) {
+static void lai_clone_package(lai_variable_t *dest, lai_variable_t *src) {
     size_t n = src->pkg_ptr->size;
     if (lai_create_pkg(dest, n))
         lai_panic("unable to allocate memory for package object.");
@@ -193,13 +193,13 @@ static void lai_clone_package(lai_object_t *dest, lai_object_t *src) {
 }
 
 // lai_clone_object(): Copies an object
-// Param:    lai_object_t *dest - destination
-// Param:    lai_object_t *source - source
+// Param:    lai_variable_t *dest - destination
+// Param:    lai_variable_t *source - source
 // Return:   Nothing
 
-void lai_clone_object(lai_object_t *dest, lai_object_t *source) {
+void lai_clone_object(lai_variable_t *dest, lai_variable_t *source) {
     // Clone into a temporary object.
-    lai_object_t temp = {0};
+    lai_variable_t temp = {0};
     switch (source->type) {
         case LAI_STRING:
             lai_clone_string(&temp, source);
@@ -222,7 +222,7 @@ void lai_clone_object(lai_object_t *dest, lai_object_t *source) {
     }
 }
 
-static void lai_load_ns(lai_nsnode_t *src, lai_object_t *object) {
+static void lai_load_ns(lai_nsnode_t *src, lai_variable_t *object) {
     switch (src->type) {
         case LAI_NAMESPACE_NAME:
             lai_assign_object(object, &src->object);
@@ -240,7 +240,7 @@ static void lai_load_ns(lai_nsnode_t *src, lai_object_t *object) {
     }
 }
 
-static void lai_store_ns(lai_nsnode_t *target, lai_object_t *object) {
+static void lai_store_ns(lai_nsnode_t *target, lai_variable_t *object) {
     switch (target->type) {
         case LAI_NAMESPACE_NAME:
             lai_assign_object(&target->object, object);
@@ -259,7 +259,7 @@ static void lai_store_ns(lai_nsnode_t *target, lai_object_t *object) {
 
 // Loads from a name.
 // Returns a view of an existing object and not a clone of the object.
-void lai_load(lai_state_t *state, struct lai_operand *src, lai_object_t *object) {
+void lai_load(lai_state_t *state, struct lai_operand *src, lai_variable_t *object) {
     switch (src->tag) {
         case LAI_ARG_NAME:
             LAI_ENSURE(state->invocation);
@@ -289,7 +289,7 @@ void lai_load(lai_state_t *state, struct lai_operand *src, lai_object_t *object)
 }
 
 // lai_store(): Stores a copy of the object to a reference.
-void lai_store(lai_state_t *state, struct lai_operand *dest, lai_object_t *object) {
+void lai_store(lai_state_t *state, struct lai_operand *dest, lai_variable_t *object) {
     // First, handle stores to AML references (returned by Index() and friends).
     if (dest->tag == LAI_OPERAND_OBJECT) {
         switch (dest->object.type) {
@@ -304,7 +304,7 @@ void lai_store(lai_state_t *state, struct lai_operand *dest, lai_object_t *objec
                 break;
             }
             case LAI_PACKAGE_INDEX: {
-                lai_object_t copy = {0};
+                lai_variable_t copy = {0};
                 lai_assign_object(&copy, object);
                 lai_exec_pkg_var_store(&copy, dest->object.pkg_ptr, dest->object.integer);
                 lai_free_object(&copy);
@@ -366,7 +366,7 @@ void lai_store(lai_state_t *state, struct lai_operand *dest, lai_object_t *objec
     }
 }
 
-static enum lai_object_type lai_object_type_of_objref(lai_object_t *object) {
+static enum lai_variable_type lai_variable_type_of_objref(lai_variable_t *object) {
     switch (object->type) {
         case LAI_INTEGER:
             return LAI_TYPE_INTEGER;
@@ -378,30 +378,30 @@ static enum lai_object_type lai_object_type_of_objref(lai_object_t *object) {
             return LAI_TYPE_PACKAGE;
 
         default:
-            lai_panic("unexpected object type %d in lai_object_type_of_objref()", object->type);
+            lai_panic("unexpected object type %d in lai_variable_type_of_objref()", object->type);
     }
 }
 
-static enum lai_object_type lai_object_type_of_node(lai_nsnode_t *handle) {
+static enum lai_variable_type lai_variable_type_of_node(lai_nsnode_t *handle) {
     switch (handle->type) {
         case LAI_NAMESPACE_DEVICE:
             return LAI_TYPE_DEVICE;
 
         default:
-            lai_panic("unexpected node type %d in lai_object_type_of_node()", handle->type);
+            lai_panic("unexpected node type %d in lai_variable_type_of_node()", handle->type);
     }
 }
 
-enum lai_object_type lai_obj_get_type(lai_object_t *object) {
+enum lai_variable_type lai_obj_get_type(lai_variable_t *object) {
     switch (object->type) {
         case LAI_INTEGER:
         case LAI_STRING:
         case LAI_BUFFER:
         case LAI_PACKAGE:
-            return lai_object_type_of_objref(object);
+            return lai_variable_type_of_objref(object);
 
         case LAI_HANDLE:
-            return lai_object_type_of_node(object->handle);
+            return lai_variable_type_of_node(object->handle);
         case LAI_LAZY_HANDLE: {
             struct lai_amlname amln;
             lai_amlname_parse(&amln, object->unres_aml);
@@ -409,7 +409,7 @@ enum lai_object_type lai_obj_get_type(lai_object_t *object) {
             lai_nsnode_t *handle = lai_do_resolve(object->unres_ctx_handle, &amln);
             if(!handle)
                 lai_panic("undefined reference %s", lai_stringify_amlname(&amln));
-            return lai_object_type_of_node(handle);
+            return lai_variable_type_of_node(handle);
         }
 
         default:
@@ -421,8 +421,8 @@ enum lai_object_type lai_obj_get_type(lai_object_t *object) {
 // This is the access method used by Store().
 // Returns immediate objects and indices as-is (i.e., without load from a name).
 // Returns a view of an existing object and not a clone of the object.
-void lai_exec_get_objectref(lai_state_t *state, struct lai_operand *src, lai_object_t *object) {
-    lai_object_t temp = {0};
+void lai_exec_get_objectref(lai_state_t *state, struct lai_operand *src, lai_variable_t *object) {
+    lai_variable_t temp = {0};
     if (src->tag == LAI_OPERAND_OBJECT) {
         lai_assign_object(&temp, &src->object);
     } else {
@@ -433,8 +433,8 @@ void lai_exec_get_objectref(lai_state_t *state, struct lai_operand *src, lai_obj
 
 // Load an integer.
 // Returns immediate objects as-is.
-void lai_exec_get_integer(lai_state_t *state, struct lai_operand *src, lai_object_t *object) {
-    lai_object_t temp = {0};
+void lai_exec_get_integer(lai_state_t *state, struct lai_operand *src, lai_variable_t *object) {
+    lai_variable_t temp = {0};
     if (src->tag == LAI_OPERAND_OBJECT) {
         lai_assign_object(&temp, &src->object);
     } else {
@@ -445,7 +445,7 @@ void lai_exec_get_integer(lai_state_t *state, struct lai_operand *src, lai_objec
     lai_move_object(object, &temp);
 }
 
-lai_api_error_t lai_obj_get_integer(lai_object_t *object, uint64_t *out) {
+lai_api_error_t lai_obj_get_integer(lai_variable_t *object, uint64_t *out) {
     switch (object->type) {
         case LAI_INTEGER:
             *out = object->integer;
@@ -458,7 +458,7 @@ lai_api_error_t lai_obj_get_integer(lai_object_t *object, uint64_t *out) {
     }
 }
 
-lai_api_error_t lai_obj_get_handle(lai_object_t *object, lai_nsnode_t **out) {
+lai_api_error_t lai_obj_get_handle(lai_variable_t *object, lai_nsnode_t **out) {
     switch (object->type) {
         case LAI_HANDLE:
             *out = object->handle;
@@ -482,7 +482,7 @@ lai_api_error_t lai_obj_get_handle(lai_object_t *object, lai_nsnode_t **out) {
 }
 
 // lai_write_buffer(): Writes to a BufferField.
-void lai_write_buffer(lai_nsnode_t *handle, lai_object_t *source) {
+void lai_write_buffer(lai_nsnode_t *handle, lai_variable_t *source) {
     lai_nsnode_t *buffer_handle = handle->bf_node;
 
     uint64_t value = source->integer;

@@ -15,12 +15,12 @@
 #include "libc.h"
 #include "opregion.h"
 
-void lai_read_field(lai_object_t *, lai_nsnode_t *);
-void lai_write_field(lai_nsnode_t *, lai_object_t *);
-void lai_read_indexfield(lai_object_t *, lai_nsnode_t *);
-void lai_write_indexfield(lai_nsnode_t *, lai_object_t *);
+void lai_read_field(lai_variable_t *, lai_nsnode_t *);
+void lai_write_field(lai_nsnode_t *, lai_variable_t *);
+void lai_read_indexfield(lai_variable_t *, lai_nsnode_t *);
+void lai_write_indexfield(lai_nsnode_t *, lai_variable_t *);
 
-void lai_read_opregion(lai_object_t *destination, lai_nsnode_t *field) {
+void lai_read_opregion(lai_variable_t *destination, lai_nsnode_t *field) {
     if (field->type == LAI_NAMESPACE_FIELD)
         return lai_read_field(destination, field);
 
@@ -30,7 +30,7 @@ void lai_read_opregion(lai_object_t *destination, lai_nsnode_t *field) {
     lai_panic("undefined field read: %s", lai_stringify_node_path(field));
 }
 
-void lai_write_opregion(lai_nsnode_t *field, lai_object_t *source) {
+void lai_write_opregion(lai_nsnode_t *field, lai_variable_t *source) {
     if (field->type == LAI_NAMESPACE_FIELD)
         return lai_write_field(field, source);
 
@@ -40,7 +40,7 @@ void lai_write_opregion(lai_nsnode_t *field, lai_object_t *source) {
     lai_panic("undefined field write: %s", lai_stringify_node_path(field));
 }
 
-void lai_read_field(lai_object_t *destination, lai_nsnode_t *field) {
+void lai_read_field(lai_variable_t *destination, lai_nsnode_t *field) {
     lai_nsnode_t *opregion = field->fld_region_node;
 
     uint64_t offset, value, mask;
@@ -52,8 +52,8 @@ void lai_read_field(lai_object_t *destination, lai_nsnode_t *field) {
     void *mmio;
 
     // these are for PCI
-    lai_object_t bus_number = {0};
-    lai_object_t address_number = {0};
+    lai_variable_t bus_number = {0};
+    lai_variable_t address_number = {0};
     int bbn_result = 0; // When _BBN is not present, we assume PCI bus 0.
     int adr_result = 0; // When _ADR is not present, again, default to zero.
     size_t pci_byte_offset;
@@ -181,7 +181,7 @@ void lai_read_field(lai_object_t *destination, lai_nsnode_t *field) {
     destination->integer = value & mask;
 }
 
-void lai_write_field(lai_nsnode_t *field, lai_object_t *source) {
+void lai_write_field(lai_nsnode_t *field, lai_variable_t *source) {
     // determine the flags we need in order to write
     lai_nsnode_t *opregion = field->fld_region_node;
 
@@ -194,8 +194,8 @@ void lai_write_field(lai_nsnode_t *field, lai_object_t *source) {
     void *mmio;
 
     // these are for PCI
-    lai_object_t bus_number = {0};
-    lai_object_t address_number = {0};
+    lai_variable_t bus_number = {0};
+    lai_variable_t address_number = {0};
     int bbn_result = 0; // When _BBN is not present, we assume PCI bus 0.
     int adr_result = 0; // When _ADR is not present, again, default to zero.
     size_t pci_byte_offset;
@@ -397,11 +397,11 @@ void lai_write_field(lai_nsnode_t *field, lai_object_t *source) {
     }
 }
 
-void lai_read_indexfield(lai_object_t *dest, lai_nsnode_t *idxf) {
+void lai_read_indexfield(lai_variable_t *dest, lai_nsnode_t *idxf) {
     lai_nsnode_t *index_field = idxf->idxf_index_node;
     lai_nsnode_t *data_field = idxf->idxf_data_node;
 
-    lai_object_t index = {0};
+    lai_variable_t index = {0};
     index.type = LAI_INTEGER;
     index.integer = idxf->idxf_offset / 8; // Always byte-aligned.
 
@@ -409,11 +409,11 @@ void lai_read_indexfield(lai_object_t *dest, lai_nsnode_t *idxf) {
     lai_read_field(dest, data_field); // Read data register.
 }
 
-void lai_write_indexfield(lai_nsnode_t *idxf, lai_object_t *src) {
+void lai_write_indexfield(lai_nsnode_t *idxf, lai_variable_t *src) {
     lai_nsnode_t *index_field = idxf->idxf_index_node;
     lai_nsnode_t *data_field = idxf->idxf_data_node;
 
-    lai_object_t index = {0};
+    lai_variable_t index = {0};
     index.type = LAI_INTEGER;
     index.integer = idxf->idxf_offset / 8; // Always byte-aligned.
 

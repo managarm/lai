@@ -43,9 +43,9 @@ int lai_enter_sleep(uint8_t sleep_state)
         return 1;
     }
 
-    lai_object_t package = {0};
-    lai_object_t slp_typa = {0};
-    lai_object_t slp_typb = {0};
+    lai_variable_t package = {0};
+    lai_variable_t slp_typa = {0};
+    lai_variable_t slp_typb = {0};
     int eval_status;
     eval_status = lai_eval(&package, handle, &state);
     if(eval_status) {
@@ -63,7 +63,7 @@ int lai_enter_sleep(uint8_t sleep_state)
         lai_init_state(&state);
 
         // pass the sleeping type as an argument
-        lai_object_t sleep_object = {0};
+        lai_variable_t sleep_object = {0};
         sleep_object.type = LAI_INTEGER;
         sleep_object.integer = sleep_state & 0xFF;
 
@@ -78,7 +78,7 @@ int lai_enter_sleep(uint8_t sleep_state)
         lai_init_state(&state);
 
         // pass the sleeping type as an argument
-        lai_object_t sleep_object = {0};
+        lai_variable_t sleep_object = {0};
         sleep_object.type = LAI_INTEGER;
         sleep_object.integer = sleep_state & 0xFF;
 
