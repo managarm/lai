@@ -481,43 +481,32 @@ lai_api_error_t lai_obj_get_handle(lai_object_t *object, lai_nsnode_t **out) {
     }
 }
 
-// lai_write_buffer(): Writes to a Buffer Field
-// Param:    lai_nsnode_t *handle - handle of buffer field
-// Param:    lai_object_t *source - object to write
-// Return:    Nothing
-
+// lai_write_buffer(): Writes to a BufferField.
 void lai_write_buffer(lai_nsnode_t *handle, lai_object_t *source) {
     lai_nsnode_t *buffer_handle = handle->bf_node;
 
     uint64_t value = source->integer;
 
-    uint64_t offset = handle->bf_offset / 8;
-    uint64_t bitshift = handle->bf_offset % 8;
+    // Offset that we are writing to, in bytes.
+    size_t offset = handle->bf_offset;
+    size_t size = handle->bf_size;
+    uint8_t *data = lai_exec_buffer_access(&buffer_handle->object);
 
-    value <<= bitshift;
+    int n = 0; // Number of bits that have been written.
+    while (n < size) {
+        // First bit (of the current byte) that will be overwritten.
+        int bit = (offset + n) & 7;
 
-    uint64_t mask = 1;
-    mask <<= bitshift;
-    mask--;
-    mask <<= bitshift;
+        // Number of bits (of the current byte) that will be overwritten.
+        int m = size - n;
+        if (m > (8 - bit))
+            m = 8 - bit;
+        LAI_ENSURE(m); // Write at least one bit.
 
-    // TODO: This function does unaligned access. That needs to be fixed!
-    uint8_t *byte = (uint8_t*)(lai_exec_buffer_access(&buffer_handle->object) + offset);
-    uint16_t *word = (uint16_t*)(lai_exec_buffer_access(&buffer_handle->object) + offset);
-    uint32_t *dword = (uint32_t*)(lai_exec_buffer_access(&buffer_handle->object) + offset);
-    uint64_t *qword = (uint64_t*)(lai_exec_buffer_access(&buffer_handle->object) + offset);
+        uint8_t mask = (1 << m) - 1;
+        data[(offset + n) >> 3] &= ~(mask << bit);
+        data[(offset + n) >> 3] |= ((value >> n) & mask) << bit;
 
-    if (handle->bf_size <= 8) {
-        byte[0] &= (uint8_t)mask;
-        byte[0] |= (uint8_t)value;
-    } else if (handle->bf_size <= 16) {
-        word[0] &= (uint16_t)mask;
-        word[0] |= (uint16_t)value;
-    } else if (handle->bf_size <= 32) {
-        dword[0] &= (uint32_t)mask;
-        dword[0] |= (uint32_t)value;
-    } else if (handle->bf_size <= 64) {
-        qword[0] &= mask;
-        qword[0] |= value;
+        n += m;
     }
 }
