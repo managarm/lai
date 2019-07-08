@@ -366,7 +366,7 @@ void lai_store(lai_state_t *state, struct lai_operand *dest, lai_variable_t *obj
     }
 }
 
-static enum lai_variable_type lai_variable_type_of_objref(lai_variable_t *object) {
+static enum lai_object_type lai_object_type_of_objref(lai_variable_t *object) {
     switch (object->type) {
         case LAI_INTEGER:
             return LAI_TYPE_INTEGER;
@@ -378,30 +378,30 @@ static enum lai_variable_type lai_variable_type_of_objref(lai_variable_t *object
             return LAI_TYPE_PACKAGE;
 
         default:
-            lai_panic("unexpected object type %d in lai_variable_type_of_objref()", object->type);
+            lai_panic("unexpected object type %d in lai_object_type_of_objref()", object->type);
     }
 }
 
-static enum lai_variable_type lai_variable_type_of_node(lai_nsnode_t *handle) {
+static enum lai_object_type lai_object_type_of_node(lai_nsnode_t *handle) {
     switch (handle->type) {
         case LAI_NAMESPACE_DEVICE:
             return LAI_TYPE_DEVICE;
 
         default:
-            lai_panic("unexpected node type %d in lai_variable_type_of_node()", handle->type);
+            lai_panic("unexpected node type %d in lai_object_type_of_node()", handle->type);
     }
 }
 
-enum lai_variable_type lai_obj_get_type(lai_variable_t *object) {
+enum lai_object_type lai_obj_get_type(lai_variable_t *object) {
     switch (object->type) {
         case LAI_INTEGER:
         case LAI_STRING:
         case LAI_BUFFER:
         case LAI_PACKAGE:
-            return lai_variable_type_of_objref(object);
+            return lai_object_type_of_objref(object);
 
         case LAI_HANDLE:
-            return lai_variable_type_of_node(object->handle);
+            return lai_object_type_of_node(object->handle);
         case LAI_LAZY_HANDLE: {
             struct lai_amlname amln;
             lai_amlname_parse(&amln, object->unres_aml);
@@ -409,7 +409,7 @@ enum lai_variable_type lai_obj_get_type(lai_variable_t *object) {
             lai_nsnode_t *handle = lai_do_resolve(object->unres_ctx_handle, &amln);
             if(!handle)
                 lai_panic("undefined reference %s", lai_stringify_amlname(&amln));
-            return lai_variable_type_of_node(handle);
+            return lai_object_type_of_node(handle);
         }
 
         default:

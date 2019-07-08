@@ -366,7 +366,7 @@ lai_nsnode_t *lai_ns_iterate(struct lai_ns_iterator *);
 
 // Access and manipulation of lai_variable_t.
 
-enum lai_variable_type {
+enum lai_object_type {
     LAI_TYPE_NONE,
     LAI_TYPE_INTEGER,
     LAI_TYPE_STRING,
@@ -375,7 +375,7 @@ enum lai_variable_type {
     LAI_TYPE_DEVICE,
 };
 
-enum lai_variable_type lai_obj_get_type(lai_variable_t *object);
+enum lai_object_type lai_obj_get_type(lai_variable_t *object);
 lai_api_error_t lai_obj_get_integer(lai_variable_t *, uint64_t *);
 lai_api_error_t lai_obj_get_handle(lai_variable_t *, lai_nsnode_t **);
 
