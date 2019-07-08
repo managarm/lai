@@ -161,7 +161,7 @@ static void lai_exec_reduce_node(int opcode, lai_state_t *state, struct lai_oper
                 case DWORDFIELD_OP: node->bf_size = 32; break;
                 case QWORDFIELD_OP: node->bf_size = 64; break;
             }
-            node->bf_offset = offset.integer;
+            node->bf_offset = offset.integer * 8;
 
             lai_install_nsnode(node);
             if (state->invocation)
