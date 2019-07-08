@@ -21,6 +21,16 @@
 typedef enum lai_api_error {
     LAI_ERROR_NONE,
     LAI_ERROR_TYPE_MISMATCH,
+    LAI_ERROR_NO_SUCH_NODE,
+    LAI_ERROR_EXECUTION_FAILURE,
+    LAI_ERROR_ILLEGAL_ARGUMENTS,
+
+    /* Evaluating external inputs (e.g., nodes of the ACPI namespace) returned an unexpected result.
+     * Unlike LAI_ERROR_EXECUTION_FAILURE, this error does not indicate that
+     * execution of AML failed; instead, the resulting object fails to satisfy some
+     * expectation (e.g., it is of the wrong type, has an unexpected size, or consists of
+     * unexpected contents) */
+    LAI_ERROR_UNEXPECTED_RESULT,
 } lai_api_error_t;
 
 void lai_init_state(lai_state_t *);
@@ -90,7 +100,9 @@ int lai_disable_acpi();
 uint16_t lai_get_sci_event(void);
 void lai_set_sci_event(uint16_t);
 int lai_enter_sleep(uint8_t);
+__attribute__((deprecated("use lai_pci_route_pin instead")))
 int lai_pci_route(acpi_resource_t *, uint8_t, uint8_t, uint8_t);
+lai_api_error_t lai_pci_route_pin(acpi_resource_t *, uint8_t, uint8_t, uint8_t, uint8_t);
 
 // LAI debugging functions.
 

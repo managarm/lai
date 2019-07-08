@@ -19,17 +19,22 @@
 #define PCI_PNP_ID        "PNP0A03"
 #define PCIE_PNP_ID        "PNP0A08"
 
-// This function resolves PCI IRQ routing for a specific device corresponding to
-// a given bus, slot, function combination.
 int lai_pci_route(acpi_resource_t *dest, uint8_t bus, uint8_t slot, uint8_t function) {
-    //lai_debug("attempt to resolve PCI IRQ for device %X:%X:%X", bus, slot, function);
-    LAI_CLEANUP_STATE lai_state_t state;
-    lai_init_state(&state);
 
-    // determine the interrupt pin
     uint8_t pin = (uint8_t)(laihost_pci_read(bus, slot, function, 0x3C) >> 8);
     if (!pin || pin > 4)
         return 1;
+
+    if (lai_pci_route_pin(dest, bus, slot, function, pin))
+        return 1;
+    return 0;
+}
+
+lai_api_error_t lai_pci_route_pin(acpi_resource_t *dest, uint8_t bus, uint8_t slot, uint8_t function, uint8_t pin) {
+    LAI_CLEANUP_STATE lai_state_t state;
+    lai_init_state(&state);
+
+    LAI_ENSURE(pin && pin <= 4);
 
     // PCI numbers pins from 1, but ACPI numbers them from 0. Hence we
     // subtract 1 to arrive at the correct pin number.
@@ -70,13 +75,13 @@ int lai_pci_route(acpi_resource_t *dest, uint8_t bus, uint8_t slot, uint8_t func
     }
 
     if (!handle)
-        return 1;
+        return LAI_ERROR_NO_SUCH_NODE;
 
     // read the PCI routing table
     lai_nsnode_t *prt_handle = lai_resolve_path(handle, "_PRT");
     if (!prt_handle) {
         lai_warn("host bridge has no _PRT");
-        return 1;
+        return LAI_ERROR_NO_SUCH_NODE;
     }
 
     int status;
@@ -104,18 +109,18 @@ int lai_pci_route(acpi_resource_t *dest, uint8_t bus, uint8_t slot, uint8_t func
         // read the _PRT package
         status = lai_eval_package(&prt, i, &prt_package);
         if (status)
-            return 1;
+            return LAI_ERROR_EXECUTION_FAILURE;
 
         if (prt_package.type != LAI_PACKAGE)
-            return 1;
+            return LAI_ERROR_TYPE_MISMATCH;
 
         // read the device address
         status = lai_eval_package(&prt_package, 0, &prt_entry);
         if (status)
-            return 1;
+            return LAI_ERROR_EXECUTION_FAILURE;
 
         if (prt_entry.type != LAI_INTEGER)
-            return 1;
+            return LAI_ERROR_TYPE_MISMATCH;
 
         // is this the device we want?
         if ((prt_entry.integer >> 16) == slot) {
@@ -123,10 +128,10 @@ int lai_pci_route(acpi_resource_t *dest, uint8_t bus, uint8_t slot, uint8_t func
                 // is this the interrupt pin we want?
                 status = lai_eval_package(&prt_package, 1, &prt_entry);
                 if (status)
-                    return 1;
+                    return LAI_ERROR_EXECUTION_FAILURE;
 
                 if (prt_entry.type != LAI_INTEGER)
-                    return 1;
+                    return LAI_ERROR_TYPE_MISMATCH;
 
                 if (prt_entry.integer == pin)
                     goto resolve_pin;
@@ -141,7 +146,7 @@ resolve_pin:
     // here we've found what we need
     // is it a link device or a GSI?
     if (lai_eval_package(&prt_package, 2, &prt_entry))
-        return 1;
+        return LAI_ERROR_EXECUTION_FAILURE;
 
     acpi_resource_t *res;
     size_t res_count;
@@ -151,21 +156,21 @@ resolve_pin:
         // Direct routing to a GSI.
         uint64_t gsi;
         if (lai_eval_package(&prt_package, 3, &prt_entry))
-            return 1;
+            return LAI_ERROR_EXECUTION_FAILURE;
         if (lai_obj_get_integer(&prt_entry, &gsi))
-            return 1;
+            return LAI_ERROR_UNEXPECTED_RESULT;
 
         dest->type = ACPI_RESOURCE_IRQ;
         dest->base = gsi;
         dest->irq_flags = ACPI_IRQ_LEVEL | ACPI_IRQ_ACTIVE_HIGH | ACPI_IRQ_SHARED;
 
         lai_debug("PCI device %X:%X:%X is using IRQ %d", bus, slot, function, (int)dest->base);
-        return 0;
+        return LAI_ERROR_NONE;
     } else if (prt_entry_type == LAI_TYPE_DEVICE) {
         // GSI is determined by an Interrupt Link Device.
         lai_nsnode_t *link_handle;
         if (lai_obj_get_handle(&prt_entry, &link_handle))
-            return 1;
+            return LAI_ERROR_UNEXPECTED_RESULT;
         lai_debug("PCI interrupt link is %s", link_handle->fullpath);
 
         // read the resource template of the device
@@ -173,7 +178,7 @@ resolve_pin:
         res_count = lai_read_resource(link_handle, res);
 
         if (!res_count)
-            return 1;
+            return LAI_ERROR_UNEXPECTED_RESULT;
 
         for (size_t i = 0; i < res_count; i++) {
             if (res[i].type == ACPI_RESOURCE_IRQ) {
@@ -184,27 +189,16 @@ resolve_pin:
                 laihost_free(res);
 
                 lai_debug("PCI device %X:%X:%X is using IRQ %d", bus, slot, function, (int)dest->base);
-                return 0;
+                return LAI_ERROR_NONE;
             }
 
             i++;
         }
 
-        return 0;
+        return LAI_ERROR_NONE;
     } else {
         lai_warn("PRT entry has unexpected type %d", prt_entry_type);
-        return 1;
+        return LAI_ERROR_TYPE_MISMATCH;
     }
 }
-
-
-
-
-
-
-
-
-
-
-
 
