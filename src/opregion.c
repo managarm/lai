@@ -162,7 +162,7 @@ void lai_read_field(lai_object_t *destination, lai_nsnode_t *field) {
         if (adr_handle) {
             if (lai_eval(&address_number, adr_handle, &state))
                 lai_panic("could not evaluate _ADR of OperationRegion()");
-            adr_result = bus_number.integer;
+            adr_result = address_number.integer;
         }
 
         if (!laihost_pci_read)
@@ -304,7 +304,7 @@ void lai_write_field(lai_nsnode_t *field, lai_object_t *source) {
         if (adr_handle) {
             if (lai_eval(&address_number, adr_handle, &state))
                 lai_panic("could not evaluate _ADR of OperationRegion()");
-            adr_result = bus_number.integer;
+            adr_result = address_number.integer;
         }
 
         if (!laihost_pci_read)
