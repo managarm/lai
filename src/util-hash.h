@@ -57,7 +57,7 @@ static void lai_hashtable_grow(struct lai_hashtable *ht, int n, int m) {
 static inline void lai_hashtable_insert(struct lai_hashtable *ht, int h, void *elem) {
     LAI_ENSURE(elem);
 
-    if (!ht->elem_ptr_tab || !ht->bucket_tab) {
+    if (!ht->elem_capacity || !ht->bucket_capacity) {
         lai_hashtable_grow(ht, 2, 4);
     } else if (ht->num_elems + 1 >= ht->elem_capacity) {
         // TODO: We should grow more aggressively to avoid O(n) behavior

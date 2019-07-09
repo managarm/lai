@@ -102,12 +102,22 @@ void lai_uninstall_nsnode(lai_nsnode_t *node) {
         int h = lai_hash_string(node->name, 4);
         struct lai_hashtable_chain chain = LAI_HASHTABLE_CHAIN_INITIALIZER;
         for (;;) {
-            lai_hashtable_chain_advance(&parent->children, h, &chain);
+            if (lai_hashtable_chain_advance(&parent->children, h, &chain))
+                lai_panic("child node is missing from parent's hash table"
+                          " during lai_uninstall_nsnode()");
             lai_nsnode_t *child = lai_hashtable_chain_get(&parent->children, h, &chain);
             if (child != node)
                 continue;
             lai_hashtable_chain_remove(&parent->children, h, &chain);
             break;
+        }
+
+        // As a sanity-check: make sure that the child does not occur twice.
+        while (!lai_hashtable_chain_advance(&parent->children, h, &chain)) {
+            lai_nsnode_t *child = lai_hashtable_chain_get(&parent->children, h, &chain);
+            if (child == node)
+                lai_panic("child node appears multiple times in parent's hash table"
+                          " during lai_uninstall_nsnode()");
         }
     }
 }
