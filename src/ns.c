@@ -646,22 +646,6 @@ lai_nsnode_t *lai_resolve_search(lai_nsnode_t *ctx_handle, const char *segment) 
     return NULL;
 }
 
-// search for a device by its index
-lai_nsnode_t *lai_get_device(size_t index) {
-    size_t i = 0, j = 0;
-    while (j < lai_ns_size) {
-        if (lai_namespace[i] && lai_namespace[j]->type == LAI_NAMESPACE_DEVICE)
-            i++;
-
-        if (i > index)
-            return lai_namespace[j];
-
-        j++;
-    }
-
-    return NULL;
-}
-
 int lai_check_device_pnp_id(lai_nsnode_t *dev, lai_variable_t *pnp_id,
                             lai_state_t *state) {
 
