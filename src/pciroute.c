@@ -48,7 +48,7 @@ lai_api_error_t lai_pci_route_pin(acpi_resource_t *dest, uint8_t bus, uint8_t sl
 
     lai_nsnode_t *handle = NULL;
 
-    struct lai_ns_iterator iter = LAI_NS_ITERATOR_INIT;
+    struct lai_ns_iterator iter = LAI_NS_ITERATOR_INITIALIZER;
     lai_nsnode_t *node;
     while ((node = lai_ns_iterate(&iter))) {
 

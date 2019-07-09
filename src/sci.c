@@ -134,9 +134,9 @@ static void lai_init_children(lai_nsnode_t *parent) {
     lai_nsnode_t *node;
     lai_nsnode_t *handle;
 
-    struct lai_ns_child_iterator iter = LAI_NS_CHILD_ITERATOR_INIT(parent);
+    struct lai_ns_child_iterator iter = LAI_NS_CHILD_ITERATOR_INITIALIZER(parent);
 
-    while ((node = lai_ns_children_iterate(&iter))) {
+    while ((node = lai_ns_child_iterate(&iter))) {
         if (node->type == LAI_NAMESPACE_DEVICE) {
             int sta = evaluate_sta(node);
 
