@@ -42,7 +42,13 @@ struct lai_ns_iterator {
     size_t i;
 };
 
+struct lai_ns_child_iterator {
+    size_t i;
+    lai_nsnode_t *parent;
+};
+
 #define LAI_NS_ITERATOR_INIT {0}
+#define LAI_NS_CHILD_ITERATOR_INIT(x) {0, x}
 
 __attribute__((always_inline))
 inline lai_variable_t *lai_retvalue(lai_state_t *state) {
@@ -67,6 +73,7 @@ lai_nsnode_t *lai_enum(char *, size_t);
 void lai_eisaid(lai_variable_t *, char *);
 size_t lai_read_resource(lai_nsnode_t *, acpi_resource_t *);
 lai_nsnode_t *lai_ns_iterate(struct lai_ns_iterator *);
+lai_nsnode_t *lai_ns_child_iterate(struct lai_ns_children_iterator *);
 
 // Access and manipulation of lai_variable_t.
 

@@ -699,26 +699,19 @@ int lai_check_device_pnp_id(lai_nsnode_t *dev, lai_variable_t *pnp_id,
     return ret;
 }
 
-// determine the node in the ACPI namespace corresponding to a given path,
-// and return this node.
-lai_nsnode_t *lai_enum(char *parent, size_t index) {
-    index++;
-    size_t parent_size = lai_strlen(parent);
-    for (size_t i = 0; i < lai_ns_size; i++) {
-        if (lai_namespace[i] && !memcmp(parent, lai_namespace[i]->fullpath, parent_size)) {
-            if(!index)
-                return lai_namespace[i];
-            else
-                index--;
-        }
+lai_nsnode_t *lai_ns_iterate(struct lai_ns_iterator *iter) {
+    while (iter->i < lai_ns_size) {
+        lai_nsnode_t *n = lai_namespace[iter->i++];
+        if (n)
+            return n;
     }
 
     return NULL;
 }
 
-lai_nsnode_t *lai_ns_iterate(struct lai_ns_iterator *iter) {
-    while (iter->i < lai_ns_size) {
-        lai_nsnode_t *n = lai_namespace[iter->i++];
+lai_nsnode_t *lai_ns_child_iterate(struct lai_ns_child_iterator *iter) {
+    while (iter->i < iter->parent->children.elem_capacity) {
+        lai_nsnode_t *n = iter->parent->children.elem_ptr_tab[iter->i++];
         if (n)
             return n;
     }

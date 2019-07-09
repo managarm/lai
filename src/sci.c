@@ -10,7 +10,7 @@
 #include "libc.h"
 #include "exec_impl.h"
 
-static void lai_init_children(char *);
+static void lai_init_children(lai_nsnode_t *);
 
 volatile uint16_t lai_last_event = 0;
 
@@ -75,7 +75,8 @@ int lai_enable_acpi(uint32_t mode) {
     }
 
     /* _STA/_INI for all devices */
-    lai_init_children("\\._SB_");
+    handle = lai_resolve_path(NULL, "\\_SB_");
+    lai_init_children(handle);
 
     /* tell the firmware about the IRQ mode */
     handle = lai_resolve_path(NULL, "\\_PIC");
@@ -129,14 +130,13 @@ static int evaluate_sta(lai_nsnode_t *node) {
     return sta;
 }
 
-static void lai_init_children(char *parent) {
+static void lai_init_children(lai_nsnode_t *parent) {
     lai_nsnode_t *node;
     lai_nsnode_t *handle;
 
-    for (size_t i = 0; i < lai_ns_size; i++) {
-        node = lai_enum(parent, i);
-        if (!node) return;
+    struct lai_ns_child_iterator iter = LAI_NS_CHILD_ITERATOR_INIT(parent);
 
+    while ((node = lai_ns_children_iterate(&iter))) {
         if (node->type == LAI_NAMESPACE_DEVICE) {
             int sta = evaluate_sta(node);
 
@@ -148,7 +148,7 @@ static void lai_init_children(char *parent) {
                     lai_state_t state;
                     lai_init_state(&state);
                     if (!lai_eval(NULL, handle, &state)) {
-                        const char *path = lai_stringify_node_path(handle);
+                        char *path = lai_stringify_node_path(handle);
                         lai_debug("evaluated %s", path);
                         laihost_free(path);
                     }
@@ -158,7 +158,7 @@ static void lai_init_children(char *parent) {
 
             /* if functional and/or present, enumerate the children */
             if (sta & ACPI_STA_PRESENT || sta & ACPI_STA_FUNCTION)
-                lai_init_children(node->fullpath);
+                lai_init_children(node);
         }
     }
 }
