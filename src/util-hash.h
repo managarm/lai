@@ -133,8 +133,7 @@ static inline void lai_hashtable_chain_remove(struct lai_hashtable *ht, int h,
     int b = (h + chain->i) & (ht->bucket_capacity - 1);
     int k = ht->bucket_tab[b];
     LAI_ENSURE(k >= 0);
-
     ht->elem_ptr_tab[k] = NULL;
-    ht->bucket_tab[k] = -1;
+    ht->bucket_tab[b] = -1;
     ht->num_elems--;
 }
