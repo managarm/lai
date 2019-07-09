@@ -59,9 +59,6 @@ lai_nsnode_t *lai_create_nsnode_or_die(void) {
 
 // Installs the nsnode to the namespace.
 void lai_install_nsnode(lai_nsnode_t *node) {
-    if (lai_legacy_resolve(node->fullpath))
-        lai_panic("trying to install duplicate namespace node %s", node->fullpath);
-
     if (lai_ns_size == lai_ns_capacity) {
         size_t new_capacity = lai_ns_capacity * 2;
         if (!new_capacity)
@@ -81,6 +78,14 @@ void lai_install_nsnode(lai_nsnode_t *node) {
     lai_nsnode_t *parent = node->parent;
     if (parent) {
         int h = lai_hash_string(node->name, 4);
+
+        struct lai_hashtable_chain chain = LAI_HASHTABLE_CHAIN_INITIALIZER;
+        while (!lai_hashtable_chain_advance(&parent->children, h, &chain)) {
+            lai_nsnode_t *child = lai_hashtable_chain_get(&parent->children, h, &chain);
+            if (!memcmp(child->name, node->name, 4))
+                lai_panic("trying to install duplicate namespace node %s", node->fullpath);
+        }
+
         lai_hashtable_insert(&parent->children, h, node);
     }
 }
@@ -107,7 +112,7 @@ void lai_uninstall_nsnode(lai_nsnode_t *node) {
     }
 }
 
-lai_nsnode_t *lai_get_child(lai_nsnode_t *parent, char *name) {
+lai_nsnode_t *lai_get_child(lai_nsnode_t *parent, const char *name) {
     int h = lai_hash_string(name, 4);
     struct lai_hashtable_chain chain = LAI_HASHTABLE_CHAIN_INITIALIZER;
     while (!lai_hashtable_chain_advance(&parent->children, h, &chain)) {
@@ -597,14 +602,7 @@ lai_nsnode_t *lai_resolve_path(lai_nsnode_t *ctx_handle, const char *path) {
             segment[k++] = '_';
         segment[4] = '\0';
 
-        char legacy_path[ACPI_MAX_NAME];
-        size_t n = lai_strlen(current->fullpath);
-        lai_strcpy(legacy_path, current->fullpath);
-        legacy_path[n] = '.';
-        lai_strcpy(legacy_path + n + 1, segment);
-        legacy_path[n + 5] = '\0';
-
-        current = lai_legacy_resolve(legacy_path);
+        current = lai_get_child(current, segment);
         if (!current)
             return NULL;
         if (current->type == LAI_NAMESPACE_ALIAS) {
@@ -630,13 +628,7 @@ lai_nsnode_t *lai_resolve_search(lai_nsnode_t *ctx_handle, const char *segment) 
         lai_debug("resolving %s by searching through scopes", segment);
 
     while (current) {
-        char path[ACPI_MAX_NAME];
-        size_t n = lai_strlen(current->fullpath);
-        lai_strcpy(path, current->fullpath);
-        path[n] = '.';
-        lai_strcpy(path + 1 + n, segment);
-
-        lai_nsnode_t *node = lai_legacy_resolve(path);
+        lai_nsnode_t *node = lai_get_child(current, segment);
         if (!node) {
             current = current->parent;
             continue;
@@ -652,32 +644,6 @@ lai_nsnode_t *lai_resolve_search(lai_nsnode_t *ctx_handle, const char *segment) 
     }
 
     return NULL;
-}
-
-// Resolve a namespace object by its path
-lai_nsnode_t *lai_legacy_resolve(char *path) {
-    size_t i = 0;
-
-    if (path[0] == ROOT_CHAR) {
-        while(i < lai_ns_size) {
-            if(lai_namespace[i] && !lai_strcmp(lai_namespace[i]->fullpath, path))
-                return lai_namespace[i];
-            else
-                i++;
-        }
-
-        return NULL;
-    } else {
-        while (i < lai_ns_size) {
-            if (lai_namespace[i] && !memcmp(lai_namespace[i]->fullpath
-                                            + lai_strlen(lai_namespace[i]->fullpath) - 4, path, 4))
-                return lai_namespace[i];
-            else
-                i++;
-        }
-
-        return NULL;
-    }
 }
 
 // search for a device by its index
