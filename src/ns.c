@@ -17,6 +17,7 @@
 #define CODE_WINDOW            131072
 #define NAMESPACE_WINDOW       8192
 
+static int debug_namespace = 0;
 static int debug_resolution = 0;
 
 int lai_do_osi_method(lai_variable_t *args, lai_variable_t *result);
@@ -59,6 +60,11 @@ lai_nsnode_t *lai_create_nsnode_or_die(void) {
 
 // Installs the nsnode to the namespace.
 void lai_install_nsnode(lai_nsnode_t *node) {
+    if (debug_namespace) {
+        LAI_CLEANUP_FREE_STRING char *fullpath = lai_stringify_node_path(node);
+        lai_debug("created %s", fullpath);
+    }
+
     if (lai_ns_size == lai_ns_capacity) {
         size_t new_capacity = lai_ns_capacity * 2;
         if (!new_capacity)
@@ -71,7 +77,6 @@ void lai_install_nsnode(lai_nsnode_t *node) {
         lai_ns_capacity = new_capacity;
     }
 
-    /*lai_debug("created %s", node->fullpath);*/
     lai_namespace[lai_ns_size++] = node;
 
     // Insert the node into its parent's hash table.
@@ -82,8 +87,10 @@ void lai_install_nsnode(lai_nsnode_t *node) {
         struct lai_hashtable_chain chain = LAI_HASHTABLE_CHAIN_INITIALIZER;
         while (!lai_hashtable_chain_advance(&parent->children, h, &chain)) {
             lai_nsnode_t *child = lai_hashtable_chain_get(&parent->children, h, &chain);
-            if (!memcmp(child->name, node->name, 4))
-                lai_panic("trying to install duplicate namespace node %s", node->fullpath);
+            if (!memcmp(child->name, node->name, 4)) {
+                LAI_CLEANUP_FREE_STRING char *fullpath = lai_stringify_node_path(node);
+                lai_panic("trying to install duplicate namespace node %s", fullpath);
+            }
         }
 
         lai_hashtable_insert(&parent->children, h, node);
@@ -285,8 +292,10 @@ lai_nsnode_t *lai_do_resolve(lai_nsnode_t *ctx_handle, const struct lai_amlname 
                 node = node->al_target;
                 LAI_ENSURE(node->type != LAI_NAMESPACE_ALIAS);
             }
-            if(debug_resolution)
-                lai_debug("resolution returns %s", node->fullpath);
+            if(debug_resolution) {
+                LAI_CLEANUP_FREE_STRING char *fullpath = lai_stringify_node_path(node);
+                lai_debug("resolution returns %s", fullpath);
+            }
             return node;
         }
 
@@ -360,15 +369,7 @@ void lai_do_resolve_new_node(lai_nsnode_t *node,
         segment[4] = '\0';
 
         if (lai_amlname_done(&amln)) {
-            // Construct the full path of the new object.
-            char path[ACPI_MAX_NAME];
-            size_t n = lai_strlen(parent->fullpath);
-            lai_strcpy(path, parent->fullpath);
-            path[n] = '.';
-            lai_strcpy(path + 1 + n, segment);
-
             // The last segment is the name of the new node.
-            lai_strcpy(node->fullpath, path);
             lai_namecpy(node->name, segment);
             node->parent = parent;
             break;
@@ -395,28 +396,24 @@ size_t lai_resolve_new_node(lai_nsnode_t *node, lai_nsnode_t *ctx_handle, void *
 lai_nsnode_t *lai_create_root(void) {
     lai_root_node = lai_create_nsnode_or_die();
     lai_root_node->type = LAI_NAMESPACE_ROOT;
-    lai_strcpy(lai_root_node->fullpath, "\\");
     lai_namecpy(lai_root_node->name, "\\___");
     lai_root_node->parent = NULL;
 
     // Create the predefined objects.
     lai_nsnode_t *sb_node = lai_create_nsnode_or_die();
     sb_node->type = LAI_NAMESPACE_DEVICE;
-    lai_strcpy(sb_node->fullpath, "\\._SB_");
     lai_namecpy(sb_node->name, "_SB_");
     sb_node->parent = lai_root_node;
     lai_install_nsnode(sb_node);
 
     lai_nsnode_t *si_node = lai_create_nsnode_or_die();
     si_node->type = LAI_NAMESPACE_DEVICE;
-    lai_strcpy(si_node->fullpath, "\\._SI_");
     lai_namecpy(si_node->name, "_SI_");
     si_node->parent = lai_root_node;
     lai_install_nsnode(si_node);
 
     lai_nsnode_t *gpe_node = lai_create_nsnode_or_die();
     gpe_node->type = LAI_NAMESPACE_DEVICE;
-    lai_strcpy(gpe_node->fullpath, "\\._GPE");
     lai_namecpy(gpe_node->name, "_GPE");
     gpe_node->parent = lai_root_node;
     lai_install_nsnode(gpe_node);
@@ -424,14 +421,12 @@ lai_nsnode_t *lai_create_root(void) {
     // Create nodes for compatibility with ACPI 1.0.
     lai_nsnode_t *pr_node = lai_create_nsnode_or_die();
     pr_node->type = LAI_NAMESPACE_DEVICE;
-    lai_strcpy(pr_node->fullpath, "\\._PR_");
     lai_namecpy(pr_node->name, "_PR_");
     pr_node->parent = lai_root_node;
     lai_install_nsnode(pr_node);
 
     lai_nsnode_t *tz_node = lai_create_nsnode_or_die();
     tz_node->type = LAI_NAMESPACE_DEVICE;
-    lai_strcpy(tz_node->fullpath, "\\._TZ_");
     lai_namecpy(tz_node->name, "_TZ_");
     tz_node->parent = lai_root_node;
     lai_install_nsnode(tz_node);
@@ -439,7 +434,6 @@ lai_nsnode_t *lai_create_root(void) {
     // Create the OS-defined objects.
     lai_nsnode_t *osi_node = lai_create_nsnode_or_die();
     osi_node->type = LAI_NAMESPACE_METHOD;
-    lai_strcpy(osi_node->fullpath, "\\._OSI");
     lai_namecpy(osi_node->name, "_OSI");
     osi_node->parent = lai_root_node;
     osi_node->method_flags = 0x01;
@@ -448,7 +442,6 @@ lai_nsnode_t *lai_create_root(void) {
 
     lai_nsnode_t *os_node = lai_create_nsnode_or_die();
     os_node->type = LAI_NAMESPACE_METHOD;
-    lai_strcpy(os_node->fullpath, "\\._OS_");
     lai_namecpy(os_node->name, "_OS_");
     os_node->parent = lai_root_node;
     os_node->method_flags = 0x00;
@@ -457,7 +450,6 @@ lai_nsnode_t *lai_create_root(void) {
 
     lai_nsnode_t *rev_node = lai_create_nsnode_or_die();
     rev_node->type = LAI_NAMESPACE_METHOD;
-    lai_strcpy(rev_node->fullpath, "\\._REV");
     lai_namecpy(rev_node->name, "_REV");
     rev_node->parent = lai_root_node;
     rev_node->method_flags = 0x00;
@@ -648,8 +640,10 @@ lai_nsnode_t *lai_resolve_search(lai_nsnode_t *ctx_handle, const char *segment) 
             node = node->al_target;
             LAI_ENSURE(node->type != LAI_NAMESPACE_ALIAS);
         }
-        if(debug_resolution)
-            lai_debug("resolution returns %s", node->fullpath);
+        if (debug_resolution) {
+            LAI_CLEANUP_FREE_STRING char *fullpath = lai_stringify_node_path(node);
+            lai_debug("resolution returns %s", fullpath);
+        }
         return node;
     }
 

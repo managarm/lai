@@ -148,9 +148,8 @@ static void lai_init_children(lai_nsnode_t *parent) {
                     lai_state_t state;
                     lai_init_state(&state);
                     if (!lai_eval(NULL, handle, &state)) {
-                        char *path = lai_stringify_node_path(handle);
-                        lai_debug("evaluated %s", path);
-                        laihost_free(path);
+                        LAI_CLEANUP_FREE_STRING char *fullpath = lai_stringify_node_path(handle);
+                        lai_debug("evaluated %s", fullpath);
                     }
                     lai_finalize_state(&state);
                 }

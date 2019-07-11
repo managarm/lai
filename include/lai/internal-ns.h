@@ -7,9 +7,6 @@
 
 #include <lai/internal-util.h>
 
-// TODO: Remove this constant
-#define ACPI_MAX_NAME 64
-
 __attribute__((always_inline))
 inline void lai_namecpy(char *dest, const char *src) {
     memcpy(dest, src, 4);
@@ -38,7 +35,6 @@ struct lai_aml_segment {
 typedef struct lai_nsnode
 {
     char name[4];
-    char fullpath[ACPI_MAX_NAME];    // full path of object
     int type;
     struct lai_nsnode *parent;
     struct lai_aml_segment *amls;

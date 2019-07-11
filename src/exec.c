@@ -751,7 +751,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             struct lai_amlname amln;
             state->pc += lai_amlname_parse(&amln, method + state->pc);
 
-            char *debug_name;
+            LAI_CLEANUP_FREE_STRING char *debug_name = NULL;
             if (debug_opcodes)
                 debug_name = lai_stringify_amlname(&amln);
 
@@ -815,9 +815,6 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
                     }
                 }
             }
-
-            if(debug_opcodes)
-                laihost_free(debug_name);
             continue;
         }
 

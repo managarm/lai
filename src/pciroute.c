@@ -171,7 +171,8 @@ resolve_pin:
         lai_nsnode_t *link_handle;
         if (lai_obj_get_handle(&prt_entry, &link_handle))
             return LAI_ERROR_UNEXPECTED_RESULT;
-        lai_debug("PCI interrupt link is %s", link_handle->fullpath);
+        LAI_CLEANUP_FREE_STRING char *fullpath = lai_stringify_node_path(link_handle);
+        lai_debug("PCI interrupt link is %s", fullpath);
 
         // read the resource template of the device
         res = lai_calloc(sizeof(acpi_resource_t), ACPI_MAX_RESOURCES);

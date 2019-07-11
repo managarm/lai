@@ -31,6 +31,17 @@ __attribute__((noreturn)) void lai_panic(const char *, ...);
     } while(0)
 
 //---------------------------------------------------------------------------------------
+// Misc. utility functions.
+//---------------------------------------------------------------------------------------
+
+static inline void lai_cleanup_free_string(char **v) {
+    if (*v)
+        laihost_free(*v);
+}
+
+#define LAI_CLEANUP_FREE_STRING __attribute__((cleanup(lai_cleanup_free_string)))
+
+//---------------------------------------------------------------------------------------
 // Reference counting functions.
 //---------------------------------------------------------------------------------------
 
