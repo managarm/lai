@@ -78,6 +78,7 @@ lai_nsnode_t *lai_ns_child_iterate(struct lai_ns_child_iterator *);
 
 // Namespace functions.
 
+lai_nsnode_t *lai_ns_get_parent(lai_nsnode_t *node);
 lai_nsnode_t *lai_ns_get_child(lai_nsnode_t *parent, const char *name);
 
 // Access and manipulation of lai_variable_t.

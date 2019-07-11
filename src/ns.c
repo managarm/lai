@@ -129,6 +129,10 @@ void lai_uninstall_nsnode(lai_nsnode_t *node) {
     }
 }
 
+lai_nsnode_t *lai_ns_get_parent(lai_nsnode_t *node) {
+    return node->parent;
+}
+
 lai_nsnode_t *lai_ns_get_child(lai_nsnode_t *parent, const char *name) {
     int h = lai_hash_string(name, 4);
     struct lai_hashtable_chain chain = LAI_HASHTABLE_CHAIN_INITIALIZER;
