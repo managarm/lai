@@ -98,6 +98,8 @@ lai_api_error_t lai_obj_get_integer(lai_variable_t *, uint64_t *);
 lai_api_error_t lai_obj_get_pkg(lai_variable_t *, size_t, lai_variable_t *);
 lai_api_error_t lai_obj_get_handle(lai_variable_t *, lai_nsnode_t **);
 
+void lai_obj_clone(lai_variable_t *, lai_variable_t *);
+
 // Evaluation of namespace nodes (including control methods).
 
 int lai_eval_args(lai_variable_t *, lai_nsnode_t *, lai_state_t *, int, lai_variable_t *);

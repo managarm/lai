@@ -184,11 +184,11 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
         lai_variable_t out = {0};
         lai_exec_get_objectref(state, &operands[0], &objectref);
 
-        lai_clone_object(&result, &objectref);
+        lai_obj_clone(&result, &objectref);
 
         // Store a copy to the target operand.
         // TODO: Verify that we HAVE to make a copy.
-        lai_clone_object(&out, &result);
+        lai_obj_clone(&out, &result);
         lai_store(state, &operands[1], &result);
 
         lai_free_object(&objectref);
@@ -1762,7 +1762,7 @@ int lai_exec_method(lai_nsnode_t *method, lai_state_t *state, int n, lai_variabl
     struct lai_operand *result = lai_exec_get_opstack(state, 0);
     lai_variable_t objectref = {0};
     lai_exec_get_objectref(state, result, &objectref);
-    lai_clone_object(&state->retvalue, &objectref);
+    lai_obj_clone(&state->retvalue, &objectref);
     lai_free_object(&objectref);
     lai_exec_pop_opstack(state, 1);
     return 0;
@@ -1781,7 +1781,7 @@ int lai_eval_args(lai_variable_t *result, lai_nsnode_t *handle, lai_state_t *sta
                 return 1;
             }
             if (result)
-                lai_clone_object(result, &handle->object);
+                lai_obj_clone(result, &handle->object);
             return 0;
         case LAI_NAMESPACE_METHOD: {
             // We take a copy of the arguments as lai_exec_method() will move them.
@@ -1789,7 +1789,7 @@ int lai_eval_args(lai_variable_t *result, lai_nsnode_t *handle, lai_state_t *sta
             memset(args_copy, 0, sizeof(lai_variable_t) * 7);
 
             for (int i = 0; i < n; i++)
-                lai_clone_object(&args_copy[i], &args[i]);
+                lai_obj_clone(&args_copy[i], &args[i]);
 
             int e = lai_exec_method(handle, state, n, args_copy);
             if (!e && result)
@@ -1851,7 +1851,7 @@ static void lai_eval_operand(lai_variable_t *destination, lai_state_t *state,
     struct lai_operand *result = lai_exec_get_opstack(state, opstack);
     lai_variable_t objectref = {0};
     lai_exec_get_objectref(state, result, &objectref);
-    lai_clone_object(destination, &objectref);
+    lai_obj_clone(destination, &objectref);
     lai_free_object(&objectref);
     lai_exec_pop_opstack(state, 1);
 }

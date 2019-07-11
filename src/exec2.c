@@ -100,7 +100,7 @@ void lai_free_object(lai_variable_t *object) {
     memset(object, 0, sizeof(lai_variable_t));
 }
 
-// Helper function for lai_move_object() and lai_clone_object().
+// Helper function for lai_move_object() and lai_obj_clone().
 void lai_swap_object(lai_variable_t *first, lai_variable_t *second) {
     lai_variable_t temp = *first;
     *first = *second;
@@ -109,7 +109,7 @@ void lai_swap_object(lai_variable_t *first, lai_variable_t *second) {
 
 // lai_move_object(): Moves an object: instead of making a deep copy,
 //                     the pointers are exchanged and the source object is reset to zero.
-// Param & Return: See lai_clone_object().
+// Param & Return: See lai_obj_clone().
 
 void lai_move_object(lai_variable_t *destination, lai_variable_t *source) {
     // Move-by-swap idiom. This handles move-to-self operations correctly.
@@ -189,15 +189,15 @@ static void lai_clone_package(lai_variable_t *dest, lai_variable_t *src) {
     if (lai_create_pkg(dest, n))
         lai_panic("unable to allocate memory for package object.");
     for (int i = 0; i < n; i++)
-        lai_clone_object(&dest->pkg_ptr->elems[i], &src->pkg_ptr->elems[i]);
+        lai_obj_clone(&dest->pkg_ptr->elems[i], &src->pkg_ptr->elems[i]);
 }
 
-// lai_clone_object(): Copies an object
+// lai_obj_clone(): Copies an object
 // Param:    lai_variable_t *dest - destination
 // Param:    lai_variable_t *source - source
 // Return:   Nothing
 
-void lai_clone_object(lai_variable_t *dest, lai_variable_t *source) {
+void lai_obj_clone(lai_variable_t *dest, lai_variable_t *source) {
     // Clone into a temporary object.
     lai_variable_t temp = {0};
     switch (source->type) {
