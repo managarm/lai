@@ -87,8 +87,8 @@ int lai_enter_sleep(uint8_t sleep_state)
         lai_finalize_state(&state);
     }
 
-    lai_eval_package(&package, 0, &slp_typa);
-    lai_eval_package(&package, 1, &slp_typb);
+    lai_obj_get_pkg(&package, 0, &slp_typa);
+    lai_obj_get_pkg(&package, 1, &slp_typb);
 
     // and go to sleep
     uint16_t data;

@@ -22,6 +22,7 @@ typedef enum lai_api_error {
     LAI_ERROR_NONE,
     LAI_ERROR_TYPE_MISMATCH,
     LAI_ERROR_NO_SUCH_NODE,
+    LAI_ERROR_OUT_OF_BOUNDS,
     LAI_ERROR_EXECUTION_FAILURE,
     LAI_ERROR_ILLEGAL_ARGUMENTS,
 
@@ -88,6 +89,7 @@ enum lai_object_type {
 
 enum lai_object_type lai_obj_get_type(lai_variable_t *object);
 lai_api_error_t lai_obj_get_integer(lai_variable_t *, uint64_t *);
+lai_api_error_t lai_obj_get_pkg(lai_variable_t *, size_t, lai_variable_t *);
 lai_api_error_t lai_obj_get_handle(lai_variable_t *, lai_nsnode_t **);
 
 // Evaluation of namespace nodes (including control methods).

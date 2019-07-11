@@ -84,7 +84,6 @@ lai_api_error_t lai_pci_route_pin(acpi_resource_t *dest, uint8_t bus, uint8_t sl
         return LAI_ERROR_NO_SUCH_NODE;
     }
 
-    int status;
     lai_variable_t prt = {0};
     lai_variable_t prt_package = {0};
     lai_variable_t prt_entry = {0};
@@ -100,24 +99,22 @@ lai_api_error_t lai_pci_route_pin(acpi_resource_t *dest, uint8_t bus, uint8_t sl
 
     if (lai_eval(&prt, prt_handle, &state)) {
         lai_warn("failed to evaluate _PRT");
-        return 1;
+        return LAI_ERROR_EXECUTION_FAILURE;
     }
 
     size_t i = 0;
 
     for (;;) {
         // read the _PRT package
-        status = lai_eval_package(&prt, i, &prt_package);
-        if (status)
-            return LAI_ERROR_EXECUTION_FAILURE;
+        if (lai_obj_get_pkg(&prt, i, &prt_package))
+            return LAI_ERROR_UNEXPECTED_RESULT;
 
         if (prt_package.type != LAI_PACKAGE)
             return LAI_ERROR_TYPE_MISMATCH;
 
         // read the device address
-        status = lai_eval_package(&prt_package, 0, &prt_entry);
-        if (status)
-            return LAI_ERROR_EXECUTION_FAILURE;
+        if (lai_obj_get_pkg(&prt_package, 0, &prt_entry))
+            return LAI_ERROR_UNEXPECTED_RESULT;
 
         if (prt_entry.type != LAI_INTEGER)
             return LAI_ERROR_TYPE_MISMATCH;
@@ -126,9 +123,8 @@ lai_api_error_t lai_pci_route_pin(acpi_resource_t *dest, uint8_t bus, uint8_t sl
         if ((prt_entry.integer >> 16) == slot) {
             if ((prt_entry.integer & 0xFFFF) == 0xFFFF || (prt_entry.integer & 0xFFFF) == function) {
                 // is this the interrupt pin we want?
-                status = lai_eval_package(&prt_package, 1, &prt_entry);
-                if (status)
-                    return LAI_ERROR_EXECUTION_FAILURE;
+                if (lai_obj_get_pkg(&prt_package, 1, &prt_entry))
+                    return LAI_ERROR_UNEXPECTED_RESULT;
 
                 if (prt_entry.type != LAI_INTEGER)
                     return LAI_ERROR_TYPE_MISMATCH;
@@ -145,8 +141,8 @@ lai_api_error_t lai_pci_route_pin(acpi_resource_t *dest, uint8_t bus, uint8_t sl
 resolve_pin:
     // here we've found what we need
     // is it a link device or a GSI?
-    if (lai_eval_package(&prt_package, 2, &prt_entry))
-        return LAI_ERROR_EXECUTION_FAILURE;
+    if (lai_obj_get_pkg(&prt_package, 2, &prt_entry))
+        return LAI_ERROR_UNEXPECTED_RESULT;
 
     acpi_resource_t *res;
     size_t res_count;
@@ -155,8 +151,8 @@ resolve_pin:
     if (prt_entry_type == LAI_TYPE_INTEGER) {
         // Direct routing to a GSI.
         uint64_t gsi;
-        if (lai_eval_package(&prt_package, 3, &prt_entry))
-            return LAI_ERROR_EXECUTION_FAILURE;
+        if (lai_obj_get_pkg(&prt_package, 3, &prt_entry))
+            return LAI_ERROR_UNEXPECTED_RESULT;
         if (lai_obj_get_integer(&prt_entry, &gsi))
             return LAI_ERROR_UNEXPECTED_RESULT;
 

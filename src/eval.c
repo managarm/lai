@@ -51,20 +51,6 @@ size_t lai_parse_pkgsize(uint8_t *data, size_t *destination) {
     return (size_t)(bytecount + 1);
 }
 
-int lai_eval_package(lai_variable_t *package, size_t index, lai_variable_t *destination) {
-    if (package->type != LAI_PACKAGE) {
-        lai_warn("attempt to evaluate non-package object.");
-        return 1;
-    } else if (index >= lai_exec_pkg_size(package)) {
-        lai_warn("attempt to evaluate index %d of package of size %d",
-                index, lai_exec_pkg_size(package));
-        return 1;
-    }
-
-    lai_exec_pkg_load(destination, package, index);
-    return 0;
-}
-
 uint16_t bswap16(uint16_t word) {
     return (uint16_t)((word >> 8) & 0xFF) | ((word << 8) & 0xFF00);
 }

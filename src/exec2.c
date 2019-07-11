@@ -458,6 +458,15 @@ lai_api_error_t lai_obj_get_integer(lai_variable_t *object, uint64_t *out) {
     }
 }
 
+lai_api_error_t lai_obj_get_pkg(lai_variable_t *object, size_t i, lai_variable_t *out) {
+    if (object->type != LAI_PACKAGE)
+        return LAI_ERROR_TYPE_MISMATCH;
+    if (i >= lai_exec_pkg_size(object))
+        return LAI_ERROR_OUT_OF_BOUNDS;
+    lai_exec_pkg_load(out, object, i);
+    return 0;
+}
+
 lai_api_error_t lai_obj_get_handle(lai_variable_t *object, lai_nsnode_t **out) {
     switch (object->type) {
         case LAI_HANDLE:
