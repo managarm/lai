@@ -76,6 +76,10 @@ size_t lai_read_resource(lai_nsnode_t *, acpi_resource_t *);
 lai_nsnode_t *lai_ns_iterate(struct lai_ns_iterator *);
 lai_nsnode_t *lai_ns_child_iterate(struct lai_ns_child_iterator *);
 
+// Namespace functions.
+
+lai_nsnode_t *lai_ns_get_child(lai_nsnode_t *parent, const char *name);
+
 // Access and manipulation of lai_variable_t.
 
 enum lai_object_type {

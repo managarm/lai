@@ -129,7 +129,7 @@ void lai_uninstall_nsnode(lai_nsnode_t *node) {
     }
 }
 
-lai_nsnode_t *lai_get_child(lai_nsnode_t *parent, const char *name) {
+lai_nsnode_t *lai_ns_get_child(lai_nsnode_t *parent, const char *name) {
     int h = lai_hash_string(name, 4);
     struct lai_hashtable_chain chain = LAI_HASHTABLE_CHAIN_INITIALIZER;
     while (!lai_hashtable_chain_advance(&parent->children, h, &chain)) {
@@ -282,7 +282,7 @@ lai_nsnode_t *lai_do_resolve(lai_nsnode_t *ctx_handle, const struct lai_amlname 
             lai_debug("resolving %s by searching through scopes", segment);
 
         while (current) {
-            lai_nsnode_t *node = lai_get_child(current, segment);
+            lai_nsnode_t *node = lai_ns_get_child(current, segment);
             if (!node) {
                 current = current->parent;
                 continue;
@@ -321,7 +321,7 @@ lai_nsnode_t *lai_do_resolve(lai_nsnode_t *ctx_handle, const struct lai_amlname 
         while (!lai_amlname_done(&amln)) {
             char segment[4];
             lai_amlname_iterate(&amln, segment);
-            current = lai_get_child(current, segment);
+            current = lai_ns_get_child(current, segment);
             if (!current)
                 return NULL;
         }
@@ -374,7 +374,7 @@ void lai_do_resolve_new_node(lai_nsnode_t *node,
             node->parent = parent;
             break;
         } else {
-            parent = lai_get_child(parent, segment);
+            parent = lai_ns_get_child(parent, segment);
             LAI_ENSURE(parent);
             if (parent->type == LAI_NAMESPACE_ALIAS) {
                 lai_warn("resolution of new object name traverses Alias(),"
@@ -604,7 +604,7 @@ lai_nsnode_t *lai_resolve_path(lai_nsnode_t *ctx_handle, const char *path) {
             segment[k++] = '_';
         segment[4] = '\0';
 
-        current = lai_get_child(current, segment);
+        current = lai_ns_get_child(current, segment);
         if (!current)
             return NULL;
         if (current->type == LAI_NAMESPACE_ALIAS) {
@@ -630,7 +630,7 @@ lai_nsnode_t *lai_resolve_search(lai_nsnode_t *ctx_handle, const char *segment) 
         lai_debug("resolving %s by searching through scopes", segment);
 
     while (current) {
-        lai_nsnode_t *node = lai_get_child(current, segment);
+        lai_nsnode_t *node = lai_ns_get_child(current, segment);
         if (!node) {
             current = current->parent;
             continue;
