@@ -129,6 +129,10 @@ void lai_uninstall_nsnode(lai_nsnode_t *node) {
     }
 }
 
+lai_nsnode_t *lai_ns_get_root() {
+    return lai_root_node;
+}
+
 lai_nsnode_t *lai_ns_get_parent(lai_nsnode_t *node) {
     return node->parent;
 }
