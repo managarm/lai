@@ -97,8 +97,14 @@ enum lai_object_type lai_obj_get_type(lai_variable_t *object);
 lai_api_error_t lai_obj_get_integer(lai_variable_t *, uint64_t *);
 lai_api_error_t lai_obj_get_pkg(lai_variable_t *, size_t, lai_variable_t *);
 lai_api_error_t lai_obj_get_handle(lai_variable_t *, lai_nsnode_t **);
-
 void lai_obj_clone(lai_variable_t *, lai_variable_t *);
+
+#define LAI_CLEANUP_VAR __attribute__((cleanup(lai_var_finalize)))
+#define LAI_VAR_INITIALIZER {0}
+
+void lai_var_finalize(lai_variable_t *);
+void lai_var_move(lai_variable_t *, lai_variable_t *);
+void lai_var_assign(lai_variable_t *, lai_variable_t *);
 
 // Evaluation of namespace nodes (including control methods).
 

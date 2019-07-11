@@ -74,11 +74,11 @@ int lai_create_pkg(lai_variable_t *object, size_t n) {
 
 static void laihost_free_package(lai_variable_t *object) {
     for(int i = 0; i < object->pkg_ptr->size; i++)
-        lai_free_object(&object->pkg_ptr->elems[i]);
+        lai_var_finalize(&object->pkg_ptr->elems[i]);
     laihost_free(object->pkg_ptr);
 }
 
-void lai_free_object(lai_variable_t *object) {
+void lai_var_finalize(lai_variable_t *object) {
     switch (object->type) {
         case LAI_STRING:
         case LAI_STRING_INDEX:
@@ -100,26 +100,26 @@ void lai_free_object(lai_variable_t *object) {
     memset(object, 0, sizeof(lai_variable_t));
 }
 
-// Helper function for lai_move_object() and lai_obj_clone().
+// Helper function for lai_var_move() and lai_obj_clone().
 void lai_swap_object(lai_variable_t *first, lai_variable_t *second) {
     lai_variable_t temp = *first;
     *first = *second;
     *second = temp;
 }
 
-// lai_move_object(): Moves an object: instead of making a deep copy,
+// lai_var_move(): Moves an object: instead of making a deep copy,
 //                     the pointers are exchanged and the source object is reset to zero.
 // Param & Return: See lai_obj_clone().
 
-void lai_move_object(lai_variable_t *destination, lai_variable_t *source) {
+void lai_var_move(lai_variable_t *destination, lai_variable_t *source) {
     // Move-by-swap idiom. This handles move-to-self operations correctly.
     lai_variable_t temp = {0};
     lai_swap_object(&temp, source);
     lai_swap_object(&temp, destination);
-    lai_free_object(&temp);
+    lai_var_finalize(&temp);
 }
 
-void lai_assign_object(lai_variable_t *dest, lai_variable_t *src) {
+void lai_var_assign(lai_variable_t *dest, lai_variable_t *src) {
     // Make a local shallow copy of the AML object.
     lai_variable_t temp = *src;
     switch (src->type) {
@@ -137,7 +137,7 @@ void lai_assign_object(lai_variable_t *dest, lai_variable_t *src) {
             break;
     }
 
-    lai_move_object(dest, &temp);
+    lai_var_move(dest, &temp);
 }
 
 size_t lai_exec_string_length(lai_variable_t *str) {
@@ -147,12 +147,12 @@ size_t lai_exec_string_length(lai_variable_t *str) {
 
 // Note: This function exists to enable better GC and proper locking in the future.
 void lai_exec_pkg_var_load(lai_variable_t *out, struct lai_pkg_head *head, size_t i) {
-    lai_assign_object(out, &head->elems[i]);
+    lai_var_assign(out, &head->elems[i]);
 }
 
 // Note: This function exists to enable better GC and proper locking in the future.
 void lai_exec_pkg_var_store(lai_variable_t *in, struct lai_pkg_head *head, size_t i) {
-    lai_assign_object(&head->elems[i], in);
+    lai_var_assign(&head->elems[i], in);
 }
 
 // lai_clone_buffer(): Clones a buffer object
@@ -215,17 +215,17 @@ void lai_obj_clone(lai_variable_t *dest, lai_variable_t *source) {
     if (temp.type) {
         // Afterwards, swap to the destination. This handles copy-to-self correctly.
         lai_swap_object(dest, &temp);
-        lai_free_object(&temp);
+        lai_var_finalize(&temp);
     }else{
         // For others objects: just do a shallow copy.
-        lai_assign_object(dest, source);
+        lai_var_assign(dest, source);
     }
 }
 
 static void lai_load_ns(lai_nsnode_t *src, lai_variable_t *object) {
     switch (src->type) {
         case LAI_NAMESPACE_NAME:
-            lai_assign_object(object, &src->object);
+            lai_var_assign(object, &src->object);
             break;
         case LAI_NAMESPACE_FIELD:
         case LAI_NAMESPACE_INDEXFIELD:
@@ -243,7 +243,7 @@ static void lai_load_ns(lai_nsnode_t *src, lai_variable_t *object) {
 static void lai_store_ns(lai_nsnode_t *target, lai_variable_t *object) {
     switch (target->type) {
         case LAI_NAMESPACE_NAME:
-            lai_assign_object(&target->object, object);
+            lai_var_assign(&target->object, object);
             break;
         case LAI_NAMESPACE_FIELD:
         case LAI_NAMESPACE_INDEXFIELD:
@@ -263,11 +263,11 @@ void lai_load(lai_state_t *state, struct lai_operand *src, lai_variable_t *objec
     switch (src->tag) {
         case LAI_ARG_NAME:
             LAI_ENSURE(state->invocation);
-            lai_assign_object(object, &state->invocation->arg[src->index]);
+            lai_var_assign(object, &state->invocation->arg[src->index]);
             break;
         case LAI_LOCAL_NAME:
             LAI_ENSURE(state->invocation);
-            lai_assign_object(object, &state->invocation->local[src->index]);
+            lai_var_assign(object, &state->invocation->local[src->index]);
             break;
         case LAI_UNRESOLVED_NAME:
         {
@@ -305,9 +305,9 @@ void lai_store(lai_state_t *state, struct lai_operand *dest, lai_variable_t *obj
             }
             case LAI_PACKAGE_INDEX: {
                 lai_variable_t copy = {0};
-                lai_assign_object(&copy, object);
+                lai_var_assign(&copy, object);
                 lai_exec_pkg_var_store(&copy, dest->object.pkg_ptr, dest->object.integer);
-                lai_free_object(&copy);
+                lai_var_finalize(&copy);
                 break;
             }
             default:
@@ -336,11 +336,11 @@ void lai_store(lai_state_t *state, struct lai_operand *dest, lai_variable_t *obj
             break;
         case LAI_ARG_NAME:
             LAI_ENSURE(state->invocation);
-            lai_assign_object(&state->invocation->arg[dest->index], object);
+            lai_var_assign(&state->invocation->arg[dest->index], object);
             break;
         case LAI_LOCAL_NAME:
             LAI_ENSURE(state->invocation);
-            lai_assign_object(&state->invocation->local[dest->index], object);
+            lai_var_assign(&state->invocation->local[dest->index], object);
             break;
         case LAI_DEBUG_NAME:
             if(laihost_handle_amldebug)
@@ -424,11 +424,11 @@ enum lai_object_type lai_obj_get_type(lai_variable_t *object) {
 void lai_exec_get_objectref(lai_state_t *state, struct lai_operand *src, lai_variable_t *object) {
     lai_variable_t temp = {0};
     if (src->tag == LAI_OPERAND_OBJECT) {
-        lai_assign_object(&temp, &src->object);
+        lai_var_assign(&temp, &src->object);
     } else {
         lai_load(state, src, &temp);
     }
-    lai_move_object(object, &temp);
+    lai_var_move(object, &temp);
 }
 
 // Load an integer.
@@ -436,13 +436,13 @@ void lai_exec_get_objectref(lai_state_t *state, struct lai_operand *src, lai_var
 void lai_exec_get_integer(lai_state_t *state, struct lai_operand *src, lai_variable_t *object) {
     lai_variable_t temp = {0};
     if (src->tag == LAI_OPERAND_OBJECT) {
-        lai_assign_object(&temp, &src->object);
+        lai_var_assign(&temp, &src->object);
     } else {
         lai_load(state, src, &temp);
     }
     if(temp.type != LAI_INTEGER)
         lai_panic("lai_load_integer() expects an integer, not a value of type %d", temp.type);
-    lai_move_object(object, &temp);
+    lai_var_move(object, &temp);
 }
 
 lai_api_error_t lai_obj_get_integer(lai_variable_t *object, uint64_t *out) {

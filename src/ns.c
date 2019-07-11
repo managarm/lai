@@ -697,7 +697,7 @@ int lai_check_device_pnp_id(lai_nsnode_t *dev, lai_variable_t *pnp_id,
         }
     }
 
-    lai_free_object(&id);
+    lai_var_finalize(&id);
     return ret;
 }
 

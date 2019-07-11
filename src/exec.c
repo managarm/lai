@@ -37,7 +37,7 @@ void lai_init_state(lai_state_t *state) {
 
 void lai_finalize_state(lai_state_t *state) {
     LAI_ENSURE(!state->invocation);
-    lai_free_object(&state->retvalue);
+    lai_var_finalize(&state->retvalue);
 }
 
 // Pushes a new item to the opstack and returns it.
@@ -62,7 +62,7 @@ static void lai_exec_pop_opstack(lai_state_t *state, int n) {
     for (int k = 0; k < n; k++) {
         struct lai_operand *operand = &state->opstack[state->opstack_ptr - k - 1];
         if (operand->tag == LAI_OPERAND_OBJECT)
-            lai_free_object(&operand->object);
+            lai_var_finalize(&operand->object);
     }
     state->opstack_ptr -= n;
 }
@@ -191,8 +191,8 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
         lai_obj_clone(&out, &result);
         lai_store(state, &operands[1], &result);
 
-        lai_free_object(&objectref);
-        lai_free_object(&out);
+        lai_var_finalize(&objectref);
+        lai_var_finalize(&out);
         break;
     }
     case NOT_OP:
@@ -429,7 +429,7 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
                 lai_panic("Index() is only defined for buffers, strings and packages"
                         " but object of type %d was given", object.type);
         }
-        lai_free_object(&object);
+        lai_var_finalize(&object);
 
         // TODO: Verify that we do NOT have to make a copy.
         lai_store(state, &operands[2], &result);
@@ -538,7 +538,7 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
         lai_panic("undefined opcode in lai_exec_reduce_op: %02X", opcode);
     }
 
-    lai_move_object(reduction_res, &result);
+    lai_var_move(reduction_res, &result);
 }
 
 // TODO: Make this static.
@@ -671,9 +671,9 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
                 if (item->op_want_result) {
                     struct lai_operand *opstack_res = lai_exec_push_opstack_or_die(state);
                     opstack_res->tag = LAI_OPERAND_OBJECT;
-                    lai_move_object(&opstack_res->object, &result);
+                    lai_var_move(&opstack_res->object, &result);
                 } else {
-                    lai_free_object(&result);
+                    lai_var_finalize(&result);
                 }
 
                 lai_exec_pop_stack_back(state);
@@ -795,15 +795,15 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
 
                     lai_variable_t result = {0};
                     lai_exec_method(handle, &nested_state, argc, args);
-                    lai_move_object(&result, &nested_state.retvalue);
+                    lai_var_move(&result, &nested_state.retvalue);
                     lai_finalize_state(&nested_state);
 
                     if (want_result) {
                         struct lai_operand *opstack_res = lai_exec_push_opstack_or_die(state);
                         opstack_res->tag = LAI_OPERAND_OBJECT;
-                        lai_move_object(&opstack_res->object, &result);
+                        lai_var_move(&opstack_res->object, &result);
                     }
-                    lai_free_object(&result);
+                    lai_var_finalize(&result);
                 } else {
                     if (debug_opcodes)
                         lai_debug("parsing name %s [@ %d]", debug_name, opcode_pc);
@@ -953,10 +953,10 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             if (parse_mode == LAI_DATA_MODE || parse_mode == LAI_OBJECT_MODE) {
                 struct lai_operand *opstack_res = lai_exec_push_opstack_or_die(state);
                 opstack_res->tag = LAI_OPERAND_OBJECT;
-                lai_move_object(&opstack_res->object, &result);
+                lai_var_move(&opstack_res->object, &result);
             } else
                 LAI_ENSURE(parse_mode == LAI_EXEC_MODE);
-            lai_free_object(&result);
+            lai_var_finalize(&result);
             break;
         }
         case PACKAGE_OP:
@@ -1016,7 +1016,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
                 lai_panic("opstack is not empty before return");
             struct lai_operand *opstack_res = lai_exec_push_opstack_or_die(state);
             opstack_res->tag = LAI_OPERAND_OBJECT;
-            lai_move_object(&opstack_res->object, &result);
+            lai_var_move(&opstack_res->object, &result);
 
             lai_exec_pop_stack(state, j + 1);
             lai_exec_update_context(state);
@@ -1716,7 +1716,7 @@ int lai_exec_method(lai_nsnode_t *method, lai_state_t *state, int n, lai_variabl
     lai_list_init(&state->invocation->per_method_list);
 
     for (int i = 0; i < n; i++)
-        lai_move_object(&state->invocation->arg[i], &args[i]);
+        lai_var_move(&state->invocation->arg[i], &args[i]);
 
     // Okay, by here it's a real method.
     //lai_debug("execute control method %s", method->path);
@@ -1740,9 +1740,9 @@ int lai_exec_method(lai_nsnode_t *method, lai_state_t *state, int n, lai_variabl
     }
 
     for (int i = 0; i < 7; i++)
-        lai_free_object(&state->invocation->arg[i]);
+        lai_var_finalize(&state->invocation->arg[i]);
     for (int i = 0; i < 8; i++)
-        lai_free_object(&state->invocation->local[i]);
+        lai_var_finalize(&state->invocation->local[i]);
     laihost_free(state->invocation);
     state->invocation = NULL;
 
@@ -1763,7 +1763,7 @@ int lai_exec_method(lai_nsnode_t *method, lai_state_t *state, int n, lai_variabl
     lai_variable_t objectref = {0};
     lai_exec_get_objectref(state, result, &objectref);
     lai_obj_clone(&state->retvalue, &objectref);
-    lai_free_object(&objectref);
+    lai_var_finalize(&objectref);
     lai_exec_pop_opstack(state, 1);
     return 0;
 }
@@ -1793,7 +1793,7 @@ int lai_eval_args(lai_variable_t *result, lai_nsnode_t *handle, lai_state_t *sta
 
             int e = lai_exec_method(handle, state, n, args_copy);
             if (!e && result)
-                lai_move_object(result, lai_retvalue(state));
+                lai_var_move(result, lai_retvalue(state));
             return e;
         }
 
@@ -1812,7 +1812,7 @@ int lai_eval_vargs(lai_variable_t *result, lai_nsnode_t *handle, lai_state_t *st
         lai_variable_t *object = va_arg(vl, lai_variable_t *);
         if (!object)
             break;
-        lai_assign_object(&args[n++], object);
+        lai_var_assign(&args[n++], object);
     }
 
     return lai_eval_args(result, handle, state, n, args);
@@ -1852,7 +1852,7 @@ static void lai_eval_operand(lai_variable_t *destination, lai_state_t *state,
     lai_variable_t objectref = {0};
     lai_exec_get_objectref(state, result, &objectref);
     lai_obj_clone(destination, &objectref);
-    lai_free_object(&objectref);
+    lai_var_finalize(&objectref);
     lai_exec_pop_opstack(state, 1);
 }
 
