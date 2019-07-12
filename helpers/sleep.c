@@ -1,4 +1,3 @@
-
 /*
  * Lux ACPI Implementation
  * Copyright (C) 2018-2019 the lai authors
@@ -8,9 +7,9 @@
 /* As of now, it's only for S5 (shutdown) sleep, because other sleeping states
  * need NVS and other things I still need to research */
 
-#include <lai/core.h>
-#include "libc.h"
-#include "eval.h"
+#include <lai/helpers/sleep.h>
+#include "../core/libc.h"
+#include "../core/eval.h"
 
 // lai_enter_sleep(): Enters a sleeping state
 // Param:    uint8_t state - 0-5 to correspond with states S0-S5

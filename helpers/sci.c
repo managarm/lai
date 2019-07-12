@@ -6,11 +6,9 @@
 
 /* System Control Interrupt Initialization */
 
-#include <lai/core.h>
-#include "libc.h"
-#include "exec_impl.h"
-
-static void lai_init_children(lai_nsnode_t *);
+#include <lai/helpers/sci.h>
+#include "../core/libc.h"
+#include "../core/exec_impl.h"
 
 volatile uint16_t lai_last_event = 0;
 
@@ -111,7 +109,7 @@ int lai_enable_acpi(uint32_t mode) {
     return 0;
 }
 
-static int evaluate_sta(lai_nsnode_t *node) {
+int lai_evaluate_sta(lai_nsnode_t *node) {
     // If _STA not present, assume 0x0F as ACPI spec says.
     uint64_t sta = 0x0F;
 
@@ -130,7 +128,7 @@ static int evaluate_sta(lai_nsnode_t *node) {
     return sta;
 }
 
-static void lai_init_children(lai_nsnode_t *parent) {
+void lai_init_children(lai_nsnode_t *parent) {
     lai_nsnode_t *node;
     lai_nsnode_t *handle;
 

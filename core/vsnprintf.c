@@ -1,3 +1,9 @@
+/*
+ * Lux ACPI Implementation
+ * Copyright (C) 2018-2019 the lai authors
+ */
+// from https://gitlab.com/qookei/quack
+
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>

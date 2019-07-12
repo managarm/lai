@@ -12,12 +12,12 @@
    -specific use. Therefore, nobody should assume it contains the real IRQ. Instead,
    the four PCI pins should be used: LNKA, LNKB, LNKC and LNKD. */
 
-#include <lai/core.h>
-#include "libc.h"
-#include "eval.h"
+#include <lai/helpers/pciroute.h>
+#include "../core/libc.h"
+#include "../core/eval.h"
 
 #define PCI_PNP_ID        "PNP0A03"
-#define PCIE_PNP_ID        "PNP0A08"
+#define PCIE_PNP_ID       "PNP0A08"
 
 int lai_pci_route(acpi_resource_t *dest, uint8_t bus, uint8_t slot, uint8_t function) {
 
