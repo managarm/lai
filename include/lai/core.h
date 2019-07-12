@@ -1,6 +1,6 @@
 /*
  * Lux ACPI Implementation
- * Copyright (C) 2018-2019 by Omar Muhamed
+ * Copyright (C) 2018-2019 the lai authors
  */
 
 #pragma once
@@ -72,7 +72,6 @@ lai_nsnode_t *lai_get_device(size_t);
 int lai_check_device_pnp_id(lai_nsnode_t *, lai_variable_t *, lai_state_t *);
 lai_nsnode_t *lai_enum(char *, size_t);
 void lai_eisaid(lai_variable_t *, char *);
-size_t lai_read_resource(lai_nsnode_t *, acpi_resource_t *);
 lai_nsnode_t *lai_ns_iterate(struct lai_ns_iterator *);
 lai_nsnode_t *lai_ns_child_iterate(struct lai_ns_child_iterator *);
 
@@ -115,16 +114,6 @@ int lai_eval(lai_variable_t *, lai_nsnode_t *, lai_state_t *);
 
 // ACPI Control Methods
 int lai_populate(lai_nsnode_t *, struct lai_aml_segment *, lai_state_t *);
-
-// Generic Functions
-int lai_enable_acpi(uint32_t);
-int lai_disable_acpi();
-uint16_t lai_get_sci_event(void);
-void lai_set_sci_event(uint16_t);
-int lai_enter_sleep(uint8_t);
-__attribute__((deprecated("use lai_pci_route_pin instead")))
-int lai_pci_route(acpi_resource_t *, uint8_t, uint8_t, uint8_t);
-lai_api_error_t lai_pci_route_pin(acpi_resource_t *, uint8_t, uint8_t, uint8_t, uint8_t);
 
 // LAI debugging functions.
 
