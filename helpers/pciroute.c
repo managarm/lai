@@ -19,18 +19,18 @@
 #define PCI_PNP_ID        "PNP0A03"
 #define PCIE_PNP_ID       "PNP0A08"
 
-int lai_pci_route(acpi_resource_t *dest, uint8_t bus, uint8_t slot, uint8_t function) {
+int lai_pci_route(acpi_resource_t *dest, uint16_t seg, uint8_t bus, uint8_t slot, uint8_t function) {
 
-    uint8_t pin = (uint8_t)(laihost_pci_read(bus, slot, function, 0x3C) >> 8);
+    uint8_t pin = (uint8_t)laihost_pci_readb(seg, bus, slot, function, 0x3D);
     if (!pin || pin > 4)
         return 1;
 
-    if (lai_pci_route_pin(dest, bus, slot, function, pin))
+    if (lai_pci_route_pin(dest, seg, bus, slot, function, pin))
         return 1;
     return 0;
 }
 
-lai_api_error_t lai_pci_route_pin(acpi_resource_t *dest, uint8_t bus, uint8_t slot, uint8_t function, uint8_t pin) {
+lai_api_error_t lai_pci_route_pin(acpi_resource_t *dest, uint16_t seg, uint8_t bus, uint8_t slot, uint8_t function, uint8_t pin) {
     LAI_CLEANUP_STATE lai_state_t state;
     lai_init_state(&state);
 
@@ -160,7 +160,7 @@ resolve_pin:
         dest->base = gsi;
         dest->irq_flags = ACPI_IRQ_LEVEL | ACPI_IRQ_ACTIVE_HIGH | ACPI_IRQ_SHARED;
 
-        lai_debug("PCI device %X:%X:%X is using IRQ %d", bus, slot, function, (int)dest->base);
+        lai_debug("PCI device %X:%X:%X:%X is using IRQ %d", seg, bus, slot, function, (int)dest->base);
         return LAI_ERROR_NONE;
     } else if (prt_entry_type == LAI_TYPE_DEVICE) {
         // GSI is determined by an Interrupt Link Device.
@@ -185,7 +185,7 @@ resolve_pin:
 
                 laihost_free(res);
 
-                lai_debug("PCI device %X:%X:%X is using IRQ %d", bus, slot, function, (int)dest->base);
+                lai_debug("PCI device %X:%X:%X:%X is using IRQ %d", seg, bus, slot, function, (int)dest->base);
                 return LAI_ERROR_NONE;
             }
 

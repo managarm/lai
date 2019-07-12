@@ -136,7 +136,7 @@ void lai_init_children(lai_nsnode_t *parent) {
 
     while ((node = lai_ns_child_iterate(&iter))) {
         if (node->type == LAI_NAMESPACE_DEVICE) {
-            int sta = evaluate_sta(node);
+            int sta = lai_evaluate_sta(node);
 
             /* if device is present, evaluate its _INI */
             if (sta & ACPI_STA_PRESENT) {
