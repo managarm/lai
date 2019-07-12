@@ -14,6 +14,7 @@
 #include "util-macros.h"
 
 static int debug_opcodes = 0;
+static int debug_stack = 0;
 
 /* ACPI Control Method Execution */
 /* Type1Opcode := DefBreak | DefBreakPoint | DefContinue | DefFatal | DefIfElse |
@@ -575,6 +576,14 @@ size_t lai_parse_integer(uint8_t *object, uint64_t *out) {
 static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state_t *state) {
     lai_stackitem_t *item;
     while ((item = lai_exec_peek_stack_back(state))) {
+        if (debug_stack)
+            for (int i = 0; ; i++) {
+                lai_stackitem_t *trace_item = lai_exec_peek_stack(state, i);
+                if (!trace_item)
+                    break;
+                lai_debug("stack item %d is of type %d", i, trace_item->kind);
+            }
+
         lai_stackitem_t *ctx_item = lai_exec_context(state);
         lai_nsnode_t *ctx_handle = ctx_item->ctx_handle;
 
@@ -582,6 +591,12 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
         // If an opcode sequence contains a pkgsize, the sequence generally ends at:
         //     opcode_pc + pkgsize + opcode size.
         int opcode_pc = state->pc;
+
+        // PC relative to the start of the table.
+        // This matches the offsets in the output of 'iasl -l'.
+        size_t table_pc = sizeof(acpi_header_t)
+                          + (method - amls->table->data)
+                          + opcode_pc;
 
         // Parse mode. Affects the parsing of certain opcode bytes.
         int parse_mode = LAI_EXEC_MODE;
@@ -726,12 +741,22 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
                 lai_exec_pop_stack_back(state);
                 continue;
             }
+
+            if (state->pc > item->cond_end)
+                lai_panic("execution escaped out of code range"
+                          " [0x%x, in LAI_COND_STACKITEM])",
+                          table_pc);
         } else
             lai_panic("unexpected lai_stackitem_t");
 
+        size_t table_limit_pc = sizeof(acpi_header_t)
+                          + (method - amls->table->data)
+                          + state->limit;
+
         if (state->pc >= state->limit) // This would be an interpreter bug.
-            lai_panic("execution escaped out of code range (PC is 0x%x with limit 0x%x)",
-                    state->pc, state->limit);
+            lai_panic("execution escaped out of code range"
+                      " [0x%x, limit 0x%x])",
+                      table_pc, table_limit_pc);
 
         // Whether we use the result of an expression or not.
         // If yes, it will be pushed onto the opstack after the expression is computed.
@@ -757,7 +782,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
 
             if (parse_mode == LAI_REFERENCE_MODE) {
                 if (debug_opcodes)
-                    lai_debug("parsing name %s [@ %d]", debug_name, opcode_pc);
+                    lai_debug("parsing name %s [@ 0x%x]", debug_name, table_pc);
 
                 struct lai_operand *opstack_res = lai_exec_push_opstack_or_die(state);
                 opstack_res->tag = LAI_UNRESOLVED_NAME;
@@ -765,7 +790,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
                 opstack_res->unres_aml = method + opcode_pc;
             }else if (parse_mode == LAI_DATA_MODE) {
                 if (debug_opcodes)
-                    lai_debug("parsing name %s [@ %d]", debug_name, opcode_pc);
+                    lai_debug("parsing name %s [@ 0x%x]", debug_name, table_pc);
 
                 struct lai_operand *opstack_res = lai_exec_push_opstack_or_die(state);
                 opstack_res->tag = LAI_OPERAND_OBJECT;
@@ -782,7 +807,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
 
                 if(handle->type == LAI_NAMESPACE_METHOD) {
                     if (debug_opcodes)
-                        lai_debug("parsing invocation %s [@ %d]", debug_name, opcode_pc);
+                        lai_debug("parsing invocation %s [@ 0x%x]", debug_name, table_pc);
 
                     lai_variable_t args[7];
                     memset(args, 0, sizeof(lai_variable_t) * 7);
@@ -806,7 +831,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
                     lai_var_finalize(&result);
                 } else {
                     if (debug_opcodes)
-                        lai_debug("parsing name %s [@ %d]", debug_name, opcode_pc);
+                        lai_debug("parsing name %s [@ 0x%x]", debug_name, table_pc);
 
                     if (want_result) {
                         struct lai_operand *opstack_res = lai_exec_push_opstack_or_die(state);
@@ -827,9 +852,6 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
         } else
             opcode = method[state->pc];
         if (debug_opcodes) {
-            size_t table_pc = sizeof(acpi_header_t)
-                              + (method - amls->table->data)
-                              + opcode_pc;
             lai_debug("parsing opcode 0x%02x [0x%x @ %c%c%c%c %d]", opcode, table_pc,
                     amls->table->header.signature[0],
                     amls->table->header.signature[1],
