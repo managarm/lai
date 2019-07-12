@@ -53,9 +53,11 @@ void lai_read_field(lai_variable_t *destination, lai_nsnode_t *field) {
 
     // these are for PCI
     lai_variable_t bus_number = {0};
+    lai_variable_t seg_number = {0};
     lai_variable_t address_number = {0};
-    int bbn_result = 0; // When _BBN is not present, we assume PCI bus 0.
-    int adr_result = 0; // When _ADR is not present, again, default to zero.
+    uint64_t bbn_result = 0; // When _BBN is not present, we assume PCI bus 0.
+    uint64_t seg_result = 0; // When _SEG is not present, we default to Segment Group 0
+    uint64_t adr_result = 0; // When _ADR is not present, again, default to zero.
     size_t pci_byte_offset;
 
     if (opregion->op_address_space != OPREGION_PCI) {
@@ -149,6 +151,14 @@ void lai_read_field(lai_variable_t *destination, lai_nsnode_t *field) {
         LAI_CLEANUP_STATE lai_state_t state;
         lai_init_state(&state);
 
+        // PCI seg number is in the _SEG object.
+        lai_nsnode_t *seg_handle = lai_resolve_search(opregion, "_SEG");
+        if (seg_handle) {
+            if (lai_eval(&seg_number, seg_handle, &state))
+                lai_panic("could not evaluate _SEG of OperationRegion()");
+            bbn_result = seg_number.integer;
+        }
+
         // PCI bus number is in the _BBN object.
         lai_nsnode_t *bbn_handle = lai_resolve_search(opregion, "_BBN");
         if (bbn_handle) {
@@ -167,7 +177,8 @@ void lai_read_field(lai_variable_t *destination, lai_nsnode_t *field) {
 
         if (!laihost_pci_read)
             lai_panic("host does not provide PCI access functions");
-        value = laihost_pci_read((uint8_t)bbn_result,
+        value = laihost_pci_read((uint16_t)seg_result,
+                                 (uint8_t)bbn_result,
                                  (uint8_t)(adr_result >> 16) & 0xFF,
                                  (uint8_t)(adr_result & 0xFF),
                                  (offset & 0xFFFC) + opregion->op_base);
@@ -195,9 +206,11 @@ void lai_write_field(lai_nsnode_t *field, lai_variable_t *source) {
 
     // these are for PCI
     lai_variable_t bus_number = {0};
+    lai_variable_t seg_number = {0};
     lai_variable_t address_number = {0};
-    int bbn_result = 0; // When _BBN is not present, we assume PCI bus 0.
-    int adr_result = 0; // When _ADR is not present, again, default to zero.
+    uint64_t bbn_result = 0; // When _BBN is not present, we assume PCI bus 0.
+    uint64_t seg_result = 0; // When _SEG is not present, we default to Segment Group 0
+    uint64_t adr_result = 0; // When _ADR is not present, again, default to zero.
     size_t pci_byte_offset;
 
     if (opregion->op_address_space != OPREGION_PCI) {
@@ -291,6 +304,14 @@ void lai_write_field(lai_nsnode_t *field, lai_variable_t *source) {
         LAI_CLEANUP_STATE lai_state_t state;
         lai_init_state(&state);
 
+        // PCI seg number is in the _SEG object.
+        lai_nsnode_t *seg_handle = lai_resolve_search(opregion, "_SEG");
+        if (seg_handle) {
+            if (lai_eval(&seg_number, seg_handle, &state))
+                lai_panic("could not evaluate _SEG of OperationRegion()");
+            bbn_result = seg_number.integer;
+        }
+
         // PCI bus number is in the _BBN object.
         lai_nsnode_t *bbn_handle = lai_resolve_search(opregion, "_BBN");
         if (bbn_handle) {
@@ -309,7 +330,8 @@ void lai_write_field(lai_nsnode_t *field, lai_variable_t *source) {
 
         if (!laihost_pci_read)
             lai_panic("host does not provide PCI access functions");
-        value = laihost_pci_read((uint8_t)bbn_result,
+        value = laihost_pci_read((uint16_t)seg_result,
+                                 (uint8_t)bbn_result,
                                  (uint8_t)(adr_result >> 16) & 0xFF,
                                  (uint8_t)(adr_result & 0xFF),
                                  (offset & 0xFFFC) + opregion->op_base);
@@ -388,7 +410,8 @@ void lai_write_field(lai_nsnode_t *field, lai_variable_t *source) {
     } else if (opregion->op_address_space == OPREGION_PCI) {
         if (!laihost_pci_write)
             lai_panic("host does not provide PCI access functions");
-        laihost_pci_write((uint8_t)bbn_result,
+        laihost_pci_write((uint16_t)seg_result,
+                          (uint8_t)bbn_result,
                           (uint8_t)(adr_result >> 16) & 0xFF,
                           (uint8_t)(adr_result & 0xFF),
                           (offset & 0xFFFC) + opregion->op_base, (uint32_t)value);
