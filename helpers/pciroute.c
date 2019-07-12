@@ -21,7 +21,7 @@
 
 int lai_pci_route(acpi_resource_t *dest, uint16_t seg, uint8_t bus, uint8_t slot, uint8_t function) {
 
-    uint8_t pin = (uint8_t)(laihost_pci_read(seg, bus, slot, function, 0x3C) >> 8);
+    uint8_t pin = (uint8_t)laihost_pci_readb(seg, bus, slot, function, 0x3D);
     if (!pin || pin > 4)
         return 1;
 

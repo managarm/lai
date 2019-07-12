@@ -48,7 +48,8 @@ void lai_read_field(lai_variable_t *destination, lai_nsnode_t *field) {
 
     mask = ((uint64_t)1 << field->fld_size);
     mask--;
-    offset = field->fld_offset / 8;
+    if (opregion->op_address_space != OPREGION_PCI) offset = field->fld_offset / 8;
+    else offset = field->fld_offset;
     void *mmio;
 
     // these are for PCI
@@ -175,15 +176,36 @@ void lai_read_field(lai_variable_t *destination, lai_nsnode_t *field) {
             adr_result = address_number.integer;
         }
 
-        if (!laihost_pci_read)
-            lai_panic("host does not provide PCI access functions");
-        value = laihost_pci_read((uint16_t)seg_result,
+       switch (field->fld_flags & 0x0F) {
+            case FIELD_BYTE_ACCESS:
+                if (!laihost_pci_readb) lai_panic("host does not provide PCI access functions");
+                value = laihost_pci_readb((uint16_t)seg_result,
                                  (uint8_t)bbn_result,
                                  (uint8_t)(adr_result >> 16) & 0xFF,
                                  (uint8_t)(adr_result & 0xFF),
                                  (offset & 0xFFFC) + opregion->op_base);
-
-       value >>= bit_offset;
+                break;
+            case FIELD_WORD_ACCESS:
+                if (!laihost_pci_readw) lai_panic("host does not provide PCI access functions");
+                value = laihost_pci_readw((uint16_t)seg_result,
+                                 (uint8_t)bbn_result,
+                                 (uint8_t)(adr_result >> 16) & 0xFF,
+                                 (uint8_t)(adr_result & 0xFF),
+                                 (offset & 0xFFFC) + opregion->op_base);
+                break;
+            case FIELD_DWORD_ACCESS:
+            case FIELD_ANY_ACCESS:
+                if (!laihost_pci_readd) lai_panic("host does not provide PCI access functions");
+                value = laihost_pci_readd((uint16_t)seg_result,
+                                 (uint8_t)bbn_result,
+                                 (uint8_t)(adr_result >> 16) & 0xFF,
+                                 (uint8_t)(adr_result & 0xFF),
+                                 (offset & 0xFFFC) + opregion->op_base);
+                break;
+            default:
+                lai_panic("undefined field flags 0x%02X: %s", field->fld_flags,
+                          lai_stringify_node_path(field));
+        }
     } else {
         lai_panic("undefined opregion address space: %d", opregion->op_address_space);
     }
@@ -328,13 +350,36 @@ void lai_write_field(lai_nsnode_t *field, lai_variable_t *source) {
             adr_result = address_number.integer;
         }
 
-        if (!laihost_pci_read)
-            lai_panic("host does not provide PCI access functions");
-        value = laihost_pci_read((uint16_t)seg_result,
+       switch (field->fld_flags & 0x0F) {
+            case FIELD_BYTE_ACCESS:
+                if (!laihost_pci_readb) lai_panic("host does not provide PCI access functions");
+                value = laihost_pci_readb((uint16_t)seg_result,
                                  (uint8_t)bbn_result,
                                  (uint8_t)(adr_result >> 16) & 0xFF,
                                  (uint8_t)(adr_result & 0xFF),
                                  (offset & 0xFFFC) + opregion->op_base);
+                break;
+            case FIELD_WORD_ACCESS:
+                if (!laihost_pci_readw) lai_panic("host does not provide PCI access functions");
+                value = laihost_pci_readw((uint16_t)seg_result,
+                                 (uint8_t)bbn_result,
+                                 (uint8_t)(adr_result >> 16) & 0xFF,
+                                 (uint8_t)(adr_result & 0xFF),
+                                 (offset & 0xFFFC) + opregion->op_base);
+                break;
+            case FIELD_DWORD_ACCESS:
+            case FIELD_ANY_ACCESS:
+                if (!laihost_pci_readd) lai_panic("host does not provide PCI access functions");
+                value = laihost_pci_readd((uint16_t)seg_result,
+                                 (uint8_t)bbn_result,
+                                 (uint8_t)(adr_result >> 16) & 0xFF,
+                                 (uint8_t)(adr_result & 0xFF),
+                                 (offset & 0xFFFC) + opregion->op_base);
+                break;
+            default:
+                lai_panic("undefined field flags 0x%02X: %s", field->fld_flags,
+                          lai_stringify_node_path(field));
+        }
     } else {
         lai_panic("undefined opregion address space: %d", opregion->op_address_space);
     }
@@ -408,13 +453,42 @@ void lai_write_field(lai_nsnode_t *field, lai_variable_t *source) {
                 lai_panic("undefined field flags 0x%02X", field->fld_flags);
         }
     } else if (opregion->op_address_space == OPREGION_PCI) {
-        if (!laihost_pci_write)
-            lai_panic("host does not provide PCI access functions");
-        laihost_pci_write((uint16_t)seg_result,
-                          (uint8_t)bbn_result,
-                          (uint8_t)(adr_result >> 16) & 0xFF,
-                          (uint8_t)(adr_result & 0xFF),
-                          (offset & 0xFFFC) + opregion->op_base, (uint32_t)value);
+        switch (field->fld_flags & 0x0F) {
+            case FIELD_BYTE_ACCESS:
+                if (!laihost_pci_writeb) lai_panic("host does not provide PCI access functions");
+                laihost_pci_writeb((uint16_t)seg_result,
+                                 (uint8_t)bbn_result,
+                                 (uint8_t)(adr_result >> 16) & 0xFF,
+                                 (uint8_t)(adr_result & 0xFF),
+                                 (offset & 0xFFFC) + opregion->op_base,
+                                 (uint8_t)value);
+                break;
+            case FIELD_WORD_ACCESS:
+                if (!laihost_pci_writew) lai_panic("host does not provide PCI access functions");
+                laihost_pci_writew((uint16_t)seg_result,
+                                 (uint8_t)bbn_result,
+                                 (uint8_t)(adr_result >> 16) & 0xFF,
+                                 (uint8_t)(adr_result & 0xFF),
+                                 (offset & 0xFFFC) + opregion->op_base,
+                                 (uint16_t)value);
+                break;
+            case FIELD_DWORD_ACCESS:
+            case FIELD_ANY_ACCESS:
+                if (!laihost_pci_writed) lai_panic("host does not provide PCI access functions");
+                laihost_pci_writed((uint16_t)seg_result,
+                                 (uint8_t)bbn_result,
+                                 (uint8_t)(adr_result >> 16) & 0xFF,
+                                 (uint8_t)(adr_result & 0xFF),
+                                 (offset & 0xFFFC) + opregion->op_base,
+                                 (uint32_t)value);
+                break;
+            default:
+                lai_panic("undefined field flags 0x%02X: %s", field->fld_flags,
+                          lai_stringify_node_path(field));
+        }
+
+
+
     } else {
         lai_panic("undefined opregion address space: %d", opregion->op_address_space);
     }
