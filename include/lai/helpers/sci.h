@@ -1,5 +1,5 @@
 /*
- * Lux ACPI Implementation
+ * Lightweight ACPI Implementation
  * Copyright (C) 2018-2019 the lai authors
  */
 
