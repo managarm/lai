@@ -31,6 +31,7 @@ static void lai_eval_operand(lai_variable_t *destination, lai_state_t *state,
 void lai_init_state(lai_state_t *state) {
     memset(state, 0, sizeof(lai_state_t));
     state->stack_ptr = -1;
+    state->innermost_block = -1;
     state->context_ptr = -1;
 }
 
@@ -88,6 +89,13 @@ static lai_stackitem_t *lai_exec_peek_stack_back(lai_state_t *state) {
     return lai_exec_peek_stack(state, 0);
 }
 
+// Returns the lai_stackitem_t pointed to by the state's context_ptr.
+static lai_stackitem_t *lai_exec_peek_stack_at(lai_state_t *state, int n) {
+    if (n < 0)
+        return NULL;
+    return &state->stack[n];
+}
+
 // Removes n items from the stack.
 static void lai_exec_pop_stack(lai_state_t *state, int n) {
     state->stack_ptr -= n;
@@ -96,11 +104,6 @@ static void lai_exec_pop_stack(lai_state_t *state, int n) {
 // Removes the last item from the stack.
 static void lai_exec_pop_stack_back(lai_state_t *state) {
     lai_exec_pop_stack(state, 1);
-}
-
-// Returns the lai_stackitem_t pointed to by the state's context_ptr.
-static lai_stackitem_t *lai_exec_context(lai_state_t *state) {
-    return &state->stack[state->context_ptr];
 }
 
 // Updates the state's context_ptr to point to the innermost context item.
@@ -596,13 +599,16 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
                 lai_debug("stack item %d is of type %d", i, trace_item->kind);
             }
 
-        lai_stackitem_t *ctx_item = lai_exec_context(state);
+        lai_stackitem_t *ctx_item = lai_exec_peek_stack_at(state, state->context_ptr);
+        lai_stackitem_t *block = lai_exec_peek_stack_at(state, state->innermost_block);
+        LAI_ENSURE(ctx_item);
+        LAI_ENSURE(block);
         lai_nsnode_t *ctx_handle = ctx_item->ctx_handle;
 
         // Package-size encoding (and similar) needs to know the PC of the opcode.
         // If an opcode sequence contains a pkgsize, the sequence generally ends at:
         //     opcode_pc + pkgsize + opcode size.
-        int opcode_pc = state->pc;
+        int opcode_pc = block->pc;
 
         // PC relative to the start of the table.
         // This matches the offsets in the output of 'iasl -l'.
@@ -614,17 +620,18 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
         int parse_mode = LAI_EXEC_MODE;
 
         if (item->kind == LAI_POPULATE_CONTEXT_STACKITEM) {
-    		if (state->pc == item->ctx_limit) {
+            if (block->pc == item->ctx_limit) {
+                state->innermost_block = item->outer_block;
     			lai_exec_pop_stack_back(state);
                 lai_exec_update_context(state);
     			continue;
     		}
 
-            if (state->pc > item->ctx_limit) // This would be an interpreter bug.
+            if (block->pc > item->ctx_limit) // This would be an interpreter bug.
                 lai_panic("namespace population escaped out of code range");
         } else if(item->kind == LAI_METHOD_CONTEXT_STACKITEM) {
     		// ACPI does an implicit Return(0) at the end of a control method.
-    		if (state->pc == state->limit) {
+            if (block->pc == block->limit) {
     			if (state->opstack_ptr) // This is an internal error.
     				lai_panic("opstack is not empty before return");
                 struct lai_operand *result = lai_exec_push_opstack_or_die(state);
@@ -632,6 +639,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
                 result->object.type = LAI_INTEGER;
                 result->object.integer = 0;
 
+                state->innermost_block = item->outer_block;
     			lai_exec_pop_stack_back(state);
                 lai_exec_update_context(state);
     			continue;
@@ -662,15 +670,16 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             }
             LAI_ENSURE(state->opstack_ptr == item->opstack_frame + 1);
 
-            if (state->pc == item->pkg_end) {
+            if (block->pc == item->pkg_end) {
                 if (!item->pkg_want_result)
                     lai_exec_pop_opstack(state, 1);
 
+                state->innermost_block = item->outer_block;
                 lai_exec_pop_stack_back(state);
                 continue;
             }
 
-            if (state->pc > item->pkg_end) // This would be an interpreter bug.
+            if (block->pc > item->pkg_end) // This would be an interpreter bug.
                 lai_panic("package initializer escaped out of code range");
 
             parse_mode = LAI_DATA_MODE;
@@ -709,52 +718,35 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
 
             parse_mode = item->op_arg_modes[k];
         } else if (item->kind == LAI_LOOP_STACKITEM) {
-            if (state->pc == item->loop_pred) {
+            if (block->pc == item->loop_pred) {
                 // We are at the beginning of a loop. We check the predicate; if it is false,
                 // we jump to the end of the loop and remove the stack item.
                 lai_variable_t predicate = {0};
                 lai_eval_operand(&predicate, state, amls, method);
                 if (!predicate.integer) {
-                    state->pc = item->loop_end;
+                    block->pc = item->loop_end;
+                    state->innermost_block = item->outer_block;
                     lai_exec_pop_stack_back(state);
                 }
                 continue;
-            } else if (state->pc == item->loop_end) {
+            } else if (block->pc == item->loop_end) {
                 // Unconditionally jump to the loop's predicate.
-                state->pc = item->loop_pred;
+                block->pc = item->loop_pred;
                 continue;
             }
 
-            if (state->pc > item->loop_end) // This would be an interpreter bug.
+            if (block->pc > item->loop_end) // This would be an interpreter bug.
                 lai_panic("execution escaped out of While() body");
         } else if (item->kind == LAI_COND_STACKITEM) {
             // If the condition wasn't taken, execute the Else() block if it exists
-            if (!item->cond_taken) {
-                if (method[state->pc] == ELSE_OP) {
-                    size_t else_size;
-                    state->pc++;
-                    state->pc += lai_parse_pkgsize(method + state->pc, &else_size);
-                }
-
-                lai_exec_pop_stack_back(state);
-                continue;
-            }
-
             // Clean up the execution stack at the end of If().
-            if (state->pc == item->cond_end) {
-                // Consume a follow-up Else() opcode.
-                if (state->pc < state->limit && method[state->pc] == ELSE_OP) {
-                    state->pc++;
-                    size_t else_size;
-                    state->pc += lai_parse_pkgsize(method + state->pc, &else_size);
-                    state->pc = opcode_pc + else_size + 1;
-                }
-
+            if (item->pc == item->limit) {
+                state->innermost_block = item->outer_block;
                 lai_exec_pop_stack_back(state);
                 continue;
             }
 
-            if (state->pc > item->cond_end)
+            if (item->pc > item->limit)
                 lai_panic("execution escaped out of code range"
                           " [0x%x, in LAI_COND_STACKITEM])",
                           table_pc);
@@ -763,9 +755,9 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
 
         size_t table_limit_pc = sizeof(acpi_header_t)
                           + (method - amls->table->data)
-                          + state->limit;
+                          + block->limit;
 
-        if (state->pc >= state->limit) // This would be an interpreter bug.
+        if (block->pc >= block->limit) // This would be an interpreter bug.
             lai_panic("execution escaped out of code range"
                       " [0x%x, limit 0x%x])",
                       table_pc, table_limit_pc);
@@ -778,15 +770,15 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             struct lai_operand *result = lai_exec_push_opstack_or_die(state);
             result->tag = LAI_OPERAND_OBJECT;
             result->object.type = LAI_INTEGER;
-            result->object.integer = (method[state->pc + 1] << 8) | method[state->pc];
-            state->pc += 2;
+            result->object.integer = (method[block->pc + 1] << 8) | method[block->pc];
+            block->pc += 2;
             continue;
         }
 
         // Process names.
-        if (lai_is_name(method[state->pc])) {
+        if (lai_is_name(method[block->pc])) {
             struct lai_amlname amln;
-            state->pc += lai_amlname_parse(&amln, method + state->pc);
+            block->pc += lai_amlname_parse(&amln, method + block->pc);
 
             LAI_CLEANUP_FREE_STRING char *debug_name = NULL;
             if (debug_opcodes)
@@ -857,12 +849,12 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
 
         /* General opcodes */
         int opcode;
-        if (method[state->pc] == EXTOP_PREFIX) {
-            if (state->pc + 1 == state->limit)
+        if (method[block->pc] == EXTOP_PREFIX) {
+            if (block->pc + 1 == block->limit)
                 lai_panic("two-byte opcode on method boundary");
-            opcode = (EXTOP_PREFIX << 8) | method[state->pc + 1];
+            opcode = (EXTOP_PREFIX << 8) | method[block->pc + 1];
         } else
-            opcode = method[state->pc];
+            opcode = method[block->pc];
         if (debug_opcodes) {
             lai_debug("parsing opcode 0x%02x [0x%x @ %c%c%c%c %d]", opcode, table_pc,
                     amls->table->header.signature[0],
@@ -875,7 +867,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
         // This switch handles the majority of all opcodes.
         switch (opcode) {
         case NOP_OP:
-            state->pc++;
+            block->pc++;
             break;
 
         case ZERO_OP:
@@ -892,7 +884,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
                 lai_warn("Zero() in execution mode has no effect");
                 LAI_ENSURE(parse_mode == LAI_EXEC_MODE);
             }
-            state->pc++;
+            block->pc++;
             break;
         case ONE_OP:
             if (parse_mode == LAI_DATA_MODE || parse_mode == LAI_OBJECT_MODE) {
@@ -904,7 +896,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
                 lai_warn("One() in execution mode has no effect");
                 LAI_ENSURE(parse_mode == LAI_EXEC_MODE);
             }
-            state->pc++;
+            block->pc++;
             break;
         case ONES_OP:
             if (parse_mode == LAI_DATA_MODE || parse_mode == LAI_OBJECT_MODE) {
@@ -916,7 +908,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
                 lai_warn("Ones() in execution mode has no effect");
                 LAI_ENSURE(parse_mode == LAI_EXEC_MODE);
             }
-            state->pc++;
+            block->pc++;
             break;
 
         case BYTEPREFIX:
@@ -925,7 +917,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
         case QWORDPREFIX:
         {
             uint64_t integer;
-            size_t integer_size = lai_parse_integer(method + state->pc, &integer);
+            size_t integer_size = lai_parse_integer(method + block->pc, &integer);
             if (!integer_size)
                 lai_panic("failed to parse integer opcode");
             if (parse_mode == LAI_DATA_MODE || parse_mode == LAI_OBJECT_MODE) {
@@ -935,17 +927,17 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
                 result->object.integer = integer;
             } else
                 LAI_ENSURE(parse_mode == LAI_EXEC_MODE);
-            state->pc += integer_size;
+            block->pc += integer_size;
             break;
         }
         case STRINGPREFIX:
         {
-            state->pc++;
+            block->pc++;
 
             size_t n = 0; // Determine the length of null-terminated string.
-            while (state->pc + n < state->limit && method[state->pc + n])
+            while (block->pc + n < block->limit && method[block->pc + n])
                 n++;
-            if (state->pc + n == state->limit)
+            if (block->pc + n == block->limit)
                 lai_panic("unterminated string in AML code");
 
             if (parse_mode == LAI_DATA_MODE || parse_mode == LAI_OBJECT_MODE) {
@@ -953,20 +945,20 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
                 opstack_res->tag = LAI_OPERAND_OBJECT;
                 if(lai_create_string(&opstack_res->object, n))
                     lai_panic("could not allocate memory for string");
-                memcpy(lai_exec_string_access(&opstack_res->object), method + state->pc, n);
+                memcpy(lai_exec_string_access(&opstack_res->object), method + block->pc, n);
             } else
                 LAI_ENSURE(parse_mode == LAI_EXEC_MODE);
-            state->pc += n + 1;
+            block->pc += n + 1;
             break;
         }
         case BUFFER_OP:
         {
-            state->pc++;        // Skip BUFFER_OP.
+            block->pc++;        // Skip BUFFER_OP.
 
             // Size of the buffer initializer.
             // Note that not all elements of the buffer need to be initialized.
             size_t encoded_size;
-            state->pc += lai_parse_pkgsize(method + state->pc, &encoded_size);
+            block->pc += lai_parse_pkgsize(method + block->pc, &encoded_size);
 
             // The size of the buffer in bytes.
             lai_variable_t buffer_size = {0};
@@ -976,13 +968,13 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             if (lai_create_buffer(&result, buffer_size.integer))
                  lai_panic("failed to allocate memory for AML buffer");
 
-            int initial_size = (opcode_pc + encoded_size + 1) - state->pc;
+            int initial_size = (opcode_pc + encoded_size + 1) - block->pc;
             if (initial_size < 0)
                 lai_panic("buffer initializer has negative size");
             if (initial_size > lai_exec_buffer_size(&result))
                 lai_panic("buffer initializer overflows buffer");
-            memcpy(lai_exec_buffer_access(&result), method + state->pc, initial_size);
-            state->pc += initial_size;
+            memcpy(lai_exec_buffer_access(&result), method + block->pc, initial_size);
+            block->pc += initial_size;
 
             if (parse_mode == LAI_DATA_MODE || parse_mode == LAI_OBJECT_MODE) {
                 struct lai_operand *opstack_res = lai_exec_push_opstack_or_die(state);
@@ -995,28 +987,34 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
         }
         case PACKAGE_OP:
         {
-            state->pc++;
+            block->pc++;
 
             // Size of the package initializer.
             // Note that not all elements of the package need to be initialized.
             size_t encoded_size;
-            state->pc += lai_parse_pkgsize(method + state->pc, &encoded_size);
+            block->pc += lai_parse_pkgsize(method + block->pc, &encoded_size);
 
             // The number of elements of the package.
-            int num_ents = method[state->pc];
-            state->pc++;
+            int num_ents = method[block->pc];
+            block->pc++;
 
             lai_stackitem_t *pkg_item = lai_exec_push_stack_or_die(state);
             pkg_item->kind = LAI_PKG_INITIALIZER_STACKITEM;
+            pkg_item->pc = block->pc;
+            pkg_item->limit = opcode_pc + 1 + encoded_size;
+            pkg_item->outer_block = state->innermost_block;
             pkg_item->opstack_frame = state->opstack_ptr;
             pkg_item->pkg_index = 0;
             pkg_item->pkg_end = opcode_pc + encoded_size + 1;
             pkg_item->pkg_want_result = want_result;
+            state->innermost_block = state->stack_ptr;
 
             struct lai_operand *opstack_pkg = lai_exec_push_opstack_or_die(state);
             opstack_pkg->tag = LAI_OPERAND_OBJECT;
             if (lai_create_pkg(&opstack_pkg->object, num_ents))
                 lai_panic("could not allocate memory for package");
+
+            block->pc = opcode_pc + 1 + encoded_size;
             break;
         }
 
@@ -1024,7 +1022,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
         /* So we need to take this into consideration */
         case RETURN_OP:
         {
-            state->pc++;
+            block->pc++;
             lai_variable_t result = {0};
             lai_eval_operand(&result, state, amls, method);
 
@@ -1048,6 +1046,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             opstack_res->tag = LAI_OPERAND_OBJECT;
             lai_var_move(&opstack_res->object, &result);
 
+            state->innermost_block = method_item->outer_block;
             lai_exec_pop_stack(state, j + 1);
             lai_exec_update_context(state);
             break;
@@ -1056,13 +1055,19 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
         case WHILE_OP:
         {
             size_t loop_size;
-            state->pc++;
-            state->pc += lai_parse_pkgsize(&method[state->pc], &loop_size);
+            block->pc++;
+            block->pc += lai_parse_pkgsize(&method[block->pc], &loop_size);
 
             lai_stackitem_t *loop_item = lai_exec_push_stack_or_die(state);
             loop_item->kind = LAI_LOOP_STACKITEM;
-            loop_item->loop_pred = state->pc;
+            loop_item->pc = block->pc;
+            loop_item->limit = opcode_pc + 1 + loop_size;
+            loop_item->outer_block = state->innermost_block;
+            loop_item->loop_pred = block->pc;
             loop_item->loop_end = opcode_pc + loop_size + 1;
+            state->innermost_block = state->stack_ptr;
+
+            block->pc = opcode_pc + 1 + loop_size;
             break;
         }
         /* Continue Looping */
@@ -1082,8 +1087,9 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             }
 
             // Keep the loop item but remove nested items from the exeuction stack.
-            state->pc = loop_item->loop_pred;
+            block->pc = loop_item->loop_pred;
             lai_exec_pop_stack(state, j);
+            state->innermost_block = state->stack_ptr;
             break;
         }
         /* Break Loop */
@@ -1103,7 +1109,8 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             }
 
             // Remove the loop item from the execution stack.
-            state->pc = loop_item->loop_end;
+            block->pc = loop_item->loop_end;
+            state->innermost_block = loop_item->outer_block;
             lai_exec_pop_stack(state, j + 1);
             break;
         }
@@ -1111,21 +1118,40 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
         case IF_OP:
         {
             size_t if_size;
-            state->pc++;
-            state->pc += lai_parse_pkgsize(method + state->pc, &if_size);
+            block->pc++;
+            block->pc += lai_parse_pkgsize(method + block->pc, &if_size);
 
             // Evaluate the predicate
             lai_variable_t predicate = {0};
             lai_eval_operand(&predicate, state, amls, method);
 
-            lai_stackitem_t *cond_item = lai_exec_push_stack_or_die(state);
-            cond_item->kind = LAI_COND_STACKITEM;
-            cond_item->cond_taken = predicate.integer;
-            cond_item->cond_end = opcode_pc + if_size + 1;
+            if (predicate.integer) {
+                lai_stackitem_t *cond_item = lai_exec_push_stack_or_die(state);
+                cond_item->kind = LAI_COND_STACKITEM;
+                cond_item->pc = block->pc;
+                cond_item->limit = opcode_pc + 1 + if_size;
+                cond_item->outer_block = state->innermost_block;
+                state->innermost_block = state->stack_ptr;
+            }
 
-            if (!cond_item->cond_taken)
-                state->pc = cond_item->cond_end;
+            // Look for an else block.
+            block->pc = opcode_pc + 1 + if_size;
+            if (block->pc < block->limit && method[block->pc] == ELSE_OP) {
+                size_t else_size;
+                block->pc++;
+                block->pc += lai_parse_pkgsize(method + block->pc, &else_size);
 
+                if (!predicate.integer) {
+                    lai_stackitem_t *cond_item = lai_exec_push_stack_or_die(state);
+                    cond_item->kind = LAI_COND_STACKITEM;
+                    cond_item->pc = block->pc;
+                    cond_item->limit = opcode_pc + 1 + if_size + 1 + else_size;
+                    cond_item->outer_block = state->innermost_block;
+                    state->innermost_block = state->stack_ptr;
+                }
+
+                block->pc = opcode_pc + 1 + if_size + 1 + else_size;
+            }
             break;
         }
         case ELSE_OP:
@@ -1135,10 +1161,10 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
         // "Simple" objects in the ACPI namespace.
         case NAME_OP:
         {
-            state->pc++;
+            block->pc++;
 
             struct lai_amlname amln;
-            state->pc += lai_amlname_parse(&amln, method + state->pc);
+            block->pc += lai_amlname_parse(&amln, method + block->pc);
 
             lai_nsnode_t *node = lai_create_nsnode_or_die();
             node->type = LAI_NAMESPACE_NAME;
@@ -1154,12 +1180,12 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
         // Scope-like objects in the ACPI namespace.
         case SCOPE_OP:
         {
-            state->pc++;
+            block->pc++;
 
             size_t encoded_size;
             struct lai_amlname amln;
-            state->pc += lai_parse_pkgsize(method + state->pc, &encoded_size);
-            state->pc += lai_amlname_parse(&amln, method + state->pc);
+            block->pc += lai_parse_pkgsize(method + block->pc, &encoded_size);
+            block->pc += lai_amlname_parse(&amln, method + block->pc);
 
             lai_nsnode_t *scoped_ctx_handle = lai_do_resolve(ctx_handle, &amln);
             if (!scoped_ctx_handle)
@@ -1167,19 +1193,25 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
 
             lai_stackitem_t *item = lai_exec_push_stack_or_die(state);
             item->kind = LAI_POPULATE_CONTEXT_STACKITEM;
+            item->pc = block->pc;
+            item->limit = opcode_pc + 1 + encoded_size;
+            item->outer_block = state->innermost_block;
             item->ctx_handle = scoped_ctx_handle;
             item->ctx_limit = opcode_pc + encoded_size + 1;
+            state->innermost_block = state->stack_ptr;
             lai_exec_update_context(state);
+
+            block->pc = opcode_pc + 1 + encoded_size;
             break;
         }
         case (EXTOP_PREFIX << 8) | DEVICE:
         {
-            state->pc += 2;
+            block->pc += 2;
 
             size_t encoded_size;
             struct lai_amlname amln;
-            state->pc += lai_parse_pkgsize(method + state->pc, &encoded_size);
-            state->pc += lai_amlname_parse(&amln, method + state->pc);
+            block->pc += lai_parse_pkgsize(method + block->pc, &encoded_size);
+            block->pc += lai_amlname_parse(&amln, method + block->pc);
 
             lai_nsnode_t *node = lai_create_nsnode_or_die();
             node->type = LAI_NAMESPACE_DEVICE;
@@ -1190,20 +1222,26 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
 
             lai_stackitem_t *item = lai_exec_push_stack_or_die(state);
             item->kind = LAI_POPULATE_CONTEXT_STACKITEM;
+            item->pc = block->pc;
+            item->limit = opcode_pc + 2 + encoded_size;
+            item->outer_block = state->innermost_block;
             item->ctx_handle = node;
             item->ctx_limit = opcode_pc + encoded_size + 2;
+            state->innermost_block = state->stack_ptr;
             lai_exec_update_context(state);
+
+            block->pc = opcode_pc + 2 + encoded_size;
             break;
         }
         case (EXTOP_PREFIX << 8) | PROCESSOR: {
-            state->pc += 2;            // skip over PROCESSOR_OP
-            size_t tmp_pc = state->pc;
+            block->pc += 2;            // skip over PROCESSOR_OP
+            size_t tmp_pc = block->pc;
 
             size_t pkgsize;
             struct lai_amlname amln;
             tmp_pc += lai_parse_pkgsize(method + tmp_pc, &pkgsize);
             tmp_pc += lai_amlname_parse(&amln, method + tmp_pc);
-            state->pc += pkgsize;
+            block->pc += pkgsize;
 
             lai_nsnode_t *node = lai_create_nsnode_or_die();
             node->type = LAI_NAMESPACE_PROCESSOR;
@@ -1219,12 +1257,12 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
         }
         case (EXTOP_PREFIX << 8) | POWER_RES:
         {
-            state->pc += 2;
+            block->pc += 2;
 
             size_t encoded_size;
             struct lai_amlname amln;
-            state->pc += lai_parse_pkgsize(method + state->pc, &encoded_size);
-            state->pc += lai_amlname_parse(&amln, method + state->pc);
+            block->pc += lai_parse_pkgsize(method + block->pc, &encoded_size);
+            block->pc += lai_amlname_parse(&amln, method + block->pc);
 
             lai_nsnode_t *node = lai_create_nsnode_or_die();
             node->type = LAI_NAMESPACE_POWER_RES;
@@ -1233,27 +1271,33 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             if (state->invocation)
                 lai_list_link(&state->invocation->per_method_list, &node->per_method_item);
 
-//            uint8_t system_level = method[state->pc];
-            state->pc++;
+//            uint8_t system_level = method[block->pc];
+            block->pc++;
 
-//            uint16_t resource_order = *(uint16_t*)&method[state->pc];
-            state->pc += 2;
+//            uint16_t resource_order = *(uint16_t*)&method[block->pc];
+            block->pc += 2;
 
             lai_stackitem_t *item = lai_exec_push_stack_or_die(state);
             item->kind = LAI_POPULATE_CONTEXT_STACKITEM;
+            item->pc = block->pc;
+            item->limit = opcode_pc + 2 + encoded_size;
+            item->outer_block = state->innermost_block;
             item->ctx_handle = node;
             item->ctx_limit = opcode_pc + encoded_size + 2;
+            state->innermost_block = state->stack_ptr;
             lai_exec_update_context(state);
+
+            block->pc = opcode_pc + 2 + encoded_size;
             break;
         }
         case (EXTOP_PREFIX << 8) | THERMALZONE:
         {
-            state->pc += 2;
+            block->pc += 2;
 
             size_t encoded_size;
             struct lai_amlname amln;
-            state->pc += lai_parse_pkgsize(method + state->pc, &encoded_size);
-            state->pc += lai_amlname_parse(&amln, method + state->pc);
+            block->pc += lai_parse_pkgsize(method + block->pc, &encoded_size);
+            block->pc += lai_amlname_parse(&amln, method + block->pc);
 
             lai_nsnode_t *node = lai_create_nsnode_or_die();
             node->type = LAI_NAMESPACE_THERMALZONE;
@@ -1264,23 +1308,29 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
 
             lai_stackitem_t *item = lai_exec_push_stack_or_die(state);
             item->kind = LAI_POPULATE_CONTEXT_STACKITEM;
+            item->pc = block->pc;
+            item->limit = opcode_pc + 2 + encoded_size;
+            item->outer_block = state->innermost_block;
             item->ctx_handle = node;
             item->ctx_limit = opcode_pc + encoded_size + 2;
+            state->innermost_block = state->stack_ptr;
             lai_exec_update_context(state);
+
+            block->pc = opcode_pc + 2 + encoded_size;
             break;
         }
 
         // Leafs in the ACPI namespace.
         case METHOD_OP:
-            state->pc += lai_create_method(ctx_handle, amls, method + state->pc);
+            block->pc += lai_create_method(ctx_handle, amls, method + block->pc);
             break;
         case ALIAS_OP: {
-            state->pc += 1;
+            block->pc += 1;
 
             struct lai_amlname target_amln;
             struct lai_amlname dest_amln;
-            state->pc += lai_amlname_parse(&target_amln, method + state->pc);
-            state->pc += lai_amlname_parse(&dest_amln, method + state->pc);
+            block->pc += lai_amlname_parse(&target_amln, method + block->pc);
+            block->pc += lai_amlname_parse(&dest_amln, method + block->pc);
 
             lai_nsnode_t *node = lai_create_nsnode_or_die();
             node->type = LAI_NAMESPACE_ALIAS;
@@ -1307,15 +1357,15 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             node_item->node_arg_modes[1] = LAI_OBJECT_MODE;
             node_item->node_arg_modes[2] = LAI_REFERENCE_MODE;
             node_item->node_arg_modes[3] = 0;
-            state->pc++;
+            block->pc++;
             break;
         }
         case (EXTOP_PREFIX << 8) | MUTEX: {
-            state->pc += 2;
+            block->pc += 2;
 
             struct lai_amlname amln;
-            state->pc += lai_amlname_parse(&amln, method + state->pc);
-            state->pc++; // skip over trailing 0x02
+            block->pc += lai_amlname_parse(&amln, method + block->pc);
+            block->pc++; // skip over trailing 0x02
 
             lai_nsnode_t *node = lai_create_nsnode_or_die();
             node->type = LAI_NAMESPACE_MUTEX;
@@ -1327,10 +1377,10 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
         }
         case (EXTOP_PREFIX << 8) | EVENT:
         {
-            state->pc += 2;
+            block->pc += 2;
 
             struct lai_amlname amln;
-            state->pc += lai_amlname_parse(&amln, method + state->pc);
+            block->pc += lai_amlname_parse(&amln, method + block->pc);
 
             lai_nsnode_t* node = lai_create_nsnode_or_die();
             node->type = LAI_NAMESPACE_EVENT;
@@ -1342,14 +1392,14 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
         }
         case (EXTOP_PREFIX << 8) | OPREGION:
         {
-            state->pc += 2;
+            block->pc += 2;
 
             struct lai_amlname amln;
-            state->pc += lai_amlname_parse(&amln, method + state->pc);
+            block->pc += lai_amlname_parse(&amln, method + block->pc);
 
             // First byte identifies the address space (memory, I/O ports, PCI, etc.).
-            int address_space = method[state->pc];
-            state->pc++;
+            int address_space = method[block->pc];
+            block->pc++;
 
             // Now, parse the offset and length of the opregion.
             lai_variable_t disp = {0};
@@ -1368,48 +1418,48 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             break;
         }
         case (EXTOP_PREFIX << 8) | FIELD: {
-            state->pc += 2;
+            block->pc += 2;
 
             struct lai_amlname region_amln;
-            size_t pkgsize, end_pc = state->pc;
+            size_t pkgsize, end_pc = block->pc;
 
-            state->pc += lai_parse_pkgsize(method + state->pc, &pkgsize);
-            state->pc += lai_amlname_parse(&region_amln, method + state->pc);
+            block->pc += lai_parse_pkgsize(method + block->pc, &pkgsize);
+            block->pc += lai_amlname_parse(&region_amln, method + block->pc);
 
             end_pc += pkgsize;
 
             lai_nsnode_t *region_node = lai_do_resolve(ctx_handle, &region_amln);
             if (!region_node) {
                 lai_panic("error parsing field for non-existant OpRegion, ignoring...");
-                state->pc = end_pc;
+                block->pc = end_pc;
                 break;
             }
 
-            uint8_t access_type = *(method + state->pc);
-            state->pc++;
+            uint8_t access_type = *(method + block->pc);
+            block->pc++;
 
             // parse FieldList
             struct lai_amlname field_amln;
             uint64_t curr_off = 0;
             size_t skip_bits;
-            while (state->pc < end_pc) {
-                switch (*(method + state->pc)) {
+            while (block->pc < end_pc) {
+                switch (*(method + block->pc)) {
                     case 0: // ReservedField
-                        state->pc++;
-                        state->pc += lai_parse_pkgsize(method + state->pc, &skip_bits);
+                        block->pc++;
+                        block->pc += lai_parse_pkgsize(method + block->pc, &skip_bits);
                         curr_off += skip_bits;
                         break;
                     case 1: // AccessField
-                        state->pc++;
-                        access_type = *(method + state->pc);
-                        state->pc += 2;
+                        block->pc++;
+                        access_type = *(method + block->pc);
+                        block->pc += 2;
                         break;
                     case 2: // TODO: ConnectField
                         lai_panic("ConnectField parsing isn't implemented");
                         break;
                     default: // NamedField
-                        state->pc += lai_amlname_parse(&field_amln, method + state->pc);
-                        state->pc += lai_parse_pkgsize(method + state->pc, &skip_bits);
+                        block->pc += lai_amlname_parse(&field_amln, method + block->pc);
+                        block->pc += lai_parse_pkgsize(method + block->pc, &skip_bits);
 
                         lai_nsnode_t *node = lai_create_nsnode_or_die();
                         node->type = LAI_NAMESPACE_FIELD;
@@ -1430,15 +1480,15 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             break;
         }
         case (EXTOP_PREFIX << 8) | INDEXFIELD: {
-            state->pc += 2;
+            block->pc += 2;
 
             struct lai_amlname index_amln;
             struct lai_amlname data_amln;
-            size_t pkgsize, end_pc = state->pc;
+            size_t pkgsize, end_pc = block->pc;
 
-            state->pc += lai_parse_pkgsize(method + state->pc, &pkgsize);
-            state->pc += lai_amlname_parse(&index_amln, method + state->pc);
-            state->pc += lai_amlname_parse(&data_amln, method + state->pc);
+            block->pc += lai_parse_pkgsize(method + block->pc, &pkgsize);
+            block->pc += lai_amlname_parse(&index_amln, method + block->pc);
+            block->pc += lai_amlname_parse(&data_amln, method + block->pc);
 
             end_pc += pkgsize;
 
@@ -1447,31 +1497,31 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             if (!index_node || !data_node)
                 lai_panic("could not resolve index register of IndexField()");
 
-            uint8_t access_type = *(method + state->pc);
-            state->pc++;
+            uint8_t access_type = *(method + block->pc);
+            block->pc++;
 
             // parse FieldList
             struct lai_amlname field_amln;
             uint64_t curr_off = 0;
             size_t skip_bits;
-            while (state->pc < end_pc) {
-                switch (*(method + state->pc)) {
+            while (block->pc < end_pc) {
+                switch (*(method + block->pc)) {
                     case 0: // ReservedField
-                        state->pc++;
-                        state->pc += lai_parse_pkgsize(method + state->pc, &skip_bits);
+                        block->pc++;
+                        block->pc += lai_parse_pkgsize(method + block->pc, &skip_bits);
                         curr_off += skip_bits;
                         break;
                     case 1: // AccessField
-                        state->pc++;
-                        access_type = *(method + state->pc);
-                        state->pc += 2;
+                        block->pc++;
+                        access_type = *(method + block->pc);
+                        block->pc += 2;
                         break;
                     case 2: // TODO: ConnectField
                         lai_panic("ConnectField parsing isn't implemented");
                         break;
                     default: // NamedField
-                        state->pc += lai_amlname_parse(&field_amln, method + state->pc);
-                        state->pc += lai_parse_pkgsize(method + state->pc, &skip_bits);
+                        block->pc += lai_amlname_parse(&field_amln, method + block->pc);
+                        block->pc += lai_parse_pkgsize(method + block->pc, &skip_bits);
 
                         lai_nsnode_t *node = lai_create_nsnode_or_die();
                         node->type = LAI_NAMESPACE_INDEXFIELD;
@@ -1507,7 +1557,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
                 result->tag = LAI_ARG_NAME;
                 result->index = opcode - ARG0_OP;
             }
-            state->pc++;
+            block->pc++;
             break;
         }
 
@@ -1526,7 +1576,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
                 result->tag = LAI_LOCAL_NAME;
                 result->index = opcode - LOCAL0_OP;
             }
-            state->pc++;
+            block->pc++;
             break;
         }
 
@@ -1537,7 +1587,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
                 struct lai_operand *result = lai_exec_push_opstack_or_die(state);
                 result->tag = LAI_DEBUG_NAME;
             }
-            state->pc += 2;
+            block->pc += 2;
             break;
         }
 
@@ -1552,7 +1602,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             op_item->op_arg_modes[1] = LAI_REFERENCE_MODE;
             op_item->op_arg_modes[2] = 0;
             op_item->op_want_result = want_result;
-            state->pc++;
+            block->pc++;
             break;
         }
         case ADD_OP:
@@ -1573,7 +1623,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             op_item->op_arg_modes[2] = LAI_REFERENCE_MODE;
             op_item->op_arg_modes[3] = 0;
             op_item->op_want_result = want_result;
-            state->pc++;
+            block->pc++;
             break;
         }
         case DIVIDE_OP:
@@ -1588,7 +1638,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             op_item->op_arg_modes[3] = LAI_REFERENCE_MODE;
             op_item->op_arg_modes[4] = 0;
             op_item->op_want_result = want_result;
-            state->pc++;
+            block->pc++;
             break;
         }
 
@@ -1602,7 +1652,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             op_item->op_arg_modes[0] = LAI_REFERENCE_MODE;
             op_item->op_arg_modes[1] = 0;
             op_item->op_want_result = want_result;
-            state->pc++;
+            block->pc++;
             break;
         }
 
@@ -1615,7 +1665,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             op_item->op_arg_modes[0] = LAI_OBJECT_MODE;
             op_item->op_arg_modes[1] = 0;
             op_item->op_want_result = want_result;
-            state->pc++;
+            block->pc++;
             break;
         }
         case LAND_OP:
@@ -1632,7 +1682,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             op_item->op_arg_modes[1] = LAI_OBJECT_MODE;
             op_item->op_arg_modes[2] = 0;
             op_item->op_want_result = want_result;
-            state->pc++;
+            block->pc++;
             break;
         }
 
@@ -1647,7 +1697,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             op_item->op_arg_modes[2] = LAI_REFERENCE_MODE;
             op_item->op_arg_modes[3] = 0;
             op_item->op_want_result = want_result;
-            state->pc++;
+            block->pc++;
             break;
         }
         case DEREF_OP:
@@ -1660,7 +1710,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             op_item->op_arg_modes[0] = LAI_OBJECT_MODE;
             op_item->op_arg_modes[1] = 0;
             op_item->op_want_result = want_result;
-            state->pc++;
+            block->pc++;
             break;
         }
         case (EXTOP_PREFIX << 8) | CONDREF_OP:
@@ -1674,12 +1724,12 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             op_item->op_arg_modes[1] = LAI_REFERENCE_MODE;
             op_item->op_arg_modes[2] = 0;
             op_item->op_want_result = want_result;
-            state->pc += 2;
+            block->pc += 2;
             break;
         }
 
         case (EXTOP_PREFIX << 8) | SLEEP_OP: {
-            state->pc += 2;
+            block->pc += 2;
 
             lai_stackitem_t *op_item = lai_exec_push_stack_or_die(state);
             op_item->kind = LAI_OP_STACKITEM;
@@ -1701,7 +1751,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             op_item->op_arg_modes[1] = LAI_IMMEDIATE_WORD_MODE;
             op_item->op_arg_modes[2] = 0;
             op_item->op_want_result = want_result;
-            state->pc += 2;
+            block->pc += 2;
             break;
         }
         case (EXTOP_PREFIX << 8) | RELEASE_OP:
@@ -1713,14 +1763,14 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             op_item->op_arg_modes[0] = LAI_REFERENCE_MODE;
             op_item->op_arg_modes[1] = 0;
             op_item->op_want_result = want_result;
-            state->pc += 2;
+            block->pc += 2;
             break;
         }
 
         default:
             lai_panic("unexpected opcode in lai_exec_run(), sequence %02X %02X %02X %02X",
-                    method[state->pc + 0], method[state->pc + 1],
-                    method[state->pc + 2], method[state->pc + 3]);
+                    method[block->pc + 0], method[block->pc + 1],
+                    method[block->pc + 2], method[block->pc + 3]);
         }
     }
 
@@ -1732,12 +1782,14 @@ int lai_populate(lai_nsnode_t *parent, struct lai_aml_segment *amls, lai_state_t
 
     lai_stackitem_t *item = lai_exec_push_stack_or_die(state);
     item->kind = LAI_POPULATE_CONTEXT_STACKITEM;
+    item->pc = 0;
+    item->limit = size;
+    item->outer_block = state->innermost_block;
     item->ctx_handle = parent;
     item->ctx_limit = size;
+    state->innermost_block = state->stack_ptr;
     lai_exec_update_context(state);
 
-    state->pc = 0;
-    state->limit = size;
     int status = lai_exec_run(amls, amls->table->data, state);
     if (status)
         lai_panic("lai_exec_run() failed in lai_populate()");
@@ -1766,11 +1818,13 @@ int lai_exec_method(lai_nsnode_t *method, lai_state_t *state, int n, lai_variabl
     //lai_debug("execute control method %s", method->path);
     lai_stackitem_t *item = lai_exec_push_stack_or_die(state);
     item->kind = LAI_METHOD_CONTEXT_STACKITEM;
+    item->pc = 0;
+    item->limit = method->size;
+    item->outer_block = state->innermost_block;
     item->ctx_handle = method;
+    state->innermost_block = state->stack_ptr;
     lai_exec_update_context(state);
 
-    state->pc = 0;
-    state->limit = method->size;
     int status = lai_exec_run(method->amls, method->pointer, state);
     if (status)
         return status;

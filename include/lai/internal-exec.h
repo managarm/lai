@@ -159,9 +159,24 @@ struct lai_invocation {
     struct lai_list per_method_list;
 };
 
+// We say that a stackitem is block-like if it is defined by a certain range of AML code.
+// For each active block-like stackitem, we store a program counter (PC) and PC limit.
+// Block-like stackitems are:
+// - LAI_POPULATE_CONTEXT_STACKITEM
+// - LAI_METHOD_CONTEXT_STACKITEM
+// - LAI_LOOP_STACKITEM
+// - LAI_COND_STACKITEM
+// - LAI_PKG_INITIALIZER_STACKITEM
+
 typedef struct lai_stackitem_ {
     int kind;
+    // For block-like stackitems:
+    int pc;
+    int limit;
+    int outer_block;
+    // For stackitem accepting arguments.
     int opstack_frame;
+    // Specific to each type of stackitem:
     union {
         struct {
             struct lai_nsnode *ctx_handle;
@@ -194,8 +209,6 @@ typedef struct lai_stackitem_ {
 
 typedef struct lai_state_t
 {
-    int pc;
-    int limit;
     lai_variable_t retvalue;
     struct lai_invocation *invocation;
 
@@ -205,5 +218,6 @@ typedef struct lai_state_t
     lai_stackitem_t stack[16];
     struct lai_operand opstack[16];
     int context_ptr; // Index of the last CONTEXT_STACKITEM.
+    int innermost_block; // Index of the last block-like stackitem.
 } lai_state_t;
 
