@@ -578,10 +578,12 @@ static int lai_exec_run(lai_state_t *state) {
             if (item->pc == item->limit) {
                 if (state->opstack_ptr) // This is an internal error.
                     lai_panic("opstack is not empty before return");
-                struct lai_operand *result = lai_exec_push_opstack_or_die(state);
-                result->tag = LAI_OPERAND_OBJECT;
-                result->object.type = LAI_INTEGER;
-                result->object.integer = 0;
+                if (item->mth_want_result) {
+                    struct lai_operand *result = lai_exec_push_opstack_or_die(state);
+                    result->tag = LAI_OPERAND_OBJECT;
+                    result->object.type = LAI_INTEGER;
+                    result->object.integer = 0;
+                }
 
                 // Clean up all per-method namespace nodes.
                 struct lai_list_item *pmi;
@@ -749,24 +751,28 @@ static int lai_exec_run(lai_state_t *state) {
                     lai_variable_t args[7];
                     memset(args, 0, sizeof(lai_variable_t) * 7);
 
-                    lai_state_t nested_state;
-                    lai_init_state(&nested_state);
                     int argc = handle->method_flags & METHOD_ARGC_MASK;
                     for(int i = 0; i < argc; i++)
                         lai_eval_operand(&args[i], state);
 
-                    LAI_CLEANUP_VAR lai_variable_t method_result = LAI_VAR_INITIALIZER;
-                    int e;
                     if (handle->method_override) {
                         // It's an OS-defined method.
                         // TODO: Verify the number of argument to the overridden method.
-                        e = handle->method_override(args, &method_result);
+                        LAI_CLEANUP_VAR lai_variable_t method_result = LAI_VAR_INITIALIZER;
+                        int e = handle->method_override(args, &method_result);
+
+                        if (e)
+                            return e;
+                        if (want_result) {
+                            struct lai_operand *opstack_res = lai_exec_push_opstack_or_die(state);
+                            opstack_res->tag = LAI_OPERAND_OBJECT;
+                            lai_var_move(&opstack_res->object, &method_result);
+                        }
                     } else {
                         // It's an AML method.
                         LAI_ENSURE(handle->amls);
 
-                        struct lai_ctxitem *method_ctxitem
-                                            = lai_exec_push_ctxstack_or_die(&nested_state);
+                        struct lai_ctxitem *method_ctxitem = lai_exec_push_ctxstack_or_die(state);
                         method_ctxitem->amls = handle->amls;
                         method_ctxitem->code = handle->pointer;
                         method_ctxitem->handle = handle;
@@ -779,36 +785,13 @@ static int lai_exec_run(lai_state_t *state) {
                         for (int i = 0; i < argc; i++)
                             lai_var_move(&method_ctxitem->invocation->arg[i], &args[i]);
 
-                        lai_stackitem_t *item = lai_exec_push_stack_or_die(&nested_state);
+                        lai_stackitem_t *item = lai_exec_push_stack_or_die(state);
                         item->kind = LAI_METHOD_CONTEXT_STACKITEM;
                         item->pc = 0;
                         item->limit = handle->size;
-                        item->outer_block = nested_state.innermost_block;
-                        nested_state.innermost_block = nested_state.stack_ptr;
-
-                        e = lai_exec_run(&nested_state);
-
-                        if (!e) {
-                            LAI_ENSURE(nested_state.ctxstack_ptr == -1);
-                            LAI_ENSURE(nested_state.stack_ptr == -1);
-                            if (nested_state.opstack_ptr != 1) // This would be an internal error.
-                                lai_panic("expected exactly one return value after method invocation");
-                            struct lai_operand *opstack_top = lai_exec_get_opstack(&nested_state, 0);
-                            lai_variable_t objectref = {0};
-                            lai_exec_get_objectref(&nested_state, opstack_top, &objectref);
-                            lai_obj_clone(&method_result, &objectref);
-                            lai_var_finalize(&objectref);
-                            lai_exec_pop_opstack(&nested_state, 1);
-                        }
-                    }
-                    lai_finalize_state(&nested_state);
-
-                    if (e)
-                        return e;
-                    if (want_result) {
-                        struct lai_operand *opstack_res = lai_exec_push_opstack_or_die(state);
-                        opstack_res->tag = LAI_OPERAND_OBJECT;
-                        lai_var_move(&opstack_res->object, &method_result);
+                        item->outer_block = state->innermost_block;
+                        item->mth_want_result = want_result;
+                        state->innermost_block = state->stack_ptr;
                     }
                 } else {
                     if (debug_opcodes)
@@ -1001,7 +984,7 @@ static int lai_exec_run(lai_state_t *state) {
         case RETURN_OP:
         {
             block->pc++;
-            lai_variable_t result = {0};
+            LAI_CLEANUP_VAR lai_variable_t result = LAI_VAR_INITIALIZER;
             lai_eval_operand(&result, state);
 
             // Find the last LAI_METHOD_CONTEXT_STACKITEM on the stack.
@@ -1017,12 +1000,12 @@ static int lai_exec_run(lai_state_t *state) {
                 j++;
             }
 
-            // Remove the method stack item and push the return value.
-            if (state->opstack_ptr) // This is an internal error.
-                lai_panic("opstack is not empty before return");
-            struct lai_operand *opstack_res = lai_exec_push_opstack_or_die(state);
-            opstack_res->tag = LAI_OPERAND_OBJECT;
-            lai_var_move(&opstack_res->object, &result);
+            // Push the return value.
+            if (method_item->mth_want_result) {
+                struct lai_operand *opstack_res = lai_exec_push_opstack_or_die(state);
+                opstack_res->tag = LAI_OPERAND_OBJECT;
+                lai_obj_clone(&opstack_res->object, &result);
+            }
 
             // Clean up all per-method namespace nodes.
             struct lai_list_item *pmi;
@@ -1843,6 +1826,7 @@ int lai_eval_args(lai_variable_t *result, lai_nsnode_t *handle, lai_state_t *sta
                 item->pc = 0;
                 item->limit = handle->size;
                 item->outer_block = state->innermost_block;
+                item->mth_want_result = 1;
                 state->innermost_block = state->stack_ptr;
 
                 e = lai_exec_run(state);

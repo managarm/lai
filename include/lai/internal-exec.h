@@ -186,6 +186,9 @@ typedef struct lai_stackitem_ {
     // Specific to each type of stackitem:
     union {
         struct {
+            uint8_t mth_want_result;
+        };
+        struct {
             int loop_pred; // Loop predicate PC.
         };
         struct {
