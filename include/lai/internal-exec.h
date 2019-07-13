@@ -202,7 +202,6 @@ typedef struct lai_stackitem_ {
 
 typedef struct lai_state_t
 {
-    lai_variable_t retvalue;
     struct lai_invocation *invocation;
 
     // Stack to track the current execution state.

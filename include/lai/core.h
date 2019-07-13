@@ -51,11 +51,6 @@ struct lai_ns_child_iterator {
 #define LAI_NS_ITERATOR_INITIALIZER {0}
 #define LAI_NS_CHILD_ITERATOR_INITIALIZER(x) {0, x}
 
-__attribute__((always_inline))
-inline lai_variable_t *lai_retvalue(lai_state_t *state) {
-    return &state->retvalue;
-}
-
 // TODO: The following functions are not API functions.
 extern acpi_fadt_t *lai_fadt;
 extern size_t lai_ns_size;

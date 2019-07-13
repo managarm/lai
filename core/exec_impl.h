@@ -70,8 +70,6 @@ void lai_store(lai_state_t *, struct lai_operand *, lai_variable_t *);
 void lai_exec_get_objectref(lai_state_t *, struct lai_operand *, lai_variable_t *);
 void lai_exec_get_integer(lai_state_t *, struct lai_operand *, lai_variable_t *);
 
-int lai_exec_method(lai_nsnode_t *, lai_state_t *, int, lai_variable_t *);
-
 // --------------------------------------------------------------------------------------
 // Inline function for execution stack manipulation.
 // --------------------------------------------------------------------------------------

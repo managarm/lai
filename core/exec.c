@@ -39,7 +39,6 @@ void lai_init_state(lai_state_t *state) {
 
 void lai_finalize_state(lai_state_t *state) {
     LAI_ENSURE(!state->invocation);
-    lai_var_finalize(&state->retvalue);
 }
 
 // Updates the state's context_ptr to point to the innermost context item.
@@ -744,17 +743,73 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
                     for(int i = 0; i < argc; i++)
                         lai_eval_operand(&args[i], state, amls, method);
 
-                    lai_variable_t result = {0};
-                    lai_exec_method(handle, &nested_state, argc, args);
-                    lai_var_move(&result, &nested_state.retvalue);
+                    LAI_CLEANUP_VAR lai_variable_t method_result = LAI_VAR_INITIALIZER;
+                    int e;
+                    if (handle->method_override) {
+                        // It's an OS-defined method.
+                        // TODO: Verify the number of argument to the overridden method.
+                        e = handle->method_override(args, &method_result);
+                    } else {
+                        // It's an AML method.
+                        LAI_ENSURE(handle->amls);
+
+                        LAI_ENSURE(!nested_state.invocation);
+                        nested_state.invocation = laihost_malloc(sizeof(struct lai_invocation));
+                        if (!nested_state.invocation)
+                            lai_panic("could not allocate memory for method invocation");
+                        memset(nested_state.invocation, 0, sizeof(struct lai_invocation));
+                        lai_list_init(&nested_state.invocation->per_method_list);
+
+                        for (int i = 0; i < argc; i++)
+                            lai_var_move(&nested_state.invocation->arg[i], &args[i]);
+
+                        // Okay, by here it's a real method.
+                        lai_stackitem_t *item = lai_exec_push_stack_or_die(&nested_state);
+                        item->kind = LAI_METHOD_CONTEXT_STACKITEM;
+                        item->pc = 0;
+                        item->limit = handle->size;
+                        item->outer_block = nested_state.innermost_block;
+                        item->ctx_handle = handle;
+                        nested_state.innermost_block = nested_state.stack_ptr;
+                        lai_exec_update_context(&nested_state);
+
+                        e = lai_exec_run(handle->amls, handle->pointer, &nested_state);
+
+                        // Clean up all per-method namespace nodes.
+                        struct lai_list_item *pmi;
+                        while ((pmi = lai_list_first(&nested_state.invocation->per_method_list))) {
+                            lai_nsnode_t *node = LAI_CONTAINER_OF(pmi, lai_nsnode_t, per_method_item);
+                            lai_uninstall_nsnode(node);
+                            lai_list_unlink(&node->per_method_item);
+                        }
+
+                        for (int i = 0; i < 7; i++)
+                            lai_var_finalize(&nested_state.invocation->arg[i]);
+                        for (int i = 0; i < 8; i++)
+                            lai_var_finalize(&nested_state.invocation->local[i]);
+                        laihost_free(nested_state.invocation);
+                        nested_state.invocation = NULL;
+
+                        if (!e) {
+                            if (nested_state.opstack_ptr != 1) // This would be an internal error.
+                                lai_panic("expected exactly one return value after method invocation");
+                            struct lai_operand *opstack_top = lai_exec_get_opstack(&nested_state, 0);
+                            lai_variable_t objectref = {0};
+                            lai_exec_get_objectref(&nested_state, opstack_top, &objectref);
+                            lai_obj_clone(&method_result, &objectref);
+                            lai_var_finalize(&objectref);
+                            lai_exec_pop_opstack(&nested_state, 1);
+                        }
+                    }
                     lai_finalize_state(&nested_state);
 
+                    if (e)
+                        return e;
                     if (want_result) {
                         struct lai_operand *opstack_res = lai_exec_push_opstack_or_die(state);
                         opstack_res->tag = LAI_OPERAND_OBJECT;
-                        lai_var_move(&opstack_res->object, &result);
+                        lai_var_move(&opstack_res->object, &method_result);
                     }
-                    lai_var_finalize(&result);
                 } else {
                     if (debug_opcodes)
                         lai_debug("parsing name %s [@ 0x%x]", debug_name, table_pc);
@@ -1710,76 +1765,6 @@ int lai_populate(lai_nsnode_t *parent, struct lai_aml_segment *amls, lai_state_t
     return 0;
 }
 
-// lai_exec_method(): Executes a control method.
-int lai_exec_method(lai_nsnode_t *method, lai_state_t *state, int n, lai_variable_t *args) {
-    // Check for OS-defined methods.
-    // TODO: Verify the number of argument to the overridden method.
-    if (method->method_override)
-        return method->method_override(args, &state->retvalue);
-    LAI_ENSURE(method->amls);
-
-    LAI_ENSURE(!state->invocation);
-    state->invocation = laihost_malloc(sizeof(struct lai_invocation));
-    if (!state->invocation)
-        lai_panic("could not allocate memory for method invocation");
-    memset(state->invocation, 0, sizeof(struct lai_invocation));
-    lai_list_init(&state->invocation->per_method_list);
-
-    for (int i = 0; i < n; i++)
-        lai_var_move(&state->invocation->arg[i], &args[i]);
-
-    // Okay, by here it's a real method.
-    //lai_debug("execute control method %s", method->path);
-    lai_stackitem_t *item = lai_exec_push_stack_or_die(state);
-    item->kind = LAI_METHOD_CONTEXT_STACKITEM;
-    item->pc = 0;
-    item->limit = method->size;
-    item->outer_block = state->innermost_block;
-    item->ctx_handle = method;
-    state->innermost_block = state->stack_ptr;
-    lai_exec_update_context(state);
-
-    int status = lai_exec_run(method->amls, method->pointer, state);
-    if (status)
-        return status;
-
-    // Clean up all per-method namespace nodes.
-    struct lai_list_item *pmi;
-    while ((pmi = lai_list_first(&state->invocation->per_method_list))) {
-        lai_nsnode_t *node = LAI_CONTAINER_OF(pmi, lai_nsnode_t, per_method_item);
-        lai_uninstall_nsnode(node);
-        lai_list_unlink(&node->per_method_item);
-    }
-
-    for (int i = 0; i < 7; i++)
-        lai_var_finalize(&state->invocation->arg[i]);
-    for (int i = 0; i < 8; i++)
-        lai_var_finalize(&state->invocation->local[i]);
-    laihost_free(state->invocation);
-    state->invocation = NULL;
-
-    /*lai_debug("%s finished, ", method->path);
-
-    if(state->retvalue.type == LAI_INTEGER)
-        lai_debug("return value is integer: %d", state->retvalue.integer);
-    else if(state->retvalue.type == LAI_STRING)
-        lai_debug("return value is string: '%s'", state->retvalue.string);
-    else if(state->retvalue.type == LAI_PACKAGE)
-        lai_debug("return value is package");
-    else if(state->retvalue.type == LAI_BUFFER)
-        lai_debug("return value is buffer");*/
-
-    if (state->opstack_ptr != 1) // This would be an internal error.
-        lai_panic("expected exactly one return value after method invocation");
-    struct lai_operand *result = lai_exec_get_opstack(state, 0);
-    lai_variable_t objectref = {0};
-    lai_exec_get_objectref(state, result, &objectref);
-    lai_obj_clone(&state->retvalue, &objectref);
-    lai_var_finalize(&objectref);
-    lai_exec_pop_opstack(state, 1);
-    return 0;
-}
-
 // lai_eval_args(): Evaluates a node of the ACPI namespace (including control methods).
 int lai_eval_args(lai_variable_t *result, lai_nsnode_t *handle, lai_state_t *state,
         int n, lai_variable_t *args) {
@@ -1796,16 +1781,66 @@ int lai_eval_args(lai_variable_t *result, lai_nsnode_t *handle, lai_state_t *sta
                 lai_obj_clone(result, &handle->object);
             return 0;
         case LAI_NAMESPACE_METHOD: {
-            // We take a copy of the arguments as lai_exec_method() will move them.
-            lai_variable_t args_copy[7];
-            memset(args_copy, 0, sizeof(lai_variable_t) * 7);
+            LAI_CLEANUP_VAR lai_variable_t method_result = LAI_VAR_INITIALIZER;
+            int e;
+            if (handle->method_override) {
+                // It's an OS-defined method.
+                // TODO: Verify the number of argument to the overridden method.
+                e = handle->method_override(args, &method_result);
+            } else {
+                // It's an AML method.
+                LAI_ENSURE(handle->amls);
 
-            for (int i = 0; i < n; i++)
-                lai_obj_clone(&args_copy[i], &args[i]);
+                LAI_ENSURE(!state->invocation);
+                state->invocation = laihost_malloc(sizeof(struct lai_invocation));
+                if (!state->invocation)
+                    lai_panic("could not allocate memory for method invocation");
+                memset(state->invocation, 0, sizeof(struct lai_invocation));
+                lai_list_init(&state->invocation->per_method_list);
 
-            int e = lai_exec_method(handle, state, n, args_copy);
+                for (int i = 0; i < n; i++)
+                    lai_var_assign(&state->invocation->arg[i], &args[i]);
+
+                // Okay, by here it's a real method.
+                lai_stackitem_t *item = lai_exec_push_stack_or_die(state);
+                item->kind = LAI_METHOD_CONTEXT_STACKITEM;
+                item->pc = 0;
+                item->limit = handle->size;
+                item->outer_block = state->innermost_block;
+                item->ctx_handle = handle;
+                state->innermost_block = state->stack_ptr;
+                lai_exec_update_context(state);
+
+                e = lai_exec_run(handle->amls, handle->pointer, state);
+
+                // Clean up all per-method namespace nodes.
+                struct lai_list_item *pmi;
+                while ((pmi = lai_list_first(&state->invocation->per_method_list))) {
+                    lai_nsnode_t *node = LAI_CONTAINER_OF(pmi, lai_nsnode_t, per_method_item);
+                    lai_uninstall_nsnode(node);
+                    lai_list_unlink(&node->per_method_item);
+                }
+
+                for (int i = 0; i < 7; i++)
+                    lai_var_finalize(&state->invocation->arg[i]);
+                for (int i = 0; i < 8; i++)
+                    lai_var_finalize(&state->invocation->local[i]);
+                laihost_free(state->invocation);
+                state->invocation = NULL;
+
+                if (!e) {
+                    if (state->opstack_ptr != 1) // This would be an internal error.
+                        lai_panic("expected exactly one return value after method invocation");
+                    struct lai_operand *opstack_top = lai_exec_get_opstack(state, 0);
+                    lai_variable_t objectref = {0};
+                    lai_exec_get_objectref(state, opstack_top, &objectref);
+                    lai_obj_clone(&method_result, &objectref);
+                    lai_var_finalize(&objectref);
+                    lai_exec_pop_opstack(state, 1);
+                }
+            }
             if (!e && result)
-                lai_var_move(result, lai_retvalue(state));
+                lai_var_move(result, &method_result);
             return e;
         }
 
