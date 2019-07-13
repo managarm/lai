@@ -77,23 +77,33 @@ void lai_exec_get_integer(lai_state_t *, struct lai_operand *, lai_variable_t *)
 // Pushes a new item to the context stack and returns it.
 static inline struct lai_ctxitem *lai_exec_push_ctxstack_or_die(lai_state_t *state) {
     state->ctxstack_ptr++;
-    if (state->ctxstack_ptr == 8)
-        lai_panic("context stack overflow");
-    memset(&state->ctxstack[state->ctxstack_ptr], 0, sizeof(struct lai_ctxitem));
-    return &state->ctxstack[state->ctxstack_ptr];
+    if (state->ctxstack_ptr == state->ctxstack_capacity) {
+        size_t new_capacity = 2 * state->ctxstack_capacity;
+        struct lai_ctxitem *new_stack = laihost_malloc(new_capacity * sizeof(struct lai_ctxitem));
+        if (!new_stack)
+            lai_panic("failed to allocate memory for context stack");
+        memcpy(new_stack, state->ctxstack_base,
+               state->ctxstack_capacity * sizeof(struct lai_ctxitem));
+        if (state->ctxstack_base != state->small_ctxstack)
+            laihost_free(state->ctxstack_base);
+        state->ctxstack_base = new_stack;
+        state->ctxstack_capacity = new_capacity;
+    }
+    memset(&state->ctxstack_base[state->ctxstack_ptr], 0, sizeof(struct lai_ctxitem));
+    return &state->ctxstack_base[state->ctxstack_ptr];
 }
 
 // Returns the last item of the context stack.
 static inline struct lai_ctxitem *lai_exec_peek_ctxstack_back(lai_state_t *state) {
     if (state->ctxstack_ptr < 0)
         return NULL;
-    return &state->ctxstack[state->ctxstack_ptr];
+    return &state->ctxstack_base[state->ctxstack_ptr];
 }
 
 // Removes an item from the context stack.
 static inline void lai_exec_pop_ctxstack_back(lai_state_t *state) {
     LAI_ENSURE(state->ctxstack_ptr >= 0);
-    struct lai_ctxitem *ctxitem = &state->ctxstack[state->ctxstack_ptr];
+    struct lai_ctxitem *ctxitem = &state->ctxstack_base[state->ctxstack_ptr];
     if (ctxitem->invocation) {
         for (int i = 0; i < 7; i++)
             lai_var_finalize(&ctxitem->invocation->arg[i]);
@@ -116,7 +126,8 @@ static inline lai_stackitem_t *lai_exec_push_stack_or_die(lai_state_t *state) {
         lai_stackitem_t *new_stack = laihost_malloc(new_capacity * sizeof(lai_stackitem_t));
         if (!new_stack)
             lai_panic("failed to allocate memory for execution stack");
-        memcpy(new_stack, state->stack_base, state->stack_capacity * sizeof(lai_stackitem_t));
+        memcpy(new_stack, state->stack_base,
+               state->stack_capacity * sizeof(lai_stackitem_t));
         if (state->stack_base != state->small_stack)
             laihost_free(state->stack_base);
         state->stack_base = new_stack;

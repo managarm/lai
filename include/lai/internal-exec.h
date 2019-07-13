@@ -204,17 +204,20 @@ typedef struct lai_stackitem_ {
     };
 } lai_stackitem_t;
 
+#define LAI_SMALL_CTXSTACK_SIZE 8
 #define LAI_SMALL_STACK_SIZE 16
 
 typedef struct lai_state_t {
     // Base pointers and stack capacities.
+    struct lai_ctxitem *ctxstack_base;
     lai_stackitem_t *stack_base;
+    int ctxstack_capacity;
     int stack_capacity;
     // Current stack pointers.
     int ctxstack_ptr; // Stack to track the current context.
     int stack_ptr;    // Stack to track the current execution state.
     int opstack_ptr;
-    struct lai_ctxitem ctxstack[8];
+    struct lai_ctxitem small_ctxstack[LAI_SMALL_CTXSTACK_SIZE];
     lai_stackitem_t small_stack[LAI_SMALL_STACK_SIZE];
     struct lai_operand opstack[16];
     int innermost_block; // Index of the last block-like stackitem.
