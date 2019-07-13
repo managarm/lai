@@ -71,3 +71,75 @@ void lai_exec_get_objectref(lai_state_t *, struct lai_operand *, lai_variable_t 
 void lai_exec_get_integer(lai_state_t *, struct lai_operand *, lai_variable_t *);
 
 int lai_exec_method(lai_nsnode_t *, lai_state_t *, int, lai_variable_t *);
+
+// --------------------------------------------------------------------------------------
+// Inline function for execution stack manipulation.
+// --------------------------------------------------------------------------------------
+
+// Pushes a new item to the execution stack and returns it.
+static inline lai_stackitem_t *lai_exec_push_stack_or_die(lai_state_t *state) {
+    state->stack_ptr++;
+    if (state->stack_ptr == 16)
+        lai_panic("execution engine stack overflow");
+    return &state->stack[state->stack_ptr];
+}
+
+// Returns the n-th item from the top of the stack.
+static inline lai_stackitem_t *lai_exec_peek_stack(lai_state_t *state, int n) {
+    if (state->stack_ptr - n < 0)
+        return NULL;
+    return &state->stack[state->stack_ptr - n];
+}
+
+// Returns the last item of the stack.
+static inline lai_stackitem_t *lai_exec_peek_stack_back(lai_state_t *state) {
+    return lai_exec_peek_stack(state, 0);
+}
+
+// Returns the lai_stackitem_t pointed to by the state's context_ptr.
+static inline lai_stackitem_t *lai_exec_peek_stack_at(lai_state_t *state, int n) {
+    if (n < 0)
+        return NULL;
+    return &state->stack[n];
+}
+
+// Removes n items from the stack.
+static inline void lai_exec_pop_stack(lai_state_t *state, int n) {
+    state->stack_ptr -= n;
+}
+
+// Removes the last item from the stack.
+static inline void lai_exec_pop_stack_back(lai_state_t *state) {
+    lai_exec_pop_stack(state, 1);
+}
+
+// --------------------------------------------------------------------------------------
+// Inline function for opstack manipulation.
+// --------------------------------------------------------------------------------------
+
+// Pushes a new item to the opstack and returns it.
+static inline struct lai_operand *lai_exec_push_opstack_or_die(lai_state_t *state) {
+    if (state->opstack_ptr == 16)
+        lai_panic("operand stack overflow");
+    struct lai_operand *object = &state->opstack[state->opstack_ptr];
+    memset(object, 0, sizeof(struct lai_operand));
+    state->opstack_ptr++;
+    return object;
+}
+
+// Returns the n-th item from the opstack.
+static inline struct lai_operand *lai_exec_get_opstack(lai_state_t *state, int n) {
+    if (n >= state->opstack_ptr)
+        lai_panic("opstack access out of bounds"); // This is an internal execution error.
+    return &state->opstack[n];
+}
+
+// Removes n items from the opstack.
+static inline void lai_exec_pop_opstack(lai_state_t *state, int n) {
+    for (int k = 0; k < n; k++) {
+        struct lai_operand *operand = &state->opstack[state->opstack_ptr - k - 1];
+        if (operand->tag == LAI_OPERAND_OBJECT)
+            lai_var_finalize(&operand->object);
+    }
+    state->opstack_ptr -= n;
+}
