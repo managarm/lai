@@ -111,16 +111,26 @@ static inline void lai_exec_pop_ctxstack_back(lai_state_t *state) {
 // Pushes a new item to the execution stack and returns it.
 static inline lai_stackitem_t *lai_exec_push_stack_or_die(lai_state_t *state) {
     state->stack_ptr++;
-    if (state->stack_ptr == 16)
-        lai_panic("execution engine stack overflow");
-    return &state->stack[state->stack_ptr];
+    if (state->stack_ptr == state->stack_capacity) {
+        size_t new_capacity = 2 * state->stack_capacity;
+        lai_stackitem_t *new_stack = laihost_malloc(new_capacity * sizeof(lai_stackitem_t));
+        if (!new_stack)
+            lai_panic("failed to allocate memory for execution stack");
+        memcpy(new_stack, state->stack_base, state->stack_capacity * sizeof(lai_stackitem_t));
+        if (state->stack_base != state->small_stack)
+            laihost_free(state->stack_base);
+        state->stack_base = new_stack;
+        state->stack_capacity = new_capacity;
+    }
+    LAI_ENSURE(state->stack_ptr < state->stack_capacity);
+    return &state->stack_base[state->stack_ptr];
 }
 
 // Returns the n-th item from the top of the stack.
 static inline lai_stackitem_t *lai_exec_peek_stack(lai_state_t *state, int n) {
     if (state->stack_ptr - n < 0)
         return NULL;
-    return &state->stack[state->stack_ptr - n];
+    return &state->stack_base[state->stack_ptr - n];
 }
 
 // Returns the last item of the stack.
@@ -132,7 +142,7 @@ static inline lai_stackitem_t *lai_exec_peek_stack_back(lai_state_t *state) {
 static inline lai_stackitem_t *lai_exec_peek_stack_at(lai_state_t *state, int n) {
     if (n < 0)
         return NULL;
-    return &state->stack[n];
+    return &state->stack_base[n];
 }
 
 // Removes n items from the stack.
