@@ -71,5 +71,3 @@ void lai_exec_get_objectref(lai_state_t *, struct lai_operand *, lai_variable_t 
 void lai_exec_get_integer(lai_state_t *, struct lai_operand *, lai_variable_t *);
 
 int lai_exec_method(lai_nsnode_t *, lai_state_t *, int, lai_variable_t *);
-
-void lai_exec_sleep(struct lai_aml_segment *, void *, lai_state_t *);

@@ -522,6 +522,18 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
 
         break;
     }
+    case (EXTOP_PREFIX << 8) | SLEEP_OP: {
+        if (!laihost_sleep)
+            lai_panic("host does not provide timer functions required by Sleep()");
+
+        lai_variable_t time = {0};
+        lai_exec_get_integer(state, &operands[0], &time);
+
+        if (!time.integer)
+            time.integer = 1;
+        laihost_sleep(time.integer);
+        break;
+    }
     case (EXTOP_PREFIX << 8) | ACQUIRE_OP:
     {
         lai_debug("Acquire() is a stub");
@@ -1007,10 +1019,6 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
                 lai_panic("could not allocate memory for package");
             break;
         }
-
-        case (EXTOP_PREFIX << 8) | SLEEP_OP:
-            lai_exec_sleep(amls, method, state);
-            break;
 
         /* A control method can return literally any object */
         /* So we need to take this into consideration */
@@ -1669,6 +1677,20 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             state->pc += 2;
             break;
         }
+
+        case (EXTOP_PREFIX << 8) | SLEEP_OP: {
+            state->pc += 2;
+
+            lai_stackitem_t *op_item = lai_exec_push_stack_or_die(state);
+            op_item->kind = LAI_OP_STACKITEM;
+            op_item->op_opcode = opcode;
+            op_item->opstack_frame = state->opstack_ptr;
+            op_item->op_arg_modes[0] = LAI_OBJECT_MODE;
+            op_item->op_arg_modes[1] = 0;
+            op_item->op_want_result = want_result;
+            break;
+        }
+
         case (EXTOP_PREFIX << 8) | ACQUIRE_OP:
         {
             lai_stackitem_t *op_item = lai_exec_push_stack_or_die(state);
@@ -1876,24 +1898,6 @@ static void lai_eval_operand(lai_variable_t *destination, lai_state_t *state,
     lai_obj_clone(destination, &objectref);
     lai_var_finalize(&objectref);
     lai_exec_pop_opstack(state, 1);
-}
-
-// lai_exec_sleep(): Executes a Sleep() opcode
-// Param:    void *code - opcode data
-// Param:    lai_state_t *state - AML VM state
-
-void lai_exec_sleep(struct lai_aml_segment *amls, void *code, lai_state_t *state) {
-    state->pc += 2; // Skip EXTOP_PREFIX and SLEEP_OP.
-
-    lai_variable_t time = {0};
-    lai_eval_operand(&time, state, amls, code);
-
-    if (!time.integer)
-        time.integer = 1;
-
-    if (!laihost_sleep)
-        lai_panic("host does not provide timer functions required by Sleep()");
-    laihost_sleep(time.integer);
 }
 
 void lai_enable_tracing(int enable) {
