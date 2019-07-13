@@ -13,6 +13,7 @@
    the four PCI pins should be used: LNKA, LNKB, LNKC and LNKD. */
 
 #include <lai/helpers/pciroute.h>
+#include <lai/helpers/resource.h>
 #include "../core/libc.h"
 #include "../core/eval.h"
 
