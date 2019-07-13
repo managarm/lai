@@ -30,32 +30,16 @@ static void lai_eval_operand(lai_variable_t *destination, lai_state_t *state,
 
 void lai_init_state(lai_state_t *state) {
     memset(state, 0, sizeof(lai_state_t));
+    state->ctxstack_ptr = -1;
     state->stack_ptr = -1;
     state->innermost_block = -1;
-    state->context_ptr = -1;
 }
 
 // Finalize the interpreter state. Frees all memory owned by the state.
-
 void lai_finalize_state(lai_state_t *state) {
-    LAI_ENSURE(!state->invocation);
-}
-
-// Updates the state's context_ptr to point to the innermost context item.
-static void lai_exec_update_context(lai_state_t *state) {
-    int j = 0;
-    lai_stackitem_t *ctx_item;
-    while (1) {
-        ctx_item = lai_exec_peek_stack(state, j);
-        if (!ctx_item)
-            break;
-        if (ctx_item->kind == LAI_POPULATE_CONTEXT_STACKITEM
-                || ctx_item->kind == LAI_METHOD_CONTEXT_STACKITEM)
-            break;
-        j++;
-    }
-
-    state->context_ptr = state->stack_ptr - j;
+    // TODO: Clean other stacks.
+    while (state->ctxstack_ptr >= 0)
+        lai_exec_pop_ctxstack_back(state);
 }
 
 static int lai_compare(lai_variable_t *lhs, lai_variable_t *rhs) {
@@ -103,8 +87,9 @@ static void lai_exec_reduce_node(int opcode, lai_state_t *state, struct lai_oper
             node->bf_offset = offset.integer * 8;
 
             lai_install_nsnode(node);
-            if (state->invocation)
-                lai_list_link(&state->invocation->per_method_list, &node->per_method_item);
+            struct lai_ctxitem *ctxitem = lai_exec_peek_ctxstack_back(state);
+            if (ctxitem->invocation)
+                lai_list_link(&ctxitem->invocation->per_method_list, &node->per_method_item);
             break;
         }
         default:
@@ -534,11 +519,11 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
                 lai_debug("stack item %d is of type %d", i, trace_item->kind);
             }
 
-        lai_stackitem_t *ctx_item = lai_exec_peek_stack_at(state, state->context_ptr);
+        struct lai_ctxitem *ctxitem = lai_exec_peek_ctxstack_back(state);
         lai_stackitem_t *block = lai_exec_peek_stack_at(state, state->innermost_block);
-        LAI_ENSURE(ctx_item);
+        LAI_ENSURE(ctxitem);
         LAI_ENSURE(block);
-        lai_nsnode_t *ctx_handle = ctx_item->ctx_handle;
+        lai_nsnode_t *ctx_handle = ctxitem->handle;
 
         // Package-size encoding (and similar) needs to know the PC of the opcode.
         // If an opcode sequence contains a pkgsize, the sequence generally ends at:
@@ -568,7 +553,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             if (item->pc == item->limit) {
                 state->innermost_block = item->outer_block;
                 lai_exec_pop_stack_back(state);
-                lai_exec_update_context(state);
+                lai_exec_pop_ctxstack_back(state);
                 continue;
             }
         } else if(item->kind == LAI_METHOD_CONTEXT_STACKITEM) {
@@ -581,9 +566,17 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
                 result->object.type = LAI_INTEGER;
                 result->object.integer = 0;
 
+                // Clean up all per-method namespace nodes.
+                struct lai_list_item *pmi;
+                while ((pmi = lai_list_first(&ctxitem->invocation->per_method_list))) {
+                    lai_nsnode_t *node = LAI_CONTAINER_OF(pmi, lai_nsnode_t, per_method_item);
+                    lai_uninstall_nsnode(node);
+                    lai_list_unlink(&node->per_method_item);
+                }
+
                 state->innermost_block = item->outer_block;
                 lai_exec_pop_stack_back(state);
-                lai_exec_update_context(state);
+                lai_exec_pop_ctxstack_back(state);
                 continue;
             }
         } else if (item->kind == LAI_EVALOPERAND_STACKITEM) {
@@ -753,44 +746,30 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
                         // It's an AML method.
                         LAI_ENSURE(handle->amls);
 
-                        LAI_ENSURE(!nested_state.invocation);
-                        nested_state.invocation = laihost_malloc(sizeof(struct lai_invocation));
-                        if (!nested_state.invocation)
+                        struct lai_ctxitem *method_ctxitem
+                                            = lai_exec_push_ctxstack_or_die(&nested_state);
+                        method_ctxitem->handle = handle;
+                        method_ctxitem->invocation = laihost_malloc(sizeof(struct lai_invocation));
+                        if (!method_ctxitem->invocation)
                             lai_panic("could not allocate memory for method invocation");
-                        memset(nested_state.invocation, 0, sizeof(struct lai_invocation));
-                        lai_list_init(&nested_state.invocation->per_method_list);
+                        memset(method_ctxitem->invocation, 0, sizeof(struct lai_invocation));
+                        lai_list_init(&method_ctxitem->invocation->per_method_list);
 
                         for (int i = 0; i < argc; i++)
-                            lai_var_move(&nested_state.invocation->arg[i], &args[i]);
+                            lai_var_move(&method_ctxitem->invocation->arg[i], &args[i]);
 
-                        // Okay, by here it's a real method.
                         lai_stackitem_t *item = lai_exec_push_stack_or_die(&nested_state);
                         item->kind = LAI_METHOD_CONTEXT_STACKITEM;
                         item->pc = 0;
                         item->limit = handle->size;
                         item->outer_block = nested_state.innermost_block;
-                        item->ctx_handle = handle;
                         nested_state.innermost_block = nested_state.stack_ptr;
-                        lai_exec_update_context(&nested_state);
 
                         e = lai_exec_run(handle->amls, handle->pointer, &nested_state);
 
-                        // Clean up all per-method namespace nodes.
-                        struct lai_list_item *pmi;
-                        while ((pmi = lai_list_first(&nested_state.invocation->per_method_list))) {
-                            lai_nsnode_t *node = LAI_CONTAINER_OF(pmi, lai_nsnode_t, per_method_item);
-                            lai_uninstall_nsnode(node);
-                            lai_list_unlink(&node->per_method_item);
-                        }
-
-                        for (int i = 0; i < 7; i++)
-                            lai_var_finalize(&nested_state.invocation->arg[i]);
-                        for (int i = 0; i < 8; i++)
-                            lai_var_finalize(&nested_state.invocation->local[i]);
-                        laihost_free(nested_state.invocation);
-                        nested_state.invocation = NULL;
-
                         if (!e) {
+                            LAI_ENSURE(nested_state.ctxstack_ptr == -1);
+                            LAI_ENSURE(nested_state.stack_ptr == -1);
                             if (nested_state.opstack_ptr != 1) // This would be an internal error.
                                 lai_panic("expected exactly one return value after method invocation");
                             struct lai_operand *opstack_top = lai_exec_get_opstack(&nested_state, 0);
@@ -1022,9 +1001,17 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             opstack_res->tag = LAI_OPERAND_OBJECT;
             lai_var_move(&opstack_res->object, &result);
 
+            // Clean up all per-method namespace nodes.
+            struct lai_list_item *pmi;
+            while ((pmi = lai_list_first(&ctxitem->invocation->per_method_list))) {
+                lai_nsnode_t *node = LAI_CONTAINER_OF(pmi, lai_nsnode_t, per_method_item);
+                lai_uninstall_nsnode(node);
+                lai_list_unlink(&node->per_method_item);
+            }
+
             state->innermost_block = method_item->outer_block;
             lai_exec_pop_stack(state, j + 1);
-            lai_exec_update_context(state);
+            lai_exec_pop_ctxstack_back(state);
             break;
         }
         /* While Loops */
@@ -1144,8 +1131,8 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             node->type = LAI_NAMESPACE_NAME;
             lai_do_resolve_new_node(node, ctx_handle, &amln);
             lai_install_nsnode(node);
-            if (state->invocation)
-                lai_list_link(&state->invocation->per_method_list, &node->per_method_item);
+            if (ctxitem->invocation)
+                lai_list_link(&ctxitem->invocation->per_method_list, &node->per_method_item);
 
             lai_eval_operand(&node->object, state, amls, method);
             break;
@@ -1165,14 +1152,15 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             if (!scoped_ctx_handle)
                 lai_panic("could not resolve node referenced in scope");
 
+            struct lai_ctxitem *populate_ctxitem = lai_exec_push_ctxstack_or_die(state);
+            populate_ctxitem->handle = scoped_ctx_handle;
+
             lai_stackitem_t *item = lai_exec_push_stack_or_die(state);
             item->kind = LAI_POPULATE_CONTEXT_STACKITEM;
             item->pc = block->pc;
             item->limit = opcode_pc + 1 + encoded_size;
             item->outer_block = state->innermost_block;
-            item->ctx_handle = scoped_ctx_handle;
             state->innermost_block = state->stack_ptr;
-            lai_exec_update_context(state);
 
             block->pc = opcode_pc + 1 + encoded_size;
             break;
@@ -1190,17 +1178,18 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             node->type = LAI_NAMESPACE_DEVICE;
             lai_do_resolve_new_node(node, ctx_handle, &amln);
             lai_install_nsnode(node);
-            if (state->invocation)
-                lai_list_link(&state->invocation->per_method_list, &node->per_method_item);
+            if (ctxitem->invocation)
+                lai_list_link(&ctxitem->invocation->per_method_list, &node->per_method_item);
+
+            struct lai_ctxitem *populate_ctxitem = lai_exec_push_ctxstack_or_die(state);
+            populate_ctxitem->handle = node;
 
             lai_stackitem_t *item = lai_exec_push_stack_or_die(state);
             item->kind = LAI_POPULATE_CONTEXT_STACKITEM;
             item->pc = block->pc;
             item->limit = opcode_pc + 2 + encoded_size;
             item->outer_block = state->innermost_block;
-            item->ctx_handle = node;
             state->innermost_block = state->stack_ptr;
-            lai_exec_update_context(state);
 
             block->pc = opcode_pc + 2 + encoded_size;
             break;
@@ -1223,8 +1212,8 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
 
             lai_do_resolve_new_node(node, ctx_handle, &amln);
             lai_install_nsnode(node);
-            if (state->invocation)
-                lai_list_link(&state->invocation->per_method_list, &node->per_method_item);
+            if (ctxitem->invocation)
+                lai_list_link(&ctxitem->invocation->per_method_list, &node->per_method_item);
             break;
         }
         case (EXTOP_PREFIX << 8) | POWER_RES:
@@ -1240,8 +1229,8 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             node->type = LAI_NAMESPACE_POWER_RES;
             lai_do_resolve_new_node(node, ctx_handle, &amln);
             lai_install_nsnode(node);
-            if (state->invocation)
-                lai_list_link(&state->invocation->per_method_list, &node->per_method_item);
+            if (ctxitem->invocation)
+                lai_list_link(&ctxitem->invocation->per_method_list, &node->per_method_item);
 
 //            uint8_t system_level = method[block->pc];
             block->pc++;
@@ -1249,14 +1238,15 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
 //            uint16_t resource_order = *(uint16_t*)&method[block->pc];
             block->pc += 2;
 
+            struct lai_ctxitem *populate_ctxitem = lai_exec_push_ctxstack_or_die(state);
+            populate_ctxitem->handle = node;
+
             lai_stackitem_t *item = lai_exec_push_stack_or_die(state);
             item->kind = LAI_POPULATE_CONTEXT_STACKITEM;
             item->pc = block->pc;
             item->limit = opcode_pc + 2 + encoded_size;
             item->outer_block = state->innermost_block;
-            item->ctx_handle = node;
             state->innermost_block = state->stack_ptr;
-            lai_exec_update_context(state);
 
             block->pc = opcode_pc + 2 + encoded_size;
             break;
@@ -1274,17 +1264,18 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             node->type = LAI_NAMESPACE_THERMALZONE;
             lai_do_resolve_new_node(node, ctx_handle, &amln);
             lai_install_nsnode(node);
-            if (state->invocation)
-                lai_list_link(&state->invocation->per_method_list, &node->per_method_item);
+            if (ctxitem->invocation)
+                lai_list_link(&ctxitem->invocation->per_method_list, &node->per_method_item);
+
+            struct lai_ctxitem *populate_ctxitem = lai_exec_push_ctxstack_or_die(state);
+            populate_ctxitem->handle = node;
 
             lai_stackitem_t *item = lai_exec_push_stack_or_die(state);
             item->kind = LAI_POPULATE_CONTEXT_STACKITEM;
             item->pc = block->pc;
             item->limit = opcode_pc + 2 + encoded_size;
             item->outer_block = state->innermost_block;
-            item->ctx_handle = node;
             state->innermost_block = state->stack_ptr;
-            lai_exec_update_context(state);
 
             block->pc = opcode_pc + 2 + encoded_size;
             break;
@@ -1310,8 +1301,8 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             lai_do_resolve_new_node(node, ctx_handle, &dest_amln);
 
             lai_install_nsnode(node);
-            if (state->invocation)
-                lai_list_link(&state->invocation->per_method_list, &node->per_method_item);
+            if (ctxitem->invocation)
+                lai_list_link(&ctxitem->invocation->per_method_list, &node->per_method_item);
             break;
         }
         case BYTEFIELD_OP:
@@ -1341,8 +1332,8 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             node->type = LAI_NAMESPACE_MUTEX;
             lai_do_resolve_new_node(node, ctx_handle, &amln);
             lai_install_nsnode(node);
-            if (state->invocation)
-                lai_list_link(&state->invocation->per_method_list, &node->per_method_item);
+            if (ctxitem->invocation)
+                lai_list_link(&ctxitem->invocation->per_method_list, &node->per_method_item);
             break;
         }
         case (EXTOP_PREFIX << 8) | EVENT:
@@ -1356,8 +1347,8 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             node->type = LAI_NAMESPACE_EVENT;
             lai_do_resolve_new_node(node, ctx_handle, &amln);
             lai_install_nsnode(node);
-            if (state->invocation)
-                lai_list_link(&state->invocation->per_method_list, &node->per_method_item);
+            if (ctxitem->invocation)
+                lai_list_link(&ctxitem->invocation->per_method_list, &node->per_method_item);
             break;
         }
         case (EXTOP_PREFIX << 8) | OPREGION:
@@ -1383,8 +1374,8 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             node->op_base = disp.integer;
             node->op_length = length.integer;
             lai_install_nsnode(node);
-            if (state->invocation)
-                lai_list_link(&state->invocation->per_method_list, &node->per_method_item);
+            if (ctxitem->invocation)
+                lai_list_link(&ctxitem->invocation->per_method_list, &node->per_method_item);
             break;
         }
         case (EXTOP_PREFIX << 8) | FIELD: {
@@ -1439,8 +1430,8 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
                         node->fld_offset = curr_off;
                         lai_do_resolve_new_node(node, ctx_handle, &field_amln);
                         lai_install_nsnode(node);
-                        if (state->invocation)
-                            lai_list_link(&state->invocation->per_method_list,
+                        if (ctxitem->invocation)
+                            lai_list_link(&ctxitem->invocation->per_method_list,
                                           &node->per_method_item);
 
                         curr_off += skip_bits;
@@ -1502,8 +1493,8 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
                         node->idxf_offset = curr_off;
                         lai_do_resolve_new_node(node, ctx_handle, &field_amln);
                         lai_install_nsnode(node);
-                        if (state->invocation)
-                            lai_list_link(&state->invocation->per_method_list,
+                        if (ctxitem->invocation)
+                            lai_list_link(&ctxitem->invocation->per_method_list,
                                           &node->per_method_item);
 
                         curr_off += skip_bits;
@@ -1750,18 +1741,22 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
 int lai_populate(lai_nsnode_t *parent, struct lai_aml_segment *amls, lai_state_t *state) {
     size_t size = amls->table->header.length - sizeof(acpi_header_t);
 
+    struct lai_ctxitem *populate_ctxitem = lai_exec_push_ctxstack_or_die(state);
+    populate_ctxitem->handle = parent;
+
     lai_stackitem_t *item = lai_exec_push_stack_or_die(state);
     item->kind = LAI_POPULATE_CONTEXT_STACKITEM;
     item->pc = 0;
     item->limit = size;
     item->outer_block = state->innermost_block;
-    item->ctx_handle = parent;
     state->innermost_block = state->stack_ptr;
-    lai_exec_update_context(state);
 
     int status = lai_exec_run(amls, amls->table->data, state);
     if (status)
         lai_panic("lai_exec_run() failed in lai_populate()");
+    LAI_ENSURE(state->ctxstack_ptr == -1);
+    LAI_ENSURE(state->stack_ptr == -1);
+    LAI_ENSURE(!state->opstack_ptr);
     return 0;
 }
 
@@ -1791,15 +1786,16 @@ int lai_eval_args(lai_variable_t *result, lai_nsnode_t *handle, lai_state_t *sta
                 // It's an AML method.
                 LAI_ENSURE(handle->amls);
 
-                LAI_ENSURE(!state->invocation);
-                state->invocation = laihost_malloc(sizeof(struct lai_invocation));
-                if (!state->invocation)
+                struct lai_ctxitem *method_ctxitem = lai_exec_push_ctxstack_or_die(state);
+                method_ctxitem->handle = handle;
+                method_ctxitem->invocation = laihost_malloc(sizeof(struct lai_invocation));
+                if (!method_ctxitem->invocation)
                     lai_panic("could not allocate memory for method invocation");
-                memset(state->invocation, 0, sizeof(struct lai_invocation));
-                lai_list_init(&state->invocation->per_method_list);
+                memset(method_ctxitem->invocation, 0, sizeof(struct lai_invocation));
+                lai_list_init(&method_ctxitem->invocation->per_method_list);
 
                 for (int i = 0; i < n; i++)
-                    lai_var_assign(&state->invocation->arg[i], &args[i]);
+                    lai_var_assign(&method_ctxitem->invocation->arg[i], &args[i]);
 
                 // Okay, by here it's a real method.
                 lai_stackitem_t *item = lai_exec_push_stack_or_die(state);
@@ -1807,28 +1803,13 @@ int lai_eval_args(lai_variable_t *result, lai_nsnode_t *handle, lai_state_t *sta
                 item->pc = 0;
                 item->limit = handle->size;
                 item->outer_block = state->innermost_block;
-                item->ctx_handle = handle;
                 state->innermost_block = state->stack_ptr;
-                lai_exec_update_context(state);
 
                 e = lai_exec_run(handle->amls, handle->pointer, state);
 
-                // Clean up all per-method namespace nodes.
-                struct lai_list_item *pmi;
-                while ((pmi = lai_list_first(&state->invocation->per_method_list))) {
-                    lai_nsnode_t *node = LAI_CONTAINER_OF(pmi, lai_nsnode_t, per_method_item);
-                    lai_uninstall_nsnode(node);
-                    lai_list_unlink(&node->per_method_item);
-                }
-
-                for (int i = 0; i < 7; i++)
-                    lai_var_finalize(&state->invocation->arg[i]);
-                for (int i = 0; i < 8; i++)
-                    lai_var_finalize(&state->invocation->local[i]);
-                laihost_free(state->invocation);
-                state->invocation = NULL;
-
                 if (!e) {
+                    LAI_ENSURE(state->ctxstack_ptr == -1);
+                    LAI_ENSURE(state->stack_ptr == -1);
                     if (state->opstack_ptr != 1) // This would be an internal error.
                         lai_panic("expected exactly one return value after method invocation");
                     struct lai_operand *opstack_top = lai_exec_get_opstack(state, 0);

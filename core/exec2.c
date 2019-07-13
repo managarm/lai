@@ -261,14 +261,18 @@ static void lai_store_ns(lai_nsnode_t *target, lai_variable_t *object) {
 // Returns a view of an existing object and not a clone of the object.
 void lai_load(lai_state_t *state, struct lai_operand *src, lai_variable_t *object) {
     switch (src->tag) {
-        case LAI_ARG_NAME:
-            LAI_ENSURE(state->invocation);
-            lai_var_assign(object, &state->invocation->arg[src->index]);
+        case LAI_ARG_NAME: {
+            struct lai_ctxitem *ctxitem = lai_exec_peek_ctxstack_back(state);
+            LAI_ENSURE(ctxitem->invocation);
+            lai_var_assign(object, &ctxitem->invocation->arg[src->index]);
             break;
-        case LAI_LOCAL_NAME:
-            LAI_ENSURE(state->invocation);
-            lai_var_assign(object, &state->invocation->local[src->index]);
+        }
+        case LAI_LOCAL_NAME: {
+            struct lai_ctxitem *ctxitem = lai_exec_peek_ctxstack_back(state);
+            LAI_ENSURE(ctxitem->invocation);
+            lai_var_assign(object, &ctxitem->invocation->local[src->index]);
             break;
+        }
         case LAI_UNRESOLVED_NAME:
         {
             struct lai_amlname amln;
@@ -334,14 +338,18 @@ void lai_store(lai_state_t *state, struct lai_operand *dest, lai_variable_t *obj
         case LAI_RESOLVED_NAME:
             lai_store_ns(dest->handle, object);
             break;
-        case LAI_ARG_NAME:
-            LAI_ENSURE(state->invocation);
-            lai_var_assign(&state->invocation->arg[dest->index], object);
+        case LAI_ARG_NAME: {
+            struct lai_ctxitem *ctxitem = lai_exec_peek_ctxstack_back(state);
+            LAI_ENSURE(ctxitem->invocation);
+            lai_var_assign(&ctxitem->invocation->arg[dest->index], object);
             break;
-        case LAI_LOCAL_NAME:
-            LAI_ENSURE(state->invocation);
-            lai_var_assign(&state->invocation->local[dest->index], object);
+        }
+        case LAI_LOCAL_NAME: {
+            struct lai_ctxitem *ctxitem = lai_exec_peek_ctxstack_back(state);
+            LAI_ENSURE(ctxitem->invocation);
+            lai_var_assign(&ctxitem->invocation->local[dest->index], object);
             break;
+        }
         case LAI_DEBUG_NAME:
             if(laihost_handle_amldebug)
                 laihost_handle_amldebug(object);

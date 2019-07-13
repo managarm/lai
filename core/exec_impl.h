@@ -71,6 +71,40 @@ void lai_exec_get_objectref(lai_state_t *, struct lai_operand *, lai_variable_t 
 void lai_exec_get_integer(lai_state_t *, struct lai_operand *, lai_variable_t *);
 
 // --------------------------------------------------------------------------------------
+// Inline function for context stack manipulation.
+// --------------------------------------------------------------------------------------
+
+// Pushes a new item to the context stack and returns it.
+static inline struct lai_ctxitem *lai_exec_push_ctxstack_or_die(lai_state_t *state) {
+    state->ctxstack_ptr++;
+    if (state->ctxstack_ptr == 8)
+        lai_panic("context stack overflow");
+    memset(&state->ctxstack[state->ctxstack_ptr], 0, sizeof(struct lai_ctxitem));
+    return &state->ctxstack[state->ctxstack_ptr];
+}
+
+// Returns the last item of the context stack.
+static inline struct lai_ctxitem *lai_exec_peek_ctxstack_back(lai_state_t *state) {
+    if (state->ctxstack_ptr < 0)
+        return NULL;
+    return &state->ctxstack[state->ctxstack_ptr];
+}
+
+// Removes an item from the context stack.
+static inline void lai_exec_pop_ctxstack_back(lai_state_t *state) {
+    LAI_ENSURE(state->ctxstack_ptr >= 0);
+    struct lai_ctxitem *ctxitem = &state->ctxstack[state->ctxstack_ptr];
+    if (ctxitem->invocation) {
+        for (int i = 0; i < 7; i++)
+            lai_var_finalize(&ctxitem->invocation->arg[i]);
+        for (int i = 0; i < 8; i++)
+            lai_var_finalize(&ctxitem->invocation->local[i]);
+        laihost_free(ctxitem->invocation);
+    }
+    state->ctxstack_ptr -= 1;
+}
+
+// --------------------------------------------------------------------------------------
 // Inline function for execution stack manipulation.
 // --------------------------------------------------------------------------------------
 
