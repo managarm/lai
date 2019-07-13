@@ -160,7 +160,9 @@ struct lai_invocation {
 };
 
 struct lai_ctxitem {
-    struct lai_nsnode *handle;
+    struct lai_aml_segment *amls;
+    uint8_t *code;
+    struct lai_nsnode *handle; // Context handle for relative AML names.
     struct lai_invocation *invocation;
 };
 

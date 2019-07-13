@@ -21,8 +21,7 @@ static int debug_stack = 0;
    DefLoad | DefNoop | DefNotify | DefRelease | DefReset | DefReturn |
    DefSignal | DefSleep | DefStall | DefUnload | DefWhile */
 
-static void lai_eval_operand(lai_variable_t *destination, lai_state_t *state,
-        struct lai_aml_segment *amls, uint8_t *code);
+static void lai_eval_operand(lai_variable_t *destination, lai_state_t *state);
 
 // Prepare the interpreter state for a control method call.
 // Param: lai_state_t *state - will store method name and arguments
@@ -503,12 +502,8 @@ size_t lai_parse_integer(uint8_t *object, uint64_t *out) {
     }
 }
 
-// lai_exec_run(): Internal function, executes actual AML opcodes
-// Param:  uint8_t *method - pointer to method opcodes
-// Param:  lai_state_t *state - machine state
-// Return: int - 0 on success
-
-static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state_t *state) {
+// lai_exec_run(): This is the main AML interpreter function.
+static int lai_exec_run(lai_state_t *state) {
     lai_stackitem_t *item;
     while ((item = lai_exec_peek_stack_back(state))) {
         if (debug_stack)
@@ -523,6 +518,8 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
         lai_stackitem_t *block = lai_exec_peek_stack_at(state, state->innermost_block);
         LAI_ENSURE(ctxitem);
         LAI_ENSURE(block);
+        struct lai_aml_segment *amls = ctxitem->amls;
+        uint8_t *method = ctxitem->code;
         lai_nsnode_t *ctx_handle = ctxitem->handle;
 
         // Package-size encoding (and similar) needs to know the PC of the opcode.
@@ -654,7 +651,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
                 // We are at the beginning of a loop. We check the predicate; if it is false,
                 // we exit the loop by removing the stack item.
                 lai_variable_t predicate = {0};
-                lai_eval_operand(&predicate, state, amls, method);
+                lai_eval_operand(&predicate, state);
                 if (!predicate.integer) {
                     state->innermost_block = item->outer_block;
                     lai_exec_pop_stack_back(state);
@@ -734,7 +731,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
                     lai_init_state(&nested_state);
                     int argc = handle->method_flags & METHOD_ARGC_MASK;
                     for(int i = 0; i < argc; i++)
-                        lai_eval_operand(&args[i], state, amls, method);
+                        lai_eval_operand(&args[i], state);
 
                     LAI_CLEANUP_VAR lai_variable_t method_result = LAI_VAR_INITIALIZER;
                     int e;
@@ -748,6 +745,8 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
 
                         struct lai_ctxitem *method_ctxitem
                                             = lai_exec_push_ctxstack_or_die(&nested_state);
+                        method_ctxitem->amls = handle->amls;
+                        method_ctxitem->code = handle->pointer;
                         method_ctxitem->handle = handle;
                         method_ctxitem->invocation = laihost_malloc(sizeof(struct lai_invocation));
                         if (!method_ctxitem->invocation)
@@ -765,7 +764,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
                         item->outer_block = nested_state.innermost_block;
                         nested_state.innermost_block = nested_state.stack_ptr;
 
-                        e = lai_exec_run(handle->amls, handle->pointer, &nested_state);
+                        e = lai_exec_run(&nested_state);
 
                         if (!e) {
                             LAI_ENSURE(nested_state.ctxstack_ptr == -1);
@@ -918,7 +917,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
 
             // The size of the buffer in bytes.
             lai_variable_t buffer_size = {0};
-            lai_eval_operand(&buffer_size, state, amls, method);
+            lai_eval_operand(&buffer_size, state);
 
             lai_variable_t result = {0};
             if (lai_create_buffer(&result, buffer_size.integer))
@@ -979,7 +978,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
         {
             block->pc++;
             lai_variable_t result = {0};
-            lai_eval_operand(&result, state, amls, method);
+            lai_eval_operand(&result, state);
 
             // Find the last LAI_METHOD_CONTEXT_STACKITEM on the stack.
             int j = 0;
@@ -1084,7 +1083,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
 
             // Evaluate the predicate
             lai_variable_t predicate = {0};
-            lai_eval_operand(&predicate, state, amls, method);
+            lai_eval_operand(&predicate, state);
 
             if (predicate.integer) {
                 lai_stackitem_t *cond_item = lai_exec_push_stack_or_die(state);
@@ -1134,7 +1133,7 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             if (ctxitem->invocation)
                 lai_list_link(&ctxitem->invocation->per_method_list, &node->per_method_item);
 
-            lai_eval_operand(&node->object, state, amls, method);
+            lai_eval_operand(&node->object, state);
             break;
         }
 
@@ -1153,6 +1152,8 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
                 lai_panic("could not resolve node referenced in scope");
 
             struct lai_ctxitem *populate_ctxitem = lai_exec_push_ctxstack_or_die(state);
+            populate_ctxitem->amls = amls;
+            populate_ctxitem->code = method;
             populate_ctxitem->handle = scoped_ctx_handle;
 
             lai_stackitem_t *item = lai_exec_push_stack_or_die(state);
@@ -1182,6 +1183,8 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
                 lai_list_link(&ctxitem->invocation->per_method_list, &node->per_method_item);
 
             struct lai_ctxitem *populate_ctxitem = lai_exec_push_ctxstack_or_die(state);
+            populate_ctxitem->amls = amls;
+            populate_ctxitem->code = method;
             populate_ctxitem->handle = node;
 
             lai_stackitem_t *item = lai_exec_push_stack_or_die(state);
@@ -1239,6 +1242,8 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             block->pc += 2;
 
             struct lai_ctxitem *populate_ctxitem = lai_exec_push_ctxstack_or_die(state);
+            populate_ctxitem->amls = amls;
+            populate_ctxitem->code = method;
             populate_ctxitem->handle = node;
 
             lai_stackitem_t *item = lai_exec_push_stack_or_die(state);
@@ -1268,6 +1273,8 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
                 lai_list_link(&ctxitem->invocation->per_method_list, &node->per_method_item);
 
             struct lai_ctxitem *populate_ctxitem = lai_exec_push_ctxstack_or_die(state);
+            populate_ctxitem->amls = amls;
+            populate_ctxitem->code = method;
             populate_ctxitem->handle = node;
 
             lai_stackitem_t *item = lai_exec_push_stack_or_die(state);
@@ -1365,8 +1372,8 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
             // Now, parse the offset and length of the opregion.
             lai_variable_t disp = {0};
             lai_variable_t length = {0};
-            lai_eval_operand(&disp, state, amls, method);
-            lai_eval_operand(&length, state, amls, method);
+            lai_eval_operand(&disp, state);
+            lai_eval_operand(&length, state);
 
             lai_nsnode_t *node = lai_create_nsnode_or_die();
             lai_do_resolve_new_node(node, ctx_handle, &amln);
@@ -1742,6 +1749,8 @@ int lai_populate(lai_nsnode_t *parent, struct lai_aml_segment *amls, lai_state_t
     size_t size = amls->table->header.length - sizeof(acpi_header_t);
 
     struct lai_ctxitem *populate_ctxitem = lai_exec_push_ctxstack_or_die(state);
+    populate_ctxitem->amls = amls;
+    populate_ctxitem->code = amls->table->data;
     populate_ctxitem->handle = parent;
 
     lai_stackitem_t *item = lai_exec_push_stack_or_die(state);
@@ -1751,7 +1760,7 @@ int lai_populate(lai_nsnode_t *parent, struct lai_aml_segment *amls, lai_state_t
     item->outer_block = state->innermost_block;
     state->innermost_block = state->stack_ptr;
 
-    int status = lai_exec_run(amls, amls->table->data, state);
+    int status = lai_exec_run(state);
     if (status)
         lai_panic("lai_exec_run() failed in lai_populate()");
     LAI_ENSURE(state->ctxstack_ptr == -1);
@@ -1787,6 +1796,8 @@ int lai_eval_args(lai_variable_t *result, lai_nsnode_t *handle, lai_state_t *sta
                 LAI_ENSURE(handle->amls);
 
                 struct lai_ctxitem *method_ctxitem = lai_exec_push_ctxstack_or_die(state);
+                method_ctxitem->amls = handle->amls;
+                method_ctxitem->code = handle->pointer;
                 method_ctxitem->handle = handle;
                 method_ctxitem->invocation = laihost_malloc(sizeof(struct lai_invocation));
                 if (!method_ctxitem->invocation)
@@ -1805,7 +1816,7 @@ int lai_eval_args(lai_variable_t *result, lai_nsnode_t *handle, lai_state_t *sta
                 item->outer_block = state->innermost_block;
                 state->innermost_block = state->stack_ptr;
 
-                e = lai_exec_run(handle->amls, handle->pointer, state);
+                e = lai_exec_run(state);
 
                 if (!e) {
                     LAI_ENSURE(state->ctxstack_ptr == -1);
@@ -1862,15 +1873,14 @@ int lai_eval(lai_variable_t *result, lai_nsnode_t *handle, lai_state_t *state) {
 // TODO: Eventually, we want to remove this function. However, this requires refactoring
 //       lai_exec_run() to avoid all kinds of recursion.
 
-static void lai_eval_operand(lai_variable_t *destination, lai_state_t *state,
-        struct lai_aml_segment *amls, uint8_t *code) {
+static void lai_eval_operand(lai_variable_t *destination, lai_state_t *state) {
     int opstack = state->opstack_ptr;
 
     lai_stackitem_t *item = lai_exec_push_stack_or_die(state);
     item->kind = LAI_EVALOPERAND_STACKITEM;
     item->opstack_frame = opstack;
 
-    int status = lai_exec_run(amls, code, state);
+    int status = lai_exec_run(state);
     if (status)
         lai_panic("lai_exec_run() failed in lai_eval_operand()");
 
