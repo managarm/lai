@@ -615,6 +615,16 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
         size_t table_pc = sizeof(acpi_header_t)
                           + (method - amls->table->data)
                           + opcode_pc;
+        size_t table_limit_pc = sizeof(acpi_header_t)
+                          + (method - amls->table->data)
+                          + block->limit;
+
+        // This would be an interpreter bug.
+        if (block->pc > block->limit)
+            lai_panic("execution escaped out of code range"
+                      " [0x%x, limit 0x%x])",
+                      table_pc, table_limit_pc);
+
 
         // Parse mode. Affects the parsing of certain opcode bytes.
         int parse_mode = LAI_EXEC_MODE;
@@ -626,9 +636,6 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
                 lai_exec_update_context(state);
                 continue;
             }
-
-            if (item->pc > item->limit) // This would be an interpreter bug.
-                lai_panic("namespace population escaped out of code range");
         } else if(item->kind == LAI_METHOD_CONTEXT_STACKITEM) {
             // ACPI does an implicit Return(0) at the end of a control method.
             if (item->pc == item->limit) {
@@ -678,9 +685,6 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
                 lai_exec_pop_stack_back(state);
                 continue;
             }
-
-            if (item->pc > item->limit) // This would be an interpreter bug.
-                lai_panic("package initializer escaped out of code range");
 
             parse_mode = LAI_DATA_MODE;
         } else if (item->kind == LAI_NODE_STACKITEM) {
@@ -733,9 +737,6 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
                 item->pc = item->loop_pred;
                 continue;
             }
-
-            if (item->pc > item->limit) // This would be an interpreter bug.
-                lai_panic("execution escaped out of While() body");
         } else if (item->kind == LAI_COND_STACKITEM) {
             // If the condition wasn't taken, execute the Else() block if it exists
             // Clean up the execution stack at the end of If().
@@ -744,22 +745,8 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
                 lai_exec_pop_stack_back(state);
                 continue;
             }
-
-            if (item->pc > item->limit)
-                lai_panic("execution escaped out of code range"
-                          " [0x%x, in LAI_COND_STACKITEM])",
-                          table_pc);
         } else
             lai_panic("unexpected lai_stackitem_t");
-
-        size_t table_limit_pc = sizeof(acpi_header_t)
-                          + (method - amls->table->data)
-                          + block->limit;
-
-        if (block->pc >= block->limit) // This would be an interpreter bug.
-            lai_panic("execution escaped out of code range"
-                      " [0x%x, limit 0x%x])",
-                      table_pc, table_limit_pc);
 
         // Whether we use the result of an expression or not.
         // If yes, it will be pushed onto the opstack after the expression is computed.
