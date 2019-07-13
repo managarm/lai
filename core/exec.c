@@ -622,28 +622,28 @@ static int lai_exec_run(struct lai_aml_segment *amls, uint8_t *method, lai_state
         if (item->kind == LAI_POPULATE_CONTEXT_STACKITEM) {
             if (block->pc == item->ctx_limit) {
                 state->innermost_block = item->outer_block;
-    			lai_exec_pop_stack_back(state);
+                lai_exec_pop_stack_back(state);
                 lai_exec_update_context(state);
-    			continue;
-    		}
+                continue;
+            }
 
             if (block->pc > item->ctx_limit) // This would be an interpreter bug.
                 lai_panic("namespace population escaped out of code range");
         } else if(item->kind == LAI_METHOD_CONTEXT_STACKITEM) {
-    		// ACPI does an implicit Return(0) at the end of a control method.
+            // ACPI does an implicit Return(0) at the end of a control method.
             if (block->pc == block->limit) {
-    			if (state->opstack_ptr) // This is an internal error.
-    				lai_panic("opstack is not empty before return");
+                if (state->opstack_ptr) // This is an internal error.
+                    lai_panic("opstack is not empty before return");
                 struct lai_operand *result = lai_exec_push_opstack_or_die(state);
                 result->tag = LAI_OPERAND_OBJECT;
                 result->object.type = LAI_INTEGER;
                 result->object.integer = 0;
 
                 state->innermost_block = item->outer_block;
-    			lai_exec_pop_stack_back(state);
+                lai_exec_pop_stack_back(state);
                 lai_exec_update_context(state);
-    			continue;
-    		}
+                continue;
+            }
         } else if (item->kind == LAI_EVALOPERAND_STACKITEM) {
             if (state->opstack_ptr == item->opstack_frame + 1) {
                 lai_exec_pop_stack_back(state);
