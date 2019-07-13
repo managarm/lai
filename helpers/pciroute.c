@@ -41,6 +41,7 @@ lai_api_error_t lai_pci_route_pin(acpi_resource_t *dest, uint16_t seg, uint8_t b
     pin--;
     // find the PCI bus in the namespace
     lai_variable_t bus_number = {0};
+    lai_variable_t seg_number = {0};
     lai_variable_t pci_pnp_id = {0};
     lai_variable_t pcie_pnp_id = {0};
     lai_eisaid(&pci_pnp_id, PCI_PNP_ID);
@@ -48,9 +49,11 @@ lai_api_error_t lai_pci_route_pin(acpi_resource_t *dest, uint16_t seg, uint8_t b
 
     lai_nsnode_t *handle = NULL;
 
-    struct lai_ns_iterator iter = LAI_NS_ITERATOR_INITIALIZER;
+    lai_nsnode_t *sb_handle = lai_resolve_path(NULL, "\\_SB_");
+    LAI_ENSURE(sb_handle);
+    struct lai_ns_child_iterator iter = LAI_NS_CHILD_ITERATOR_INITIALIZER(sb_handle);
     lai_nsnode_t *node;
-    while ((node = lai_ns_iterate(&iter))) {
+    while ((node = lai_ns_child_iterate(&iter))) {
 
         if (lai_check_device_pnp_id(node, &pci_pnp_id, &state) &&
                 lai_check_device_pnp_id(node, &pcie_pnp_id, &state)) {
@@ -68,7 +71,18 @@ lai_api_error_t lai_pci_route_pin(acpi_resource_t *dest, uint16_t seg, uint8_t b
             lai_obj_get_integer(&bus_number, &bbn_result);
         }
 
-        if (bbn_result == bus) {
+        uint64_t seg_result = 0;
+
+        lai_nsnode_t *seg_handle = lai_resolve_path(node, "_SEG");
+        if (seg_handle) {
+            if (lai_eval(&seg_number, seg_handle, &state)) {
+                lai_warn("failed to evaluate _SEG");
+                continue;
+            }
+            lai_obj_get_integer(&seg_number, &seg_result);
+        }
+
+        if (bbn_result == bus && seg_result == seg) {
             handle = node;
             break;
         }
