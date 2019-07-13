@@ -180,19 +180,12 @@ typedef struct lai_stackitem_ {
     union {
         struct {
             struct lai_nsnode *ctx_handle;
-            int ctx_limit;
         };
         struct {
             int loop_pred; // Loop predicate PC.
-            int loop_end; // End of loop PC.
-        };
-        struct {
-            int cond_taken; // Whether the conditional was true or not.
-            int cond_end; // End of conditional PC.
         };
         struct {
             int pkg_index;
-            int pkg_end;
             uint8_t pkg_want_result;
         };
         struct {
