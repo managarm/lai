@@ -48,9 +48,11 @@ lai_api_error_t lai_pci_route_pin(acpi_resource_t *dest, uint16_t seg, uint8_t b
 
     lai_nsnode_t *handle = NULL;
 
-    struct lai_ns_iterator iter = LAI_NS_ITERATOR_INITIALIZER;
+    lai_nsnode_t *sb_handle = lai_resolve_path(NULL, "\\_SB_");
+    LAI_ENSURE(sb_handle);
+    struct lai_ns_child_iterator iter = LAI_NS_CHILD_ITERATOR_INITIALIZER(sb_handle);
     lai_nsnode_t *node;
-    while ((node = lai_ns_iterate(&iter))) {
+    while ((node = lai_ns_child_iterate(&iter))) {
 
         if (lai_check_device_pnp_id(node, &pci_pnp_id, &state) &&
                 lai_check_device_pnp_id(node, &pcie_pnp_id, &state)) {
