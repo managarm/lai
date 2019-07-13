@@ -31,8 +31,10 @@ void lai_init_state(lai_state_t *state) {
     memset(state, 0, sizeof(lai_state_t));
     state->ctxstack_base = state->small_ctxstack;
     state->stack_base = state->small_stack;
+    state->opstack_base = state->small_opstack;
     state->ctxstack_capacity = LAI_SMALL_CTXSTACK_SIZE;
     state->stack_capacity = LAI_SMALL_STACK_SIZE;
+    state->opstack_capacity = LAI_SMALL_OPSTACK_SIZE;
     state->ctxstack_ptr = -1;
     state->stack_ptr = -1;
     state->innermost_block = -1;
@@ -47,6 +49,8 @@ void lai_finalize_state(lai_state_t *state) {
         laihost_free(state->ctxstack_base);
     if (state->stack_base != state->small_stack)
         laihost_free(state->stack_base);
+    if (state->opstack_base != state->small_opstack)
+        laihost_free(state->opstack_base);
 }
 
 static int lai_compare(lai_variable_t *lhs, lai_variable_t *rhs) {

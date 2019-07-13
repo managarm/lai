@@ -172,9 +172,21 @@ static inline void lai_exec_pop_stack_back(lai_state_t *state) {
 
 // Pushes a new item to the opstack and returns it.
 static inline struct lai_operand *lai_exec_push_opstack_or_die(lai_state_t *state) {
-    if (state->opstack_ptr == 16)
-        lai_panic("operand stack overflow");
-    struct lai_operand *object = &state->opstack[state->opstack_ptr];
+    if (state->opstack_ptr == state->opstack_capacity) {
+        size_t new_capacity = 2 * state->opstack_capacity;
+        struct lai_operand *new_stack = laihost_malloc(new_capacity * sizeof(struct lai_operand));
+        if (!new_stack)
+            lai_panic("failed to allocate memory for operand stack");
+        // TODO: Here, we rely on the fact that moving lai_variable_t via memcpy() is OK.
+        //       Implement a some sophisticated lai_operand_move()?
+        memcpy(new_stack, state->opstack_base,
+               state->opstack_capacity * sizeof(struct lai_operand));
+        if (state->opstack_base != state->small_opstack)
+            laihost_free(state->opstack_base);
+        state->opstack_base = new_stack;
+        state->opstack_capacity = new_capacity;
+    }
+    struct lai_operand *object = &state->opstack_base[state->opstack_ptr];
     memset(object, 0, sizeof(struct lai_operand));
     state->opstack_ptr++;
     return object;
@@ -184,13 +196,13 @@ static inline struct lai_operand *lai_exec_push_opstack_or_die(lai_state_t *stat
 static inline struct lai_operand *lai_exec_get_opstack(lai_state_t *state, int n) {
     if (n >= state->opstack_ptr)
         lai_panic("opstack access out of bounds"); // This is an internal execution error.
-    return &state->opstack[n];
+    return &state->opstack_base[n];
 }
 
 // Removes n items from the opstack.
 static inline void lai_exec_pop_opstack(lai_state_t *state, int n) {
     for (int k = 0; k < n; k++) {
-        struct lai_operand *operand = &state->opstack[state->opstack_ptr - k - 1];
+        struct lai_operand *operand = &state->opstack_base[state->opstack_ptr - k - 1];
         if (operand->tag == LAI_OPERAND_OBJECT)
             lai_var_finalize(&operand->object);
     }
