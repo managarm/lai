@@ -731,27 +731,11 @@ static int lai_exec_run(lai_state_t *state) {
                 if (debug_opcodes)
                     lai_debug("parsing name %s [@ 0x%x]", path, table_pc);
 
-                lai_nsnode_t *handle = lai_do_resolve(ctx_handle, &amln);
-                if (!handle) {
-                    if (!path)
-                        path = lai_stringify_amlname(&amln);
-                    lai_warn("eager resolution fails to resolve %s", path);
-
-                    // TODO: If we get rid of lazy resolution, we should construct an
-                    //       uninitialized object here.
-                    struct lai_operand *opstack_res = lai_exec_push_opstack_or_die(state);
-                    opstack_res->tag = LAI_OPERAND_OBJECT;
-                    opstack_res->object.type = LAI_LAZY_HANDLE;
-                    opstack_res->object.unres_ctx_handle = ctx_handle;
-                    opstack_res->object.unres_aml = method + opcode_pc;
-                } else {
-                    // TODO: We should only use LAI_HANDLE for handles to non-objects.
-                    //       Object handles should be loaded here.
-                    struct lai_operand *opstack_res = lai_exec_push_opstack_or_die(state);
-                    opstack_res->tag = LAI_OPERAND_OBJECT;
-                    opstack_res->object.type = LAI_HANDLE;
-                    opstack_res->object.handle = handle;
-                }
+                struct lai_operand *opstack_res = lai_exec_push_opstack_or_die(state);
+                opstack_res->tag = LAI_OPERAND_OBJECT;
+                opstack_res->object.type = LAI_LAZY_HANDLE;
+                opstack_res->object.unres_ctx_handle = ctx_handle;
+                opstack_res->object.unres_aml = method + opcode_pc;
             } else {
                 LAI_ENSURE(parse_mode == LAI_OBJECT_MODE
                            || parse_mode == LAI_EXEC_MODE);
