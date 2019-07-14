@@ -1394,7 +1394,7 @@ static int lai_exec_run(lai_state_t *state) {
             block->pc += lai_parse_pkgsize(method + block->pc, &pkgsize);
             block->pc += lai_amlname_parse(&region_amln, method + block->pc);
 
-            int end_pc = opcode_pc + pkgsize;
+            int end_pc = opcode_pc + 2 + pkgsize;
 
             lai_nsnode_t *region_node = lai_do_resolve(ctx_handle, &region_amln);
             if (!region_node) {
