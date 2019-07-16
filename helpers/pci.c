@@ -41,10 +41,10 @@ lai_api_error_t lai_pci_route_pin(acpi_resource_t *dest, uint16_t seg, uint8_t b
     // subtract 1 to arrive at the correct pin number.
     pin--;
     // find the PCI bus in the namespace
-    lai_variable_t bus_number = {0};
-    lai_variable_t seg_number = {0};
-    lai_variable_t pci_pnp_id = {0};
-    lai_variable_t pcie_pnp_id = {0};
+    LAI_CLEANUP_VAR lai_variable_t bus_number = LAI_VAR_INITIALIZER;
+    LAI_CLEANUP_VAR lai_variable_t seg_number = LAI_VAR_INITIALIZER;
+    LAI_CLEANUP_VAR lai_variable_t pci_pnp_id = LAI_VAR_INITIALIZER;
+    LAI_CLEANUP_VAR lai_variable_t pcie_pnp_id = LAI_VAR_INITIALIZER;
     lai_eisaid(&pci_pnp_id, PCI_PNP_ID);
     lai_eisaid(&pcie_pnp_id, PCIE_PNP_ID);
 
@@ -99,9 +99,9 @@ lai_api_error_t lai_pci_route_pin(acpi_resource_t *dest, uint16_t seg, uint8_t b
         return LAI_ERROR_NO_SUCH_NODE;
     }
 
-    lai_variable_t prt = {0};
-    lai_variable_t prt_package = {0};
-    lai_variable_t prt_entry = {0};
+    LAI_CLEANUP_VAR lai_variable_t prt = LAI_VAR_INITIALIZER;
+    LAI_CLEANUP_VAR lai_variable_t prt_package = LAI_VAR_INITIALIZER;
+    LAI_CLEANUP_VAR lai_variable_t prt_entry = LAI_VAR_INITIALIZER;
 
     /* _PRT is a package of packages. Each package within the PRT is in the following format:
        0: Integer:    Address of device. Low WORD = function, high WORD = slot
@@ -224,7 +224,7 @@ lai_nsnode_t *lai_pci_find_device(lai_nsnode_t *bus, uint8_t slot, uint8_t funct
     lai_nsnode_t *node;
     while ((node = lai_ns_child_iterate(&iter))) {
         uint64_t adr_result = 0;
-        lai_variable_t adr = LAI_VAR_INITIALIZER;
+        LAI_CLEANUP_VAR lai_variable_t adr = LAI_VAR_INITIALIZER;
         lai_nsnode_t *adr_handle = lai_resolve_path(node, "_ADR");
         if (adr_handle) {
             if (lai_eval(&adr, adr_handle, &state)) {
