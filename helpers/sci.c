@@ -81,7 +81,7 @@ int lai_enable_acpi(uint32_t mode) {
     if (handle) {
         lai_init_state(&state);
 
-        lai_variable_t mode_object = {0};
+        LAI_CLEANUP_VAR lai_variable_t mode_object = LAI_VAR_INITIALIZER;
         mode_object.type = LAI_INTEGER;
         mode_object.integer = mode;
 
@@ -118,7 +118,7 @@ int lai_evaluate_sta(lai_nsnode_t *node) {
         LAI_CLEANUP_STATE lai_state_t state;
         lai_init_state(&state);
 
-        lai_variable_t result = {0};
+        LAI_CLEANUP_VAR lai_variable_t result = LAI_VAR_INITIALIZER;
         if (lai_eval(&result, handle, &state))
             lai_panic("could not evaluate _STA");
         if(lai_obj_get_integer(&result, &sta))

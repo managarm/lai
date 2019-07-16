@@ -12,7 +12,7 @@
    -specific use. Therefore, nobody should assume it contains the real IRQ. Instead,
    the four PCI pins should be used: LNKA, LNKB, LNKC and LNKD. */
 
-#include <lai/helpers/pciroute.h>
+#include <lai/helpers/pci.h>
 #include <lai/helpers/resource.h>
 #include "../core/libc.h"
 #include "../core/eval.h"
@@ -41,10 +41,10 @@ lai_api_error_t lai_pci_route_pin(acpi_resource_t *dest, uint16_t seg, uint8_t b
     // subtract 1 to arrive at the correct pin number.
     pin--;
     // find the PCI bus in the namespace
-    lai_variable_t bus_number = {0};
-    lai_variable_t seg_number = {0};
-    lai_variable_t pci_pnp_id = {0};
-    lai_variable_t pcie_pnp_id = {0};
+    LAI_CLEANUP_VAR lai_variable_t bus_number = LAI_VAR_INITIALIZER;
+    LAI_CLEANUP_VAR lai_variable_t seg_number = LAI_VAR_INITIALIZER;
+    LAI_CLEANUP_VAR lai_variable_t pci_pnp_id = LAI_VAR_INITIALIZER;
+    LAI_CLEANUP_VAR lai_variable_t pcie_pnp_id = LAI_VAR_INITIALIZER;
     lai_eisaid(&pci_pnp_id, PCI_PNP_ID);
     lai_eisaid(&pcie_pnp_id, PCIE_PNP_ID);
 
@@ -99,9 +99,9 @@ lai_api_error_t lai_pci_route_pin(acpi_resource_t *dest, uint16_t seg, uint8_t b
         return LAI_ERROR_NO_SUCH_NODE;
     }
 
-    lai_variable_t prt = {0};
-    lai_variable_t prt_package = {0};
-    lai_variable_t prt_entry = {0};
+    LAI_CLEANUP_VAR lai_variable_t prt = LAI_VAR_INITIALIZER;
+    LAI_CLEANUP_VAR lai_variable_t prt_package = LAI_VAR_INITIALIZER;
+    LAI_CLEANUP_VAR lai_variable_t prt_entry = LAI_VAR_INITIALIZER;
 
     /* _PRT is a package of packages. Each package within the PRT is in the following format:
        0: Integer:    Address of device. Low WORD = function, high WORD = slot
@@ -214,3 +214,30 @@ resolve_pin:
     }
 }
 
+lai_nsnode_t *lai_pci_find_device(lai_nsnode_t *bus, uint8_t slot, uint8_t function, lai_state_t *state){
+    LAI_ENSURE(bus);
+    LAI_ENSURE(state);
+    
+    uint64_t device_adr = ((slot << 16) | function);
+
+    struct lai_ns_child_iterator iter = LAI_NS_CHILD_ITERATOR_INITIALIZER(bus);
+    lai_nsnode_t *node;
+    while ((node = lai_ns_child_iterate(&iter))) {
+        uint64_t adr_result = 0;
+        LAI_CLEANUP_VAR lai_variable_t adr = LAI_VAR_INITIALIZER;
+        lai_nsnode_t *adr_handle = lai_resolve_path(node, "_ADR");
+        if (adr_handle) {
+            if (lai_eval(&adr, adr_handle, &state)) {
+                lai_warn("failed to evaluate _ADR");
+                continue;
+            }
+            lai_obj_get_integer(&adr, &adr_result);
+        }
+
+        if(adr_result == device_adr){
+            return node;
+        }
+    }
+
+    return NULL;
+}

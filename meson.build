@@ -11,11 +11,11 @@ library = static_library('lai',
         'core/ns.c',
         'core/opregion.c',
         'core/os_methods.c',
-        'helpers/pciroute.c',
+        'core/vsnprintf.c',
+        'helpers/pci.c',
         'helpers/resource.c',
         'helpers/sci.c',
         'helpers/sleep.c',
-        'core/vsnprintf.c',
     include_directories: include,
     pic: false)
 
