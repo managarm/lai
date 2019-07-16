@@ -12,3 +12,4 @@ int lai_pci_route(acpi_resource_t *, uint16_t, uint8_t, uint8_t, uint8_t);
 lai_api_error_t lai_pci_route_pin(acpi_resource_t *, uint16_t, uint8_t, uint8_t, uint8_t, uint8_t);
 
 lai_nsnode_t *lai_pci_find_device(lai_nsnode_t *, uint8_t, uint8_t, lai_state_t *);
+lai_nsnode_t *lai_pci_find_bus(uint16_t, uint8_t, lai_state_t *);
