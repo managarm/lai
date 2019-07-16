@@ -12,7 +12,7 @@
    -specific use. Therefore, nobody should assume it contains the real IRQ. Instead,
    the four PCI pins should be used: LNKA, LNKB, LNKC and LNKD. */
 
-#include <lai/helpers/pciroute.h>
+#include <lai/helpers/pci.h>
 #include <lai/helpers/resource.h>
 #include "../core/libc.h"
 #include "../core/eval.h"
@@ -214,3 +214,30 @@ resolve_pin:
     }
 }
 
+lai_nsnode_t *lai_pci_find_device(lai_nsnode_t *bus, uint8_t slot, uint8_t function, lai_state_t *state){
+    LAI_ENSURE(bus);
+    LAI_ENSURE(state);
+    
+    uint64_t device_adr = ((slot << 16) | function);
+
+    struct lai_ns_child_iterator iter = LAI_NS_CHILD_ITERATOR_INITIALIZER(bus);
+    lai_nsnode_t *node;
+    while ((node = lai_ns_child_iterate(&iter))) {
+        uint64_t adr_result = 0;
+        lai_variable_t adr = LAI_VAR_INITIALIZER;
+        lai_nsnode_t *adr_handle = lai_resolve_path(node, "_ADR");
+        if (adr_handle) {
+            if (lai_eval(&adr, adr_handle, &state)) {
+                lai_warn("failed to evaluate _ADR");
+                continue;
+            }
+            lai_obj_get_integer(&adr, &adr_result);
+        }
+
+        if(adr_result == device_adr){
+            return node;
+        }
+    }
+
+    return NULL;
+}
