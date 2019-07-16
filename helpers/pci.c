@@ -181,7 +181,7 @@ lai_nsnode_t *lai_pci_find_device(lai_nsnode_t *bus, uint8_t slot, uint8_t funct
         LAI_CLEANUP_VAR lai_variable_t adr = LAI_VAR_INITIALIZER;
         lai_nsnode_t *adr_handle = lai_resolve_path(node, "_ADR");
         if (adr_handle) {
-            if (lai_eval(&adr, adr_handle, &state)) {
+            if (lai_eval(&adr, adr_handle, state)) {
                 lai_warn("failed to evaluate _ADR");
                 continue;
             }
@@ -207,8 +207,8 @@ lai_nsnode_t *lai_pci_find_bus(uint16_t seg, uint8_t bus, lai_state_t *state){
     struct lai_ns_child_iterator iter = LAI_NS_CHILD_ITERATOR_INITIALIZER(sb_handle);
     lai_nsnode_t *node;
     while ((node = lai_ns_child_iterate(&iter))) {
-        if (lai_check_device_pnp_id(node, &pci_pnp_id, &state) &&
-            lai_check_device_pnp_id(node, &pcie_pnp_id, &state)) {
+        if (lai_check_device_pnp_id(node, &pci_pnp_id, state) &&
+            lai_check_device_pnp_id(node, &pcie_pnp_id, state)) {
             continue;
         }
 
@@ -216,7 +216,7 @@ lai_nsnode_t *lai_pci_find_bus(uint16_t seg, uint8_t bus, lai_state_t *state){
         uint64_t bbn_result = 0;
         lai_nsnode_t *bbn_handle = lai_resolve_path(node, "_BBN");
         if (bbn_handle) {
-            if (lai_eval(&bus_number, bbn_handle, &state)) {
+            if (lai_eval(&bus_number, bbn_handle, state)) {
                 lai_warn("failed to evaluate _BBN");
                 continue;
             }
@@ -227,7 +227,7 @@ lai_nsnode_t *lai_pci_find_bus(uint16_t seg, uint8_t bus, lai_state_t *state){
         uint64_t seg_result = 0;
         lai_nsnode_t *seg_handle = lai_resolve_path(node, "_SEG");
         if (seg_handle) {
-            if (lai_eval(&seg_number, seg_handle, &state)){
+            if (lai_eval(&seg_number, seg_handle, state)){
                 lai_warn("failed to evaluate _SEG");
                 continue;
             }
