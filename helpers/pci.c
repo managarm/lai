@@ -40,55 +40,9 @@ lai_api_error_t lai_pci_route_pin(acpi_resource_t *dest, uint16_t seg, uint8_t b
     // PCI numbers pins from 1, but ACPI numbers them from 0. Hence we
     // subtract 1 to arrive at the correct pin number.
     pin--;
+
     // find the PCI bus in the namespace
-    LAI_CLEANUP_VAR lai_variable_t bus_number = LAI_VAR_INITIALIZER;
-    LAI_CLEANUP_VAR lai_variable_t seg_number = LAI_VAR_INITIALIZER;
-    LAI_CLEANUP_VAR lai_variable_t pci_pnp_id = LAI_VAR_INITIALIZER;
-    LAI_CLEANUP_VAR lai_variable_t pcie_pnp_id = LAI_VAR_INITIALIZER;
-    lai_eisaid(&pci_pnp_id, PCI_PNP_ID);
-    lai_eisaid(&pcie_pnp_id, PCIE_PNP_ID);
-
-    lai_nsnode_t *handle = NULL;
-
-    lai_nsnode_t *sb_handle = lai_resolve_path(NULL, "\\_SB_");
-    LAI_ENSURE(sb_handle);
-    struct lai_ns_child_iterator iter = LAI_NS_CHILD_ITERATOR_INITIALIZER(sb_handle);
-    lai_nsnode_t *node;
-    while ((node = lai_ns_child_iterate(&iter))) {
-
-        if (lai_check_device_pnp_id(node, &pci_pnp_id, &state) &&
-                lai_check_device_pnp_id(node, &pcie_pnp_id, &state)) {
-            continue;
-        }
-
-        uint64_t bbn_result = 0;
-
-        lai_nsnode_t *bbn_handle = lai_resolve_path(node, "_BBN");
-        if (bbn_handle) {
-            if (lai_eval(&bus_number, bbn_handle, &state)) {
-                lai_warn("failed to evaluate _BBN");
-                continue;
-            }
-            lai_obj_get_integer(&bus_number, &bbn_result);
-        }
-
-        uint64_t seg_result = 0;
-
-        lai_nsnode_t *seg_handle = lai_resolve_path(node, "_SEG");
-        if (seg_handle) {
-            if (lai_eval(&seg_number, seg_handle, &state)) {
-                lai_warn("failed to evaluate _SEG");
-                continue;
-            }
-            lai_obj_get_integer(&seg_number, &seg_result);
-        }
-
-        if (bbn_result == bus && seg_result == seg) {
-            handle = node;
-            break;
-        }
-    }
-
+    lai_nsnode_t *handle = lai_pci_find_bus(seg, bus, &state);
     if (!handle)
         return LAI_ERROR_NO_SUCH_NODE;
 
