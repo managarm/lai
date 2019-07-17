@@ -56,7 +56,8 @@ void lai_do_resolve_new_node(lai_nsnode_t *node,
 // Like LAI_OBJECT_MODE, but discard the result.
 #define LAI_EXEC_MODE 3
 #define LAI_REFERENCE_MODE 4
-#define LAI_IMMEDIATE_WORD_MODE 5
+#define LAI_IMMEDIATE_BYTE_MODE 5
+#define LAI_IMMEDIATE_WORD_MODE 6
 
 // Allocate a new package.
 int lai_create_string(lai_variable_t *, size_t);

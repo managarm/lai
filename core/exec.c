@@ -103,6 +103,31 @@ static void lai_exec_reduce_node(int opcode, lai_state_t *state, struct lai_oper
                 lai_list_link(&ctxitem->invocation->per_method_list, &node->per_method_item);
             break;
         }
+
+        case (EXTOP_PREFIX << 8) | OPREGION: {
+            lai_variable_t base = {0};
+            lai_variable_t size = {0};
+            lai_exec_get_integer(state, &operands[2], &base);
+            lai_exec_get_integer(state, &operands[3], &size);
+            LAI_ENSURE(operands[0].tag == LAI_UNRESOLVED_NAME);
+            LAI_ENSURE(operands[1].tag == LAI_OPERAND_OBJECT
+                       && operands[1].object.type == LAI_INTEGER);
+
+            struct lai_amlname amln;
+            lai_amlname_parse(&amln, operands[0].unres_aml);
+
+            lai_nsnode_t *node = lai_create_nsnode_or_die();
+            lai_do_resolve_new_node(node, ctx_handle, &amln);
+            node->op_address_space = operands[1].object.integer;
+            node->op_base = base.integer;
+            node->op_length = size.integer;
+
+            lai_install_nsnode(node);
+            struct lai_ctxitem *ctxitem = lai_exec_peek_ctxstack_back(state);
+            if (ctxitem->invocation)
+                lai_list_link(&ctxitem->invocation->per_method_list, &node->per_method_item);
+            break;
+        }
         default:
             lai_panic("undefined opcode in lai_exec_reduce_node: %02X", opcode);
     }
@@ -699,7 +724,16 @@ static int lai_exec_run(lai_state_t *state) {
         // If yes, it will be pushed onto the opstack after the expression is computed.
         int want_result = (parse_mode != LAI_EXEC_MODE);
 
-        if (parse_mode == LAI_IMMEDIATE_WORD_MODE) {
+        if (parse_mode == LAI_IMMEDIATE_BYTE_MODE) {
+            uint8_t value = method[block->pc];
+            block->pc += 1;
+
+            struct lai_operand *result = lai_exec_push_opstack_or_die(state);
+            result->tag = LAI_OPERAND_OBJECT;
+            result->object.type = LAI_INTEGER;
+            result->object.integer = value;
+            continue;
+        } else if (parse_mode == LAI_IMMEDIATE_WORD_MODE) {
             uint16_t value = (method[block->pc + 1] << 8) | method[block->pc];
             block->pc += 2;
 
@@ -1365,26 +1399,17 @@ static int lai_exec_run(lai_state_t *state) {
         }
         case (EXTOP_PREFIX << 8) | OPREGION:
         {
-            struct lai_amlname amln;
-            lai_variable_t disp = {0};
-            lai_variable_t length = {0};
             block->pc += 2;
-            block->pc += lai_amlname_parse(&amln, method + block->pc);
-            // First byte identifies the address space (memory, I/O ports, PCI, etc.).
-            int address_space = method[block->pc];
-            block->pc++;
-            // Now, parse the offset and length of the opregion.
-            lai_eval_operand(&disp, state);
-            lai_eval_operand(&length, state);
 
-            lai_nsnode_t *node = lai_create_nsnode_or_die();
-            lai_do_resolve_new_node(node, ctx_handle, &amln);
-            node->op_address_space = address_space;
-            node->op_base = disp.integer;
-            node->op_length = length.integer;
-            lai_install_nsnode(node);
-            if (invocation)
-                lai_list_link(&invocation->per_method_list, &node->per_method_item);
+            lai_stackitem_t *node_item = lai_exec_push_stack_or_die(state);
+            node_item->kind = LAI_NODE_STACKITEM;
+            node_item->node_opcode = opcode;
+            node_item->opstack_frame = state->opstack_ptr;
+            node_item->node_arg_modes[0] = LAI_REFERENCE_MODE;
+            node_item->node_arg_modes[1] = LAI_IMMEDIATE_BYTE_MODE;
+            node_item->node_arg_modes[2] = LAI_OBJECT_MODE;
+            node_item->node_arg_modes[3] = LAI_OBJECT_MODE;
+            node_item->node_arg_modes[4] = 0;
             break;
         }
         case (EXTOP_PREFIX << 8) | FIELD: {
