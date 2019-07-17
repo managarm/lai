@@ -54,114 +54,110 @@ lai_api_error_t lai_pci_route_pin(acpi_resource_t *dest, uint16_t seg, uint8_t b
     }
 
     LAI_CLEANUP_VAR lai_variable_t prt = LAI_VAR_INITIALIZER;
-    LAI_CLEANUP_VAR lai_variable_t prt_package = LAI_VAR_INITIALIZER;
-    LAI_CLEANUP_VAR lai_variable_t prt_entry = LAI_VAR_INITIALIZER;
-
-    /* _PRT is a package of packages. Each package within the PRT is in the following format:
-       0: Integer:    Address of device. Low WORD = function, high WORD = slot
-       1: Integer:    Interrupt pin. 0 = LNKA, 1 = LNKB, 2 = LNKC, 3 = LNKD
-       2: Name or Integer:    If name, this is the namespace device which allocates the interrupt.
-        If it's an integer, then this field is ignored.
-       3: Integer:    If offset 2 is a Name, this is the index within the resource descriptor
-        of the specified device which contains the PCI interrupt. If offset 2 is an
-        integer, this field is the ACPI GSI of this PCI IRQ. */
 
     if (lai_eval(&prt, prt_handle, &state)) {
         lai_warn("failed to evaluate _PRT");
         return LAI_ERROR_EXECUTION_FAILURE;
     }
 
-    size_t i = 0;
+    struct lai_prt_iterator iter = LAI_PRT_ITERATOR_INITIALIZER(&prt);
+    lai_api_error_t err;
 
-    for (;;) {
-        // read the _PRT package
-        if (lai_obj_get_pkg(&prt, i, &prt_package))
-            return LAI_ERROR_UNEXPECTED_RESULT;
-
-        if (prt_package.type != LAI_PACKAGE)
-            return LAI_ERROR_TYPE_MISMATCH;
-
-        // read the device address
-        if (lai_obj_get_pkg(&prt_package, 0, &prt_entry))
-            return LAI_ERROR_UNEXPECTED_RESULT;
-
-        if (prt_entry.type != LAI_INTEGER)
-            return LAI_ERROR_TYPE_MISMATCH;
-
-        // is this the device we want?
-        if ((prt_entry.integer >> 16) == slot) {
-            if ((prt_entry.integer & 0xFFFF) == 0xFFFF || (prt_entry.integer & 0xFFFF) == function) {
-                // is this the interrupt pin we want?
-                if (lai_obj_get_pkg(&prt_package, 1, &prt_entry))
-                    return LAI_ERROR_UNEXPECTED_RESULT;
-
-                if (prt_entry.type != LAI_INTEGER)
-                    return LAI_ERROR_TYPE_MISMATCH;
-
-                if (prt_entry.integer == pin)
-                    goto resolve_pin;
-            }
+    while (!(err = lai_pci_parse_prt(&iter))) {
+        if (iter.slot == slot &&
+                (iter.function == function || iter.function == -1) &&
+                iter.pin == pin) {
+            dest->type = ACPI_RESOURCE_IRQ;
+            dest->base = iter.gsi;
+            dest->irq_flags = iter.flags;
+            return LAI_ERROR_NONE;
         }
-
-        // continue
-        i++;
     }
 
-resolve_pin:
-    // here we've found what we need
-    // is it a link device or a GSI?
-    if (lai_obj_get_pkg(&prt_package, 2, &prt_entry))
+    return err;
+}
+
+lai_api_error_t lai_pci_parse_prt(struct lai_prt_iterator *iter) {
+    LAI_CLEANUP_VAR lai_variable_t prt_entry = LAI_VAR_INITIALIZER;
+    LAI_CLEANUP_VAR lai_variable_t prt_entry_addr = LAI_VAR_INITIALIZER;
+    LAI_CLEANUP_VAR lai_variable_t prt_entry_pin = LAI_VAR_INITIALIZER;
+    LAI_CLEANUP_VAR lai_variable_t prt_entry_type = LAI_VAR_INITIALIZER;
+    LAI_CLEANUP_VAR lai_variable_t prt_entry_index = LAI_VAR_INITIALIZER;
+
+    if (lai_obj_get_pkg(iter->prt, iter->i, &prt_entry))
         return LAI_ERROR_UNEXPECTED_RESULT;
 
-    acpi_resource_t *res;
-    size_t res_count;
+    iter->i++;
 
-    int prt_entry_type = lai_obj_get_type(&prt_entry);
-    if (prt_entry_type == LAI_TYPE_INTEGER) {
-        // Direct routing to a GSI.
+    if (lai_obj_get_pkg(&prt_entry, 0, &prt_entry_addr))
+        return LAI_ERROR_UNEXPECTED_RESULT;
+    if (lai_obj_get_pkg(&prt_entry, 1, &prt_entry_pin))
+        return LAI_ERROR_UNEXPECTED_RESULT;
+    if (lai_obj_get_pkg(&prt_entry, 2, &prt_entry_type))
+        return LAI_ERROR_UNEXPECTED_RESULT;
+    if (lai_obj_get_pkg(&prt_entry, 3, &prt_entry_index))
+        return LAI_ERROR_UNEXPECTED_RESULT;
+
+    uint64_t addr;
+    if (lai_obj_get_integer(&prt_entry_addr, &addr))
+        return LAI_ERROR_UNEXPECTED_RESULT;
+
+    iter->slot = (addr >> 16) & 0xFFFF;
+    iter->function = addr & 0xFFFF;
+
+    if (iter->function == 0xFFFF)
+        iter->function = -1;
+
+    uint64_t pin;
+    if (lai_obj_get_integer(&prt_entry_pin, &pin))
+        return LAI_ERROR_UNEXPECTED_RESULT;
+
+    iter->pin = pin;
+
+    enum lai_object_type type = lai_obj_get_type(&prt_entry_type);
+    if (type == LAI_TYPE_INTEGER) { // direct routing to GSI
         uint64_t gsi;
-        if (lai_obj_get_pkg(&prt_package, 3, &prt_entry))
-            return LAI_ERROR_UNEXPECTED_RESULT;
-        if (lai_obj_get_integer(&prt_entry, &gsi))
+
+        if (lai_obj_get_integer(&prt_entry_index, &gsi))
             return LAI_ERROR_UNEXPECTED_RESULT;
 
-        dest->type = ACPI_RESOURCE_IRQ;
-        dest->base = gsi;
-        dest->irq_flags = ACPI_IRQ_LEVEL | ACPI_IRQ_ACTIVE_HIGH | ACPI_IRQ_SHARED;
-
-        lai_debug("PCI device %X:%X:%X:%X is using IRQ %d", seg, bus, slot, function, (int)dest->base);
+        iter->link = NULL;
+        iter->resource_idx = 0;
+        iter->flags = ACPI_IRQ_LEVEL | ACPI_IRQ_ACTIVE_HIGH
+                        | ACPI_IRQ_SHARED;
+        iter->gsi = gsi;
         return LAI_ERROR_NONE;
-    } else if (prt_entry_type == LAI_TYPE_DEVICE) {
-        // GSI is determined by an Interrupt Link Device.
+    } else if (type == LAI_TYPE_DEVICE) { // GSI obtained via a link dev
         lai_nsnode_t *link_handle;
-        if (lai_obj_get_handle(&prt_entry, &link_handle))
-            return LAI_ERROR_UNEXPECTED_RESULT;
-        LAI_CLEANUP_FREE_STRING char *fullpath = lai_stringify_node_path(link_handle);
-        lai_debug("PCI interrupt link is %s", fullpath);
 
-        // read the resource template of the device
-        res = lai_calloc(sizeof(acpi_resource_t), ACPI_MAX_RESOURCES);
-        res_count = lai_read_resource(link_handle, res);
-
-        if (!res_count)
+        if (lai_obj_get_handle(&prt_entry_type, &link_handle))
             return LAI_ERROR_UNEXPECTED_RESULT;
+
+        acpi_resource_t *res = lai_calloc(sizeof(acpi_resource_t), 
+                                            ACPI_MAX_RESOURCES);
+        size_t res_count = lai_read_resource(link_handle, res);
+
+        if (!res_count) {
+            laihost_free(res);
+            return LAI_ERROR_UNEXPECTED_RESULT;
+        }
 
         for (size_t i = 0; i < res_count; i++) {
             if (res[i].type == ACPI_RESOURCE_IRQ) {
-                dest->type = ACPI_RESOURCE_IRQ;
-                dest->base = res[i].base;
-                dest->irq_flags = res[i].irq_flags;
+                iter->link = link_handle;
+                iter->resource_idx = i;
+                iter->flags = res[i].irq_flags;
+                iter->gsi = res[i].base;
 
                 laihost_free(res);
-
-                lai_debug("PCI device %X:%X:%X:%X is using IRQ %d", seg, bus, slot, function, (int)dest->base);
                 return LAI_ERROR_NONE;
             }
 
             i++;
         }
 
-        return LAI_ERROR_NONE;
+        laihost_free(res);
+        return LAI_ERROR_UNEXPECTED_RESULT;
     } else {
         lai_warn("PRT entry has unexpected type %d", prt_entry_type);
         return LAI_ERROR_TYPE_MISMATCH;
