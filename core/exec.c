@@ -778,6 +778,51 @@ static int lai_exec_run(lai_state_t *state) {
             }
 
             parse_mode = LAI_OBJECT_MODE;
+        } else if (item->kind == LAI_RETURN_STACKITEM) {
+            int k = state->opstack_ptr - item->opstack_frame;
+            LAI_ENSURE(k <= 1);
+            if(k == 1) {
+                LAI_CLEANUP_VAR lai_variable_t result = LAI_VAR_INITIALIZER;
+                struct lai_operand *operand = lai_exec_get_opstack(state, item->opstack_frame);
+                lai_exec_get_objectref(state, operand, &result);
+                lai_exec_pop_opstack(state, 1);
+
+                // Find the last LAI_METHOD_CONTEXT_STACKITEM on the stack.
+                int j = 0;
+                lai_stackitem_t *method_item;
+                while (1) {
+                    method_item = lai_exec_peek_stack(state, j);
+                    if (!method_item)
+                        lai_panic("Return() outside of control method()");
+                    if (method_item->kind == LAI_METHOD_CONTEXT_STACKITEM)
+                        break;
+                    // TODO: Verify that we only cross conditions/loops.
+                    j++;
+                }
+
+                // Push the return value.
+                if (method_item->mth_want_result) {
+                    struct lai_operand *opstack_res = lai_exec_push_opstack_or_die(state);
+                    opstack_res->tag = LAI_OPERAND_OBJECT;
+                    lai_obj_clone(&opstack_res->object, &result);
+                }
+
+                // Clean up all per-method namespace nodes.
+                struct lai_list_item *pmi;
+                while ((pmi = lai_list_first(&invocation->per_method_list))) {
+                    lai_nsnode_t *node = LAI_CONTAINER_OF(pmi, lai_nsnode_t, per_method_item);
+                    lai_uninstall_nsnode(node);
+                    lai_list_unlink(&node->per_method_item);
+                }
+
+                state->innermost_block = method_item->outer_block;
+                lai_exec_pop_stack(state, j + 1);
+                lai_exec_pop_ctxstack_back(state);
+
+                continue;
+            }
+
+            parse_mode = LAI_OBJECT_MODE;
         } else if (item->kind == LAI_LOOP_STACKITEM) {
             if (item->pc == item->loop_pred) {
                 // We are at the beginning of a loop. We check the predicate; if it is false,
@@ -1067,40 +1112,9 @@ static int lai_exec_run(lai_state_t *state) {
         case RETURN_OP:
         {
             block->pc++;
-            LAI_CLEANUP_VAR lai_variable_t result = LAI_VAR_INITIALIZER;
-            lai_eval_operand(&result, state);
-
-            // Find the last LAI_METHOD_CONTEXT_STACKITEM on the stack.
-            int j = 0;
-            lai_stackitem_t *method_item;
-            while (1) {
-                method_item = lai_exec_peek_stack(state, j);
-                if (!method_item)
-                    lai_panic("Return() outside of control method()");
-                if (method_item->kind == LAI_METHOD_CONTEXT_STACKITEM)
-                    break;
-                // TODO: Verify that we only cross conditions/loops.
-                j++;
-            }
-
-            // Push the return value.
-            if (method_item->mth_want_result) {
-                struct lai_operand *opstack_res = lai_exec_push_opstack_or_die(state);
-                opstack_res->tag = LAI_OPERAND_OBJECT;
-                lai_obj_clone(&opstack_res->object, &result);
-            }
-
-            // Clean up all per-method namespace nodes.
-            struct lai_list_item *pmi;
-            while ((pmi = lai_list_first(&invocation->per_method_list))) {
-                lai_nsnode_t *node = LAI_CONTAINER_OF(pmi, lai_nsnode_t, per_method_item);
-                lai_uninstall_nsnode(node);
-                lai_list_unlink(&node->per_method_item);
-            }
-
-            state->innermost_block = method_item->outer_block;
-            lai_exec_pop_stack(state, j + 1);
-            lai_exec_pop_ctxstack_back(state);
+            lai_stackitem_t *node_item = lai_exec_push_stack_or_die(state);
+            node_item->kind = LAI_RETURN_STACKITEM;
+            node_item->opstack_frame = state->opstack_ptr;
             break;
         }
         /* While Loops */
