@@ -148,6 +148,7 @@ struct lai_operand {
 #define LAI_NODE_STACKITEM             6 // Parse a namespace leaf node (i.e., not a scope).
 #define LAI_OP_STACKITEM               7 // Parse an operator.
 #define LAI_INVOKE_STACKITEM           8 // Parse a method invocation.
+#define LAI_RETURN_STACKITEM           9 // Parse a return operand 
 // This implements lai_eval_operand(). // TODO: Eventually remove
 // lai_eval_operand() by moving all parsing functionality into lai_exec_run().
 #define LAI_EVALOPERAND_STACKITEM     10
