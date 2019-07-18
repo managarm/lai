@@ -1193,25 +1193,6 @@ static int lai_exec_run(lai_state_t *state) {
             lai_panic("Else() outside of If()");
             break;
 
-        // "Simple" objects in the ACPI namespace.
-        case NAME_OP:
-        {
-            struct lai_amlname amln;
-            LAI_CLEANUP_VAR lai_variable_t object = LAI_VAR_INITIALIZER;
-            block->pc++;
-            block->pc += lai_amlname_parse(&amln, method + block->pc);
-            lai_eval_operand(&object, state);
-
-            lai_nsnode_t *node = lai_create_nsnode_or_die();
-            node->type = LAI_NAMESPACE_NAME;
-            lai_do_resolve_new_node(node, ctx_handle, &amln);
-            lai_var_move(&node->object, &object);
-            lai_install_nsnode(node);
-            if (invocation)
-                lai_list_link(&invocation->per_method_list, &node->per_method_item);
-            break;
-        }
-
         // Scope-like objects in the ACPI namespace.
         case SCOPE_OP:
         {
@@ -1365,6 +1346,22 @@ static int lai_exec_run(lai_state_t *state) {
         case METHOD_OP:
             block->pc += lai_create_method(ctx_handle, amls, method + block->pc);
             break;
+        case NAME_OP: {
+            struct lai_amlname amln;
+            LAI_CLEANUP_VAR lai_variable_t object = LAI_VAR_INITIALIZER;
+            block->pc++;
+            block->pc += lai_amlname_parse(&amln, method + block->pc);
+            lai_eval_operand(&object, state);
+
+            lai_nsnode_t *node = lai_create_nsnode_or_die();
+            node->type = LAI_NAMESPACE_NAME;
+            lai_do_resolve_new_node(node, ctx_handle, &amln);
+            lai_var_move(&node->object, &object);
+            lai_install_nsnode(node);
+            if (invocation)
+                lai_list_link(&invocation->per_method_list, &node->per_method_item);
+            break;
+        }
         case ALIAS_OP: {
             struct lai_amlname target_amln;
             struct lai_amlname dest_amln;
