@@ -147,6 +147,7 @@ struct lai_operand {
 #define LAI_PKG_INITIALIZER_STACKITEM  5
 #define LAI_NODE_STACKITEM             6 // Parse a namespace leaf node (i.e., not a scope).
 #define LAI_OP_STACKITEM               7 // Parse an operator.
+#define LAI_INVOKE_STACKITEM           8 // Parse a method invocation.
 // This implements lai_eval_operand(). // TODO: Eventually remove
 // lai_eval_operand() by moving all parsing functionality into lai_exec_run().
 #define LAI_EVALOPERAND_STACKITEM     10
@@ -203,6 +204,10 @@ typedef struct lai_stackitem_ {
         struct {
             int node_opcode;
             uint8_t node_arg_modes[8];
+        };
+        struct {
+            int ivk_argc;
+            uint8_t ivk_want_result;
         };
     };
 } lai_stackitem_t;

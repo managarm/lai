@@ -693,6 +693,74 @@ static int lai_exec_run(lai_state_t *state) {
             }
 
             parse_mode = item->op_arg_modes[k];
+        } else if (item->kind == LAI_INVOKE_STACKITEM) {
+            int argc = item->ivk_argc;
+            int want_result = item->ivk_want_result;
+            int k = state->opstack_ptr - item->opstack_frame;
+            LAI_ENSURE(k <= argc + 1);
+            if (k == argc + 1) { // First operand is the method name.
+                struct lai_operand *opstack_method
+                        = lai_exec_get_opstack(state, item->opstack_frame);
+                LAI_ENSURE(opstack_method->tag == LAI_RESOLVED_NAME);
+
+                lai_nsnode_t *handle = opstack_method->handle;
+                LAI_ENSURE(handle->type == LAI_NAMESPACE_METHOD);
+
+                // TODO: Make sure that this does not leak memory.
+                lai_variable_t args[7];
+                memset(args, 0, sizeof(lai_variable_t) * 7);
+
+                for(int i = 0; i < argc; i++) {
+                    struct lai_operand *operand
+                            = lai_exec_get_opstack(state, item->opstack_frame + 1 + i);
+                    lai_exec_get_objectref(state, operand, &args[i]);
+                }
+
+                lai_exec_pop_opstack(state, argc + 1);
+                lai_exec_pop_stack_back(state);
+
+                if (handle->method_override) {
+                    // It's an OS-defined method.
+                    // TODO: Verify the number of argument to the overridden method.
+                    LAI_CLEANUP_VAR lai_variable_t method_result = LAI_VAR_INITIALIZER;
+                    int e = handle->method_override(args, &method_result);
+
+                    if (e)
+                        return e;
+                    if (want_result) {
+                        struct lai_operand *opstack_res = lai_exec_push_opstack_or_die(state);
+                        opstack_res->tag = LAI_OPERAND_OBJECT;
+                        lai_var_move(&opstack_res->object, &method_result);
+                    }
+                } else {
+                    // It's an AML method.
+                    LAI_ENSURE(handle->amls);
+
+                    struct lai_ctxitem *method_ctxitem = lai_exec_push_ctxstack_or_die(state);
+                    method_ctxitem->amls = handle->amls;
+                    method_ctxitem->code = handle->pointer;
+                    method_ctxitem->handle = handle;
+                    method_ctxitem->invocation = laihost_malloc(sizeof(struct lai_invocation));
+                    if (!method_ctxitem->invocation)
+                        lai_panic("could not allocate memory for method invocation");
+                    memset(method_ctxitem->invocation, 0, sizeof(struct lai_invocation));
+                    lai_list_init(&method_ctxitem->invocation->per_method_list);
+
+                    for (int i = 0; i < argc; i++)
+                        lai_var_move(&method_ctxitem->invocation->arg[i], &args[i]);
+
+                    lai_stackitem_t *item = lai_exec_push_stack_or_die(state);
+                    item->kind = LAI_METHOD_CONTEXT_STACKITEM;
+                    item->pc = 0;
+                    item->limit = handle->size;
+                    item->outer_block = state->innermost_block;
+                    item->mth_want_result = want_result;
+                    state->innermost_block = state->stack_ptr;
+                }
+                continue;
+            }
+
+            parse_mode = LAI_OBJECT_MODE;
         } else if (item->kind == LAI_LOOP_STACKITEM) {
             if (item->pc == item->loop_pred) {
                 // We are at the beginning of a loop. We check the predicate; if it is false,
@@ -782,51 +850,15 @@ static int lai_exec_run(lai_state_t *state) {
                     if (debug_opcodes)
                         lai_debug("parsing invocation %s [@ 0x%x]", path, table_pc);
 
-                    lai_variable_t args[7];
-                    memset(args, 0, sizeof(lai_variable_t) * 7);
+                    lai_stackitem_t *node_item = lai_exec_push_stack_or_die(state);
+                    node_item->kind = LAI_INVOKE_STACKITEM;
+                    node_item->opstack_frame = state->opstack_ptr;
+                    node_item->ivk_argc = handle->method_flags & METHOD_ARGC_MASK;
+                    node_item->ivk_want_result = want_result;
 
-                    int argc = handle->method_flags & METHOD_ARGC_MASK;
-                    for(int i = 0; i < argc; i++)
-                        lai_eval_operand(&args[i], state);
-
-                    if (handle->method_override) {
-                        // It's an OS-defined method.
-                        // TODO: Verify the number of argument to the overridden method.
-                        LAI_CLEANUP_VAR lai_variable_t method_result = LAI_VAR_INITIALIZER;
-                        int e = handle->method_override(args, &method_result);
-
-                        if (e)
-                            return e;
-                        if (want_result) {
-                            struct lai_operand *opstack_res = lai_exec_push_opstack_or_die(state);
-                            opstack_res->tag = LAI_OPERAND_OBJECT;
-                            lai_var_move(&opstack_res->object, &method_result);
-                        }
-                    } else {
-                        // It's an AML method.
-                        LAI_ENSURE(handle->amls);
-
-                        struct lai_ctxitem *method_ctxitem = lai_exec_push_ctxstack_or_die(state);
-                        method_ctxitem->amls = handle->amls;
-                        method_ctxitem->code = handle->pointer;
-                        method_ctxitem->handle = handle;
-                        method_ctxitem->invocation = laihost_malloc(sizeof(struct lai_invocation));
-                        if (!method_ctxitem->invocation)
-                            lai_panic("could not allocate memory for method invocation");
-                        memset(method_ctxitem->invocation, 0, sizeof(struct lai_invocation));
-                        lai_list_init(&method_ctxitem->invocation->per_method_list);
-
-                        for (int i = 0; i < argc; i++)
-                            lai_var_move(&method_ctxitem->invocation->arg[i], &args[i]);
-
-                        lai_stackitem_t *item = lai_exec_push_stack_or_die(state);
-                        item->kind = LAI_METHOD_CONTEXT_STACKITEM;
-                        item->pc = 0;
-                        item->limit = handle->size;
-                        item->outer_block = state->innermost_block;
-                        item->mth_want_result = want_result;
-                        state->innermost_block = state->stack_ptr;
-                    }
+                    struct lai_operand *opstack_method = lai_exec_push_opstack_or_die(state);
+                    opstack_method->tag = LAI_RESOLVED_NAME;
+                    opstack_method->handle = handle;
                 } else {
                     if (debug_opcodes)
                         lai_debug("parsing name %s [@ 0x%x]", path, table_pc);
