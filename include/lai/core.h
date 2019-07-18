@@ -32,6 +32,8 @@ typedef enum lai_api_error {
      * expectation (e.g., it is of the wrong type, has an unexpected size, or consists of
      * unexpected contents) */
     LAI_ERROR_UNEXPECTED_RESULT,
+    // Error given when end of iterator is reached, nothing to worry about
+    LAI_ERROR_END_REACHED,
 } lai_api_error_t;
 
 void lai_init_state(lai_state_t *);
