@@ -66,6 +66,24 @@ static void lai_exec_reduce_node(int opcode, lai_state_t *state, struct lai_oper
     if (debug_opcodes)
         lai_debug("lai_exec_reduce_node: opcode 0x%02X", opcode);
     switch (opcode) {
+        case NAME_OP: {
+            lai_variable_t object = {0};
+            lai_exec_get_objectref(state, &operands[1], &object);
+            LAI_ENSURE(operands[0].tag == LAI_UNRESOLVED_NAME);
+
+            struct lai_amlname amln;
+            lai_amlname_parse(&amln, operands[0].unres_aml);
+
+            lai_nsnode_t *node = lai_create_nsnode_or_die();
+            node->type = LAI_NAMESPACE_NAME;
+            lai_do_resolve_new_node(node, ctx_handle, &amln);
+            lai_var_move(&node->object, &object);
+            lai_install_nsnode(node);
+            struct lai_ctxitem *ctxitem = lai_exec_peek_ctxstack_back(state);
+            if (ctxitem->invocation)
+                lai_list_link(&ctxitem->invocation->per_method_list, &node->per_method_item);
+            break;
+        }
         case BYTEFIELD_OP:
         case WORDFIELD_OP:
         case DWORDFIELD_OP:
@@ -103,7 +121,6 @@ static void lai_exec_reduce_node(int opcode, lai_state_t *state, struct lai_oper
                 lai_list_link(&ctxitem->invocation->per_method_list, &node->per_method_item);
             break;
         }
-
         case (EXTOP_PREFIX << 8) | OPREGION: {
             lai_variable_t base = {0};
             lai_variable_t size = {0};
@@ -1347,19 +1364,15 @@ static int lai_exec_run(lai_state_t *state) {
             block->pc += lai_create_method(ctx_handle, amls, method + block->pc);
             break;
         case NAME_OP: {
-            struct lai_amlname amln;
-            LAI_CLEANUP_VAR lai_variable_t object = LAI_VAR_INITIALIZER;
             block->pc++;
-            block->pc += lai_amlname_parse(&amln, method + block->pc);
-            lai_eval_operand(&object, state);
 
-            lai_nsnode_t *node = lai_create_nsnode_or_die();
-            node->type = LAI_NAMESPACE_NAME;
-            lai_do_resolve_new_node(node, ctx_handle, &amln);
-            lai_var_move(&node->object, &object);
-            lai_install_nsnode(node);
-            if (invocation)
-                lai_list_link(&invocation->per_method_list, &node->per_method_item);
+            lai_stackitem_t *node_item = lai_exec_push_stack_or_die(state);
+            node_item->kind = LAI_NODE_STACKITEM;
+            node_item->node_opcode = opcode;
+            node_item->opstack_frame = state->opstack_ptr;
+            node_item->node_arg_modes[0] = LAI_REFERENCE_MODE;
+            node_item->node_arg_modes[1] = LAI_OBJECT_MODE;
+            node_item->node_arg_modes[2] = 0;
             break;
         }
         case ALIAS_OP: {
