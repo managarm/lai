@@ -166,7 +166,8 @@ lai_api_error_t lai_resource_iterate(struct lai_resource_view *iterator){
             } else if(info.size == 3){
                 iterator->flags = entry[3];
             } else {
-                lai_panic("Unknown Small IRQ resource size: %02X", info.size);
+                lai_warn("Unknown small IRQ resource size: %02X", info.size);
+                return LAI_ERROR_UNEXPECTED_RESULT;
             }
             iterator->skip_size = info.skip_size;
             return LAI_ERROR_NONE;
