@@ -36,6 +36,9 @@ typedef enum lai_api_error {
     LAI_ERROR_END_REACHED,
 } lai_api_error_t;
 
+// Convert a lai_api_error_t to a human readable string
+const char *lai_api_error_to_string(lai_api_error_t);
+
 void lai_init_state(lai_state_t *);
 void lai_finalize_state(lai_state_t *);
 
@@ -116,4 +119,3 @@ int lai_populate(lai_nsnode_t *, struct lai_aml_segment *, lai_state_t *);
 
 // Trace all opcodes. This will produce *very* verbose output.
 void lai_enable_tracing(int enable);
-
