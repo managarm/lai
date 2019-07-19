@@ -48,8 +48,7 @@ void lai_read_field(lai_variable_t *destination, lai_nsnode_t *field) {
 
     mask = ((uint64_t)1 << field->fld_size);
     mask--;
-    if (opregion->op_address_space != OPREGION_PCI) offset = field->fld_offset / 8;
-    else offset = field->fld_offset;
+    offset = field->fld_offset / 8;
     void *mmio;
 
     // these are for PCI
@@ -183,7 +182,7 @@ void lai_read_field(lai_variable_t *destination, lai_nsnode_t *field) {
                                  (uint8_t)bbn_result,
                                  (uint8_t)(adr_result >> 16) & 0xFF,
                                  (uint8_t)(adr_result & 0xFF),
-                                 (offset & 0xFFFC) + opregion->op_base);
+                                 (offset & 0xFFFF) + opregion->op_base);
                 break;
             case FIELD_WORD_ACCESS:
                 if (!laihost_pci_readw) lai_panic("host does not provide PCI access functions");
@@ -191,7 +190,7 @@ void lai_read_field(lai_variable_t *destination, lai_nsnode_t *field) {
                                  (uint8_t)bbn_result,
                                  (uint8_t)(adr_result >> 16) & 0xFF,
                                  (uint8_t)(adr_result & 0xFF),
-                                 (offset & 0xFFFC) + opregion->op_base);
+                                 (offset & 0xFFFE) + opregion->op_base);
                 break;
             case FIELD_DWORD_ACCESS:
             case FIELD_ANY_ACCESS:
@@ -357,7 +356,7 @@ void lai_write_field(lai_nsnode_t *field, lai_variable_t *source) {
                                  (uint8_t)bbn_result,
                                  (uint8_t)(adr_result >> 16) & 0xFF,
                                  (uint8_t)(adr_result & 0xFF),
-                                 (offset & 0xFFFC) + opregion->op_base);
+                                 (offset & 0xFFFF) + opregion->op_base);
                 break;
             case FIELD_WORD_ACCESS:
                 if (!laihost_pci_readw) lai_panic("host does not provide PCI access functions");
@@ -365,7 +364,7 @@ void lai_write_field(lai_nsnode_t *field, lai_variable_t *source) {
                                  (uint8_t)bbn_result,
                                  (uint8_t)(adr_result >> 16) & 0xFF,
                                  (uint8_t)(adr_result & 0xFF),
-                                 (offset & 0xFFFC) + opregion->op_base);
+                                 (offset & 0xFFFE) + opregion->op_base);
                 break;
             case FIELD_DWORD_ACCESS:
             case FIELD_ANY_ACCESS:
@@ -460,7 +459,7 @@ void lai_write_field(lai_nsnode_t *field, lai_variable_t *source) {
                                  (uint8_t)bbn_result,
                                  (uint8_t)(adr_result >> 16) & 0xFF,
                                  (uint8_t)(adr_result & 0xFF),
-                                 (offset & 0xFFFC) + opregion->op_base,
+                                 (offset & 0xFFFF) + opregion->op_base,
                                  (uint8_t)value);
                 break;
             case FIELD_WORD_ACCESS:
@@ -469,7 +468,7 @@ void lai_write_field(lai_nsnode_t *field, lai_variable_t *source) {
                                  (uint8_t)bbn_result,
                                  (uint8_t)(adr_result >> 16) & 0xFF,
                                  (uint8_t)(adr_result & 0xFF),
-                                 (offset & 0xFFFC) + opregion->op_base,
+                                 (offset & 0xFFFE) + opregion->op_base,
                                  (uint16_t)value);
                 break;
             case FIELD_DWORD_ACCESS:
