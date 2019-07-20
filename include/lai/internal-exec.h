@@ -174,6 +174,8 @@ struct lai_blkitem {
     int limit;
 };
 
+#define LAI_LOOP_ITERATION 1
+
 typedef struct lai_stackitem_ {
     int kind;
     // For stackitem accepting arguments.
@@ -184,6 +186,7 @@ typedef struct lai_stackitem_ {
             uint8_t mth_want_result;
         };
         struct {
+            int loop_state;
             int loop_pred; // Loop predicate PC.
         };
         struct {

@@ -845,20 +845,34 @@ static int lai_exec_run(lai_state_t *state) {
 
             parse_mode = LAI_OBJECT_MODE;
         } else if (item->kind == LAI_LOOP_STACKITEM) {
-            if (block->pc == item->loop_pred) {
-                // We are at the beginning of a loop. We check the predicate; if it is false,
-                // we exit the loop by removing the stack item.
-                lai_variable_t predicate = {0};
-                lai_eval_operand(&predicate, state);
-                if (!predicate.integer) {
-                    lai_exec_pop_blkstack_back(state);
-                    lai_exec_pop_stack_back(state);
+            if (!item->loop_state) {
+                // We are at the beginning of a loop and need to check the predicate.
+                int k = state->opstack_ptr - item->opstack_frame;
+                LAI_ENSURE(k <= 1);
+                if(k == 1) {
+                    LAI_CLEANUP_VAR lai_variable_t predicate = LAI_VAR_INITIALIZER;
+                    struct lai_operand *operand = lai_exec_get_opstack(state, item->opstack_frame);
+                    lai_exec_get_integer(state, operand, &predicate);
+                    lai_exec_pop_opstack(state, 1);
+
+                    if (predicate.integer) {
+                        item->loop_state = LAI_LOOP_ITERATION;
+                    }else{
+                        lai_exec_pop_blkstack_back(state);
+                        lai_exec_pop_stack_back(state);
+                    }
+                    continue;
                 }
-                continue;
-            } else if (block->pc == block->limit) {
-                // Unconditionally jump to the loop's predicate.
-                block->pc = item->loop_pred;
-                continue;
+
+                parse_mode = LAI_OBJECT_MODE;
+            } else {
+                LAI_ENSURE(item->loop_state == LAI_LOOP_ITERATION);
+                // Unconditionally reset the loop's state to recheck the predicate.
+                if (block->pc == block->limit) {
+                    item->loop_state = 0;
+                    block->pc = item->loop_pred;
+                    continue;
+                }
             }
         } else if (item->kind == LAI_COND_STACKITEM) {
             // If the condition wasn't taken, execute the Else() block if it exists
@@ -1155,6 +1169,8 @@ static int lai_exec_run(lai_state_t *state) {
 
             lai_stackitem_t *loop_item = lai_exec_push_stack_or_die(state);
             loop_item->kind = LAI_LOOP_STACKITEM;
+            loop_item->opstack_frame = state->opstack_ptr;
+            loop_item->loop_state = 0;
             loop_item->loop_pred = body_pc;
             break;
         }
