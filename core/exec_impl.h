@@ -94,7 +94,7 @@ static inline int lai_exec_reserve_ctxstack(lai_state_t *state) {
 }
 
 // Pushes a new item to the context stack and returns it.
-static inline struct lai_ctxitem *lai_exec_push_ctxstack_or_die(lai_state_t *state) {
+static inline struct lai_ctxitem *lai_exec_push_ctxstack(lai_state_t *state) {
     state->ctxstack_ptr++;
     // Users are expected to call the reserve() function before this one.
     LAI_ENSURE(state->ctxstack_ptr < state->ctxstack_capacity);
@@ -146,7 +146,7 @@ static inline int lai_exec_reserve_blkstack(lai_state_t *state) {
 }
 
 // Pushes a new item to the block stack and returns it.
-static inline struct lai_blkitem *lai_exec_push_blkstack_or_die(lai_state_t *state) {
+static inline struct lai_blkitem *lai_exec_push_blkstack(lai_state_t *state) {
     state->blkstack_ptr++;
     // Users are expected to call the reserve() function before this one.
     LAI_ENSURE(state->blkstack_ptr < state->blkstack_capacity);
@@ -190,7 +190,7 @@ static inline int lai_exec_reserve_stack(lai_state_t *state) {
 }
 
 // Pushes a new item to the execution stack and returns it.
-static inline lai_stackitem_t *lai_exec_push_stack_or_die(lai_state_t *state) {
+static inline lai_stackitem_t *lai_exec_push_stack(lai_state_t *state) {
     state->stack_ptr++;
     // Users are expected to call the reserve() function before this one.
     LAI_ENSURE(state->stack_ptr < state->stack_capacity);
@@ -251,7 +251,7 @@ static inline int lai_exec_reserve_opstack(lai_state_t *state) {
 }
 
 // Pushes a new item to the opstack and returns it.
-static inline struct lai_operand *lai_exec_push_opstack_or_die(lai_state_t *state) {
+static inline struct lai_operand *lai_exec_push_opstack(lai_state_t *state) {
     // Users are expected to call the reserve() function before this one.
     LAI_ENSURE(state->opstack_ptr < state->opstack_capacity);
     struct lai_operand *object = &state->opstack_base[state->opstack_ptr];
