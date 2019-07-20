@@ -116,6 +116,42 @@ static inline void lai_exec_pop_ctxstack_back(lai_state_t *state) {
 }
 
 // --------------------------------------------------------------------------------------
+// Inline function for block stack manipulation.
+// --------------------------------------------------------------------------------------
+
+// Pushes a new item to the block stack and returns it.
+static inline struct lai_blkitem *lai_exec_push_blkstack_or_die(lai_state_t *state) {
+    state->blkstack_ptr++;
+    if (state->blkstack_ptr == state->blkstack_capacity) {
+        size_t new_capacity = 2 * state->blkstack_capacity;
+        struct lai_blkitem *new_stack = laihost_malloc(new_capacity * sizeof(struct lai_blkitem));
+        if (!new_stack)
+            lai_panic("failed to allocate memory for block stack");
+        memcpy(new_stack, state->blkstack_base,
+               state->blkstack_capacity * sizeof(struct lai_blkitem));
+        if (state->blkstack_base != state->small_blkstack)
+            laihost_free(state->blkstack_base);
+        state->blkstack_base = new_stack;
+        state->blkstack_capacity = new_capacity;
+    }
+    memset(&state->blkstack_base[state->blkstack_ptr], 0, sizeof(struct lai_blkitem));
+    return &state->blkstack_base[state->blkstack_ptr];
+}
+
+// Returns the last item of the block stack.
+static inline struct lai_blkitem *lai_exec_peek_blkstack_back(lai_state_t *state) {
+    if (state->blkstack_ptr < 0)
+        return NULL;
+    return &state->blkstack_base[state->blkstack_ptr];
+}
+
+// Removes an item from the block stack.
+static inline void lai_exec_pop_blkstack_back(lai_state_t *state) {
+    LAI_ENSURE(state->blkstack_ptr >= 0);
+    state->blkstack_ptr -= 1;
+}
+
+// --------------------------------------------------------------------------------------
 // Inline function for execution stack manipulation.
 // --------------------------------------------------------------------------------------
 

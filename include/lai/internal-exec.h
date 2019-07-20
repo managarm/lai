@@ -168,21 +168,14 @@ struct lai_ctxitem {
     struct lai_invocation *invocation;
 };
 
-// We say that a stackitem is block-like if it is defined by a certain range of AML code.
-// For each active block-like stackitem, we store a program counter (PC) and PC limit.
-// Block-like stackitems are:
-// - LAI_POPULATE_CONTEXT_STACKITEM
-// - LAI_METHOD_CONTEXT_STACKITEM
-// - LAI_LOOP_STACKITEM
-// - LAI_COND_STACKITEM
-// - LAI_PKG_INITIALIZER_STACKITEM
+// The block stack stores a program counter (PC) and PC limit.
+struct lai_blkitem {
+    int pc;
+    int limit;
+};
 
 typedef struct lai_stackitem_ {
     int kind;
-    // For block-like stackitems:
-    int pc;
-    int limit;
-    int outer_block;
     // For stackitem accepting arguments.
     int opstack_frame;
     // Specific to each type of stackitem:
@@ -214,24 +207,27 @@ typedef struct lai_stackitem_ {
 } lai_stackitem_t;
 
 #define LAI_SMALL_CTXSTACK_SIZE 8
+#define LAI_SMALL_BLKSTACK_SIZE 8
 #define LAI_SMALL_STACK_SIZE 16
 #define LAI_SMALL_OPSTACK_SIZE 16
 
 typedef struct lai_state_t {
     // Base pointers and stack capacities.
     struct lai_ctxitem *ctxstack_base;
+    struct lai_blkitem *blkstack_base;
     lai_stackitem_t *stack_base;
     struct lai_operand *opstack_base;
     int ctxstack_capacity;
+    int blkstack_capacity;
     int stack_capacity;
     int opstack_capacity;
     // Current stack pointers.
     int ctxstack_ptr; // Stack to track the current context.
+    int blkstack_ptr; // Stack to track the current block.
     int stack_ptr;    // Stack to track the current execution state.
     int opstack_ptr;
     struct lai_ctxitem small_ctxstack[LAI_SMALL_CTXSTACK_SIZE];
+    struct lai_blkitem small_blkstack[LAI_SMALL_BLKSTACK_SIZE];
     lai_stackitem_t small_stack[LAI_SMALL_STACK_SIZE];
     struct lai_operand small_opstack[LAI_SMALL_OPSTACK_SIZE];
-    int innermost_block; // Index of the last block-like stackitem.
 } lai_state_t;
-
