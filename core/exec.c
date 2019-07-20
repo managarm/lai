@@ -30,7 +30,7 @@ void lai_init_state(lai_state_t *state) {
     state->stack_base = state->small_stack;
     state->opstack_base = state->small_opstack;
     state->ctxstack_capacity = LAI_SMALL_CTXSTACK_SIZE;
-    state->blkstack_capacity = LAI_SMALL_CTXSTACK_SIZE;
+    state->blkstack_capacity = LAI_SMALL_BLKSTACK_SIZE;
     state->stack_capacity = LAI_SMALL_STACK_SIZE;
     state->opstack_capacity = LAI_SMALL_OPSTACK_SIZE;
     state->ctxstack_ptr = -1;
