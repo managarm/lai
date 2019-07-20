@@ -616,7 +616,7 @@ static int lai_exec_process(lai_state_t *state) {
                   " [0x%x, limit 0x%x])",
                   table_pc, table_limit_pc);
 
-    if (item->kind == LAI_POPULATE_CONTEXT_STACKITEM) {
+    if (item->kind == LAI_POPULATE_STACKITEM) {
         if (block->pc == block->limit) {
             lai_exec_pop_blkstack_back(state);
             lai_exec_pop_ctxstack_back(state);
@@ -625,7 +625,7 @@ static int lai_exec_process(lai_state_t *state) {
         } else {
             return lai_exec_parse(LAI_EXEC_MODE, state);
         }
-    } else if(item->kind == LAI_METHOD_CONTEXT_STACKITEM) {
+    } else if(item->kind == LAI_METHOD_STACKITEM) {
         // ACPI does an implicit Return(0) at the end of a control method.
         if (block->pc == block->limit) {
             if (state->opstack_ptr) // This is an internal error.
@@ -685,7 +685,7 @@ static int lai_exec_process(lai_state_t *state) {
         } else {
             return lai_exec_parse(LAI_OBJECT_MODE, state);
         }
-    } else if (item->kind == LAI_PKG_INITIALIZER_STACKITEM) {
+    } else if (item->kind == LAI_PACKAGE_STACKITEM) {
         struct lai_operand *frame = lai_exec_get_opstack(state, item->opstack_frame);
 
         if (state->opstack_ptr == item->opstack_frame + 2) {
@@ -809,7 +809,7 @@ static int lai_exec_process(lai_state_t *state) {
                 blkitem->limit = handle->size;
 
                 lai_stackitem_t *item = lai_exec_push_stack_or_die(state);
-                item->kind = LAI_METHOD_CONTEXT_STACKITEM;
+                item->kind = LAI_METHOD_STACKITEM;
                 item->mth_want_result = want_result;
             }
             return 0;
@@ -825,7 +825,7 @@ static int lai_exec_process(lai_state_t *state) {
             lai_exec_get_objectref(state, operand, &result);
             lai_exec_pop_opstack(state, 1);
 
-            // Find the last LAI_METHOD_CONTEXT_STACKITEM on the stack.
+            // Find the last LAI_METHOD_STACKITEM on the stack.
             int m = 0;
             lai_stackitem_t *method_item;
             while (1) {
@@ -833,7 +833,7 @@ static int lai_exec_process(lai_state_t *state) {
                 method_item = lai_exec_peek_stack(state, 1 + m);
                 if (!method_item)
                     lai_panic("Return() outside of control method()");
-                if (method_item->kind == LAI_METHOD_CONTEXT_STACKITEM)
+                if (method_item->kind == LAI_METHOD_STACKITEM)
                     break;
                 if (method_item->kind != LAI_COND_STACKITEM
                         && method_item->kind != LAI_LOOP_STACKITEM)
@@ -868,7 +868,7 @@ static int lai_exec_process(lai_state_t *state) {
                 lai_exec_pop_stack_back(state);
             }
 
-            // Pop the LAI_METHOD_CONTEXT_STACKITEM.
+            // Pop the LAI_METHOD_STACKITEM.
             lai_exec_pop_ctxstack_back(state);
             lai_exec_pop_blkstack_back(state);
             lai_exec_pop_stack_back(state);
@@ -1210,7 +1210,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         blkitem->limit = opcode_pc + 1 + encoded_size;
 
         lai_stackitem_t *pkg_item = lai_exec_push_stack_or_die(state);
-        pkg_item->kind = LAI_PKG_INITIALIZER_STACKITEM;
+        pkg_item->kind = LAI_PACKAGE_STACKITEM;
         pkg_item->opstack_frame = state->opstack_ptr;
         pkg_item->pkg_index = 0;
         pkg_item->pkg_want_result = want_result;
@@ -1379,7 +1379,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         blkitem->limit = opcode_pc + 1 + encoded_size;
 
         lai_stackitem_t *item = lai_exec_push_stack_or_die(state);
-        item->kind = LAI_POPULATE_CONTEXT_STACKITEM;
+        item->kind = LAI_POPULATE_STACKITEM;
         break;
     }
     case (EXTOP_PREFIX << 8) | DEVICE:
@@ -1410,7 +1410,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         blkitem->limit = opcode_pc + 2 + encoded_size;
 
         lai_stackitem_t *item = lai_exec_push_stack_or_die(state);
-        item->kind = LAI_POPULATE_CONTEXT_STACKITEM;
+        item->kind = LAI_POPULATE_STACKITEM;
         break;
     }
     case (EXTOP_PREFIX << 8) | PROCESSOR: {
@@ -1467,7 +1467,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         blkitem->limit = opcode_pc + 2 + encoded_size;
 
         lai_stackitem_t *item = lai_exec_push_stack_or_die(state);
-        item->kind = LAI_POPULATE_CONTEXT_STACKITEM;
+        item->kind = LAI_POPULATE_STACKITEM;
         break;
     }
     case (EXTOP_PREFIX << 8) | THERMALZONE:
@@ -1498,7 +1498,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         blkitem->limit = opcode_pc + 2 + encoded_size;
 
         lai_stackitem_t *item = lai_exec_push_stack_or_die(state);
-        item->kind = LAI_POPULATE_CONTEXT_STACKITEM;
+        item->kind = LAI_POPULATE_STACKITEM;
         break;
     }
 
@@ -1978,7 +1978,7 @@ int lai_populate(lai_nsnode_t *parent, struct lai_aml_segment *amls, lai_state_t
     blkitem->limit = size;
 
     lai_stackitem_t *item = lai_exec_push_stack_or_die(state);
-    item->kind = LAI_POPULATE_CONTEXT_STACKITEM;
+    item->kind = LAI_POPULATE_STACKITEM;
 
     int status = lai_exec_run(state);
     if (status)
@@ -2033,7 +2033,7 @@ int lai_eval_args(lai_variable_t *result, lai_nsnode_t *handle, lai_state_t *sta
                 blkitem->limit = handle->size;
 
                 lai_stackitem_t *item = lai_exec_push_stack_or_die(state);
-                item->kind = LAI_METHOD_CONTEXT_STACKITEM;
+                item->kind = LAI_METHOD_STACKITEM;
                 item->mth_want_result = 1;
 
                 e = lai_exec_run(state);

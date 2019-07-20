@@ -140,12 +140,12 @@ struct lai_operand {
 // struct lai_state.
 // ----------------------------------------------------------------------------
 
-#define LAI_POPULATE_CONTEXT_STACKITEM 1
-#define LAI_METHOD_CONTEXT_STACKITEM   2
+#define LAI_POPULATE_STACKITEM         1
+#define LAI_METHOD_STACKITEM           2
 #define LAI_LOOP_STACKITEM             3
 #define LAI_COND_STACKITEM             4
 #define LAI_BUFFER_STACKITEM           5
-#define LAI_PKG_INITIALIZER_STACKITEM  6
+#define LAI_PACKAGE_STACKITEM          6
 #define LAI_NODE_STACKITEM             7 // Parse a namespace leaf node (i.e., not a scope).
 #define LAI_OP_STACKITEM               8 // Parse an operator.
 #define LAI_INVOKE_STACKITEM           9 // Parse a method invocation.
