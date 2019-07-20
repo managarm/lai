@@ -144,14 +144,15 @@ struct lai_operand {
 #define LAI_METHOD_CONTEXT_STACKITEM   2
 #define LAI_LOOP_STACKITEM             3
 #define LAI_COND_STACKITEM             4
-#define LAI_PKG_INITIALIZER_STACKITEM  5
-#define LAI_NODE_STACKITEM             6 // Parse a namespace leaf node (i.e., not a scope).
-#define LAI_OP_STACKITEM               7 // Parse an operator.
-#define LAI_INVOKE_STACKITEM           8 // Parse a method invocation.
-#define LAI_RETURN_STACKITEM           9 // Parse a return operand 
+#define LAI_BUFFER_STACKITEM           5
+#define LAI_PKG_INITIALIZER_STACKITEM  6
+#define LAI_NODE_STACKITEM             7 // Parse a namespace leaf node (i.e., not a scope).
+#define LAI_OP_STACKITEM               8 // Parse an operator.
+#define LAI_INVOKE_STACKITEM           9 // Parse a method invocation.
+#define LAI_RETURN_STACKITEM          10 // Parse a return operand
 // This implements lai_eval_operand(). // TODO: Eventually remove
 // lai_eval_operand() by moving all parsing functionality into lai_exec_run().
-#define LAI_EVALOPERAND_STACKITEM     10
+#define LAI_EVALOPERAND_STACKITEM     11
 
 struct lai_invocation {
     lai_variable_t arg[7];
@@ -195,6 +196,9 @@ typedef struct lai_stackitem_ {
         struct {
             int loop_state;
             int loop_pred; // Loop predicate PC.
+        };
+        struct {
+            uint8_t buf_want_result;
         };
         struct {
             int pkg_index;

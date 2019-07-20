@@ -653,6 +653,39 @@ static int lai_exec_run(lai_state_t *state) {
             }
 
             parse_mode = LAI_OBJECT_MODE;
+        } else if (item->kind == LAI_BUFFER_STACKITEM) {
+            int k = state->opstack_ptr - item->opstack_frame;
+            LAI_ENSURE(k <= 1);
+            if(k == 1) {
+                LAI_CLEANUP_VAR lai_variable_t size = LAI_VAR_INITIALIZER;
+                struct lai_operand *operand = lai_exec_get_opstack(state, item->opstack_frame);
+                lai_exec_get_objectref(state, operand, &size);
+                lai_exec_pop_opstack(state, 1);
+
+                // Note that not all elements of the buffer need to be initialized.
+                LAI_CLEANUP_VAR lai_variable_t result = LAI_VAR_INITIALIZER;
+                if (lai_create_buffer(&result, size.integer))
+                     lai_panic("failed to allocate memory for AML buffer");
+
+                int initial_size = block->limit - block->pc;
+                if (initial_size < 0)
+                    lai_panic("buffer initializer has negative size");
+                if (initial_size > lai_exec_buffer_size(&result))
+                    lai_panic("buffer initializer overflows buffer");
+                memcpy(lai_exec_buffer_access(&result), method + block->pc, initial_size);
+
+                if (item->buf_want_result) {
+                    struct lai_operand *opstack_res = lai_exec_push_opstack_or_die(state);
+                    opstack_res->tag = LAI_OPERAND_OBJECT;
+                    lai_var_move(&opstack_res->object, &result);
+                }
+
+                lai_exec_pop_blkstack_back(state);
+                lai_exec_pop_stack_back(state);
+                continue;
+            }
+
+            parse_mode = LAI_OBJECT_MODE;
         } else if (item->kind == LAI_PKG_INITIALIZER_STACKITEM) {
             struct lai_operand *frame = lai_exec_get_opstack(state, item->opstack_frame);
 
@@ -1110,33 +1143,19 @@ static int lai_exec_run(lai_state_t *state) {
         {
             int data_pc;
             size_t encoded_size; // Size of the buffer initializer.
-            lai_variable_t buffer_size = {0}; // The size of the buffer in bytes.
             block->pc++;
             block->pc += lai_parse_pkgsize(method + block->pc, &encoded_size);
-            lai_eval_operand(&buffer_size, state);
-            block = lai_exec_peek_blkstack_back(state); // Reset block.
             data_pc = block->pc;
             block->pc = opcode_pc + 1 + encoded_size;
 
-            // Note that not all elements of the buffer need to be initialized.
-            lai_variable_t result = {0};
-            if (lai_create_buffer(&result, buffer_size.integer))
-                 lai_panic("failed to allocate memory for AML buffer");
+            struct lai_blkitem *blkitem = lai_exec_push_blkstack_or_die(state);
+            blkitem->pc = data_pc;
+            blkitem->limit = opcode_pc + 1 + encoded_size;
 
-            int initial_size = (opcode_pc + 1 + encoded_size) - data_pc;
-            if (initial_size < 0)
-                lai_panic("buffer initializer has negative size");
-            if (initial_size > lai_exec_buffer_size(&result))
-                lai_panic("buffer initializer overflows buffer");
-            memcpy(lai_exec_buffer_access(&result), method + data_pc, initial_size);
-
-            if (parse_mode == LAI_DATA_MODE || parse_mode == LAI_OBJECT_MODE) {
-                struct lai_operand *opstack_res = lai_exec_push_opstack_or_die(state);
-                opstack_res->tag = LAI_OPERAND_OBJECT;
-                lai_var_move(&opstack_res->object, &result);
-            } else
-                LAI_ENSURE(parse_mode == LAI_EXEC_MODE);
-            lai_var_finalize(&result);
+            lai_stackitem_t *buf_item = lai_exec_push_stack_or_die(state);
+            buf_item->kind = LAI_BUFFER_STACKITEM;
+            buf_item->opstack_frame = state->opstack_ptr;
+            buf_item->buf_want_result = want_result;
             break;
         }
         case PACKAGE_OP:
