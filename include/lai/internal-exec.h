@@ -175,6 +175,7 @@ struct lai_blkitem {
 };
 
 #define LAI_LOOP_ITERATION 1
+#define LAI_COND_BRANCH 1
 
 typedef struct lai_stackitem_ {
     int kind;
@@ -184,6 +185,12 @@ typedef struct lai_stackitem_ {
     union {
         struct {
             uint8_t mth_want_result;
+        };
+        struct {
+            int cond_state;
+            int cond_has_else;
+            int cond_else_pc;
+            int cond_else_limit;
         };
         struct {
             int loop_state;

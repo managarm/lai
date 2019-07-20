@@ -875,12 +875,39 @@ static int lai_exec_run(lai_state_t *state) {
                 }
             }
         } else if (item->kind == LAI_COND_STACKITEM) {
-            // If the condition wasn't taken, execute the Else() block if it exists
-            // Clean up the execution stack at the end of If().
-            if (block->pc == block->limit) {
-                lai_exec_pop_blkstack_back(state);
-                lai_exec_pop_stack_back(state);
-                continue;
+            if (!item->cond_state) {
+                // We are at the beginning of the condition and need to check the predicate.
+                int k = state->opstack_ptr - item->opstack_frame;
+                LAI_ENSURE(k <= 1);
+                if(k == 1) {
+                    LAI_CLEANUP_VAR lai_variable_t predicate = LAI_VAR_INITIALIZER;
+                    struct lai_operand *operand = lai_exec_get_opstack(state, item->opstack_frame);
+                    lai_exec_get_integer(state, operand, &predicate);
+                    lai_exec_pop_opstack(state, 1);
+
+                    if (predicate.integer) {
+                        item->cond_state = LAI_COND_BRANCH;
+                    } else {
+                        if (item->cond_has_else) {
+                            item->cond_state = LAI_COND_BRANCH;
+                            block->pc = item->cond_else_pc;
+                            block->limit = item->cond_else_limit;
+                        } else {
+                            lai_exec_pop_blkstack_back(state);
+                            lai_exec_pop_stack_back(state);
+                        }
+                    }
+                    continue;
+                }
+
+                parse_mode = LAI_OBJECT_MODE;
+            } else {
+                LAI_ENSURE(item->cond_state == LAI_COND_BRANCH);
+                if (block->pc == block->limit) {
+                    lai_exec_pop_blkstack_back(state);
+                    lai_exec_pop_stack_back(state);
+                    continue;
+                }
             }
         } else
             lai_panic("unexpected lai_stackitem_t");
@@ -1245,12 +1272,8 @@ static int lai_exec_run(lai_state_t *state) {
             int has_else = 0;
             size_t if_size;
             size_t else_size;
-            lai_variable_t predicate = {0};
             block->pc++;
             block->pc += lai_parse_pkgsize(method + block->pc, &if_size);
-            // Evaluate the predicate
-            lai_eval_operand(&predicate, state);
-            block = lai_exec_peek_blkstack_back(state); // Reset block.
             if_pc = block->pc;
             block->pc = opcode_pc + 1 + if_size;
             if (block->pc < block->limit && method[block->pc] == ELSE_OP) {
@@ -1261,21 +1284,17 @@ static int lai_exec_run(lai_state_t *state) {
                 block->pc = opcode_pc + 1 + if_size + 1 + else_size;
             }
 
-            if (predicate.integer) {
-                struct lai_blkitem *blkitem = lai_exec_push_blkstack_or_die(state);
-                blkitem->pc = if_pc;
-                blkitem->limit = opcode_pc + 1 + if_size;
+            struct lai_blkitem *blkitem = lai_exec_push_blkstack_or_die(state);
+            blkitem->pc = if_pc;
+            blkitem->limit = opcode_pc + 1 + if_size;
 
-                lai_stackitem_t *cond_item = lai_exec_push_stack_or_die(state);
-                cond_item->kind = LAI_COND_STACKITEM;
-            } else if (has_else) {
-                struct lai_blkitem *blkitem = lai_exec_push_blkstack_or_die(state);
-                blkitem->pc = else_pc;
-                blkitem->limit = opcode_pc + 1 + if_size + 1 + else_size;
-
-                lai_stackitem_t *cond_item = lai_exec_push_stack_or_die(state);
-                cond_item->kind = LAI_COND_STACKITEM;
-            }
+            lai_stackitem_t *cond_item = lai_exec_push_stack_or_die(state);
+            cond_item->kind = LAI_COND_STACKITEM;
+            cond_item->opstack_frame = state->opstack_ptr;
+            cond_item->cond_state = 0;
+            cond_item->cond_has_else = has_else;
+            cond_item->cond_else_pc = else_pc;
+            cond_item->cond_else_limit = opcode_pc + 1 + if_size + 1 + else_size;
             break;
         }
         case ELSE_OP:
