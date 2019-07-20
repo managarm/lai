@@ -84,7 +84,7 @@ static inline int lai_exec_reserve_ctxstack(lai_state_t *state) {
             return 1;
         }
         memcpy(new_stack, state->ctxstack_base,
-               state->ctxstack_capacity * sizeof(struct lai_ctxitem));
+               (state->ctxstack_ptr + 1) * sizeof(struct lai_ctxitem));
         if (state->ctxstack_base != state->small_ctxstack)
             laihost_free(state->ctxstack_base);
         state->ctxstack_base = new_stack;
@@ -136,7 +136,7 @@ static inline int lai_exec_reserve_blkstack(lai_state_t *state) {
             return 1;
         }
         memcpy(new_stack, state->blkstack_base,
-               state->blkstack_capacity * sizeof(struct lai_blkitem));
+               (state->blkstack_ptr + 1) * sizeof(struct lai_blkitem));
         if (state->blkstack_base != state->small_blkstack)
             laihost_free(state->blkstack_base);
         state->blkstack_base = new_stack;
@@ -180,7 +180,7 @@ static inline int lai_exec_reserve_stack(lai_state_t *state) {
             return 1;
         }
         memcpy(new_stack, state->stack_base,
-               state->stack_capacity * sizeof(lai_stackitem_t));
+               (state->stack_ptr + 1) * sizeof(lai_stackitem_t));
         if (state->stack_base != state->small_stack)
             laihost_free(state->stack_base);
         state->stack_base = new_stack;
@@ -241,7 +241,7 @@ static inline int lai_exec_reserve_opstack(lai_state_t *state) {
         // TODO: Here, we rely on the fact that moving lai_variable_t via memcpy() is OK.
         //       Implement a some sophisticated lai_operand_move()?
         memcpy(new_stack, state->opstack_base,
-               state->opstack_capacity * sizeof(struct lai_operand));
+               state->opstack_ptr * sizeof(struct lai_operand));
         if (state->opstack_base != state->small_opstack)
             laihost_free(state->opstack_base);
         state->opstack_base = new_stack;
