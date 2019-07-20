@@ -40,11 +40,14 @@ void lai_init_state(lai_state_t *state) {
 
 // Finalize the interpreter state. Frees all memory owned by the state.
 void lai_finalize_state(lai_state_t *state) {
-    // TODO: Clean other stacks.
     while (state->ctxstack_ptr >= 0)
         lai_exec_pop_ctxstack_back(state);
     while (state->blkstack_ptr >= 0)
         lai_exec_pop_blkstack_back(state);
+    while (state->stack_ptr >= 0)
+        lai_exec_pop_stack_back(state);
+    lai_exec_pop_opstack(state, state->opstack_ptr);
+
     if (state->ctxstack_base != state->small_ctxstack)
         laihost_free(state->ctxstack_base);
     if (state->blkstack_base != state->small_blkstack)
@@ -662,7 +665,7 @@ static int lai_exec_process(lai_state_t *state) {
             LAI_CLEANUP_VAR lai_variable_t size = LAI_VAR_INITIALIZER;
             struct lai_operand *operand = lai_exec_get_opstack(state, item->opstack_frame);
             lai_exec_get_objectref(state, operand, &size);
-            lai_exec_pop_opstack(state, 1);
+            lai_exec_pop_opstack_back(state);
 
             // Note that not all elements of the buffer need to be initialized.
             LAI_CLEANUP_VAR lai_variable_t result = LAI_VAR_INITIALIZER;
@@ -704,13 +707,13 @@ static int lai_exec_process(lai_state_t *state) {
 
             lai_exec_pkg_store(&initializer->object, &package->object, item->pkg_index);
             item->pkg_index++;
-            lai_exec_pop_opstack(state, 1);
+            lai_exec_pop_opstack_back(state);
         }
         LAI_ENSURE(state->opstack_ptr == item->opstack_frame + 1);
 
         if (block->pc == block->limit) {
             if (!item->pkg_want_result)
-                lai_exec_pop_opstack(state, 1);
+                lai_exec_pop_opstack_back(state);
 
             lai_exec_pop_blkstack_back(state);
             lai_exec_pop_stack_back(state);
@@ -836,7 +839,7 @@ static int lai_exec_process(lai_state_t *state) {
             LAI_CLEANUP_VAR lai_variable_t result = LAI_VAR_INITIALIZER;
             struct lai_operand *operand = lai_exec_get_opstack(state, item->opstack_frame);
             lai_exec_get_objectref(state, operand, &result);
-            lai_exec_pop_opstack(state, 1);
+            lai_exec_pop_opstack_back(state);
 
             // Find the last LAI_METHOD_STACKITEM on the stack.
             int m = 0;
@@ -899,7 +902,7 @@ static int lai_exec_process(lai_state_t *state) {
                 LAI_CLEANUP_VAR lai_variable_t predicate = LAI_VAR_INITIALIZER;
                 struct lai_operand *operand = lai_exec_get_opstack(state, item->opstack_frame);
                 lai_exec_get_integer(state, operand, &predicate);
-                lai_exec_pop_opstack(state, 1);
+                lai_exec_pop_opstack_back(state);
 
                 if (predicate.integer) {
                     item->loop_state = LAI_LOOP_ITERATION;
@@ -931,7 +934,7 @@ static int lai_exec_process(lai_state_t *state) {
                 LAI_CLEANUP_VAR lai_variable_t predicate = LAI_VAR_INITIALIZER;
                 struct lai_operand *operand = lai_exec_get_opstack(state, item->opstack_frame);
                 lai_exec_get_integer(state, operand, &predicate);
-                lai_exec_pop_opstack(state, 1);
+                lai_exec_pop_opstack_back(state);
 
                 if (predicate.integer) {
                     item->cond_state = LAI_COND_BRANCH;

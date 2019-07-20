@@ -216,14 +216,10 @@ static inline lai_stackitem_t *lai_exec_peek_stack_at(lai_state_t *state, int n)
     return &state->stack_base[n];
 }
 
-// Removes n items from the stack.
-static inline void lai_exec_pop_stack(lai_state_t *state, int n) {
-    state->stack_ptr -= n;
-}
-
 // Removes the last item from the stack.
 static inline void lai_exec_pop_stack_back(lai_state_t *state) {
-    lai_exec_pop_stack(state, 1);
+    LAI_ENSURE(state->stack_ptr >= 0);
+    state->stack_ptr--;
 }
 
 // --------------------------------------------------------------------------------------
@@ -274,4 +270,9 @@ static inline void lai_exec_pop_opstack(lai_state_t *state, int n) {
             lai_var_finalize(&operand->object);
     }
     state->opstack_ptr -= n;
+}
+
+// Removes the last item from the opstack.
+static inline void lai_exec_pop_opstack_back(lai_state_t *state) {
+    lai_exec_pop_opstack(state, 1);
 }
