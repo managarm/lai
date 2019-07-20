@@ -616,15 +616,14 @@ static int lai_exec_process(lai_state_t *state) {
                   " [0x%x, limit 0x%x])",
                   table_pc, table_limit_pc);
 
-    // Parse mode. Affects the parsing of certain opcode bytes.
-    int parse_mode = LAI_EXEC_MODE;
-
     if (item->kind == LAI_POPULATE_CONTEXT_STACKITEM) {
         if (block->pc == block->limit) {
             lai_exec_pop_blkstack_back(state);
             lai_exec_pop_ctxstack_back(state);
             lai_exec_pop_stack_back(state);
             return 0;
+        } else {
+            return lai_exec_parse(LAI_EXEC_MODE, state);
         }
     } else if(item->kind == LAI_METHOD_CONTEXT_STACKITEM) {
         // ACPI does an implicit Return(0) at the end of a control method.
@@ -650,6 +649,8 @@ static int lai_exec_process(lai_state_t *state) {
             lai_exec_pop_ctxstack_back(state);
             lai_exec_pop_stack_back(state);
             return 0;
+        } else {
+            return lai_exec_parse(LAI_EXEC_MODE, state);
         }
     } else if (item->kind == LAI_BUFFER_STACKITEM) {
         int k = state->opstack_ptr - item->opstack_frame;
@@ -681,9 +682,9 @@ static int lai_exec_process(lai_state_t *state) {
             lai_exec_pop_blkstack_back(state);
             lai_exec_pop_stack_back(state);
             return 0;
+        } else {
+            return lai_exec_parse(LAI_OBJECT_MODE, state);
         }
-
-        parse_mode = LAI_OBJECT_MODE;
     } else if (item->kind == LAI_PKG_INITIALIZER_STACKITEM) {
         struct lai_operand *frame = lai_exec_get_opstack(state, item->opstack_frame);
 
@@ -710,9 +711,9 @@ static int lai_exec_process(lai_state_t *state) {
             lai_exec_pop_blkstack_back(state);
             lai_exec_pop_stack_back(state);
             return 0;
+        } else {
+            return lai_exec_parse(LAI_DATA_MODE, state);
         }
-
-        parse_mode = LAI_DATA_MODE;
     } else if (item->kind == LAI_NODE_STACKITEM) {
         int k = state->opstack_ptr - item->opstack_frame;
         if (!item->node_arg_modes[k]) {
@@ -722,9 +723,9 @@ static int lai_exec_process(lai_state_t *state) {
 
             lai_exec_pop_stack_back(state);
             return 0;
+        } else {
+            return lai_exec_parse(item->node_arg_modes[k], state);
         }
-
-        parse_mode = item->node_arg_modes[k];
     } else if (item->kind == LAI_OP_STACKITEM) {
         int k = state->opstack_ptr - item->opstack_frame;
 //            lai_debug("got %d parameters", k);
@@ -744,9 +745,9 @@ static int lai_exec_process(lai_state_t *state) {
 
             lai_exec_pop_stack_back(state);
             return 0;
+        } else {
+            return lai_exec_parse(item->op_arg_modes[k], state);
         }
-
-        parse_mode = item->op_arg_modes[k];
     } else if (item->kind == LAI_INVOKE_STACKITEM) {
         int argc = item->ivk_argc;
         int want_result = item->ivk_want_result;
@@ -812,9 +813,9 @@ static int lai_exec_process(lai_state_t *state) {
                 item->mth_want_result = want_result;
             }
             return 0;
+        } else {
+            return lai_exec_parse(LAI_OBJECT_MODE, state);
         }
-
-        parse_mode = LAI_OBJECT_MODE;
     } else if (item->kind == LAI_RETURN_STACKITEM) {
         int k = state->opstack_ptr - item->opstack_frame;
         LAI_ENSURE(k <= 1);
@@ -872,9 +873,9 @@ static int lai_exec_process(lai_state_t *state) {
             lai_exec_pop_blkstack_back(state);
             lai_exec_pop_stack_back(state);
             return 0;
+        } else {
+            return lai_exec_parse(LAI_OBJECT_MODE, state);
         }
-
-        parse_mode = LAI_OBJECT_MODE;
     } else if (item->kind == LAI_LOOP_STACKITEM) {
         if (!item->loop_state) {
             // We are at the beginning of a loop and need to check the predicate.
@@ -893,9 +894,9 @@ static int lai_exec_process(lai_state_t *state) {
                     lai_exec_pop_stack_back(state);
                 }
                 return 0;
+            } else {
+                return lai_exec_parse(LAI_OBJECT_MODE, state);
             }
-
-            parse_mode = LAI_OBJECT_MODE;
         } else {
             LAI_ENSURE(item->loop_state == LAI_LOOP_ITERATION);
             // Unconditionally reset the loop's state to recheck the predicate.
@@ -903,6 +904,8 @@ static int lai_exec_process(lai_state_t *state) {
                 item->loop_state = 0;
                 block->pc = item->loop_pred;
                 return 0;
+            } else {
+                return lai_exec_parse(LAI_EXEC_MODE, state);
             }
         }
     } else if (item->kind == LAI_COND_STACKITEM) {
@@ -929,21 +932,21 @@ static int lai_exec_process(lai_state_t *state) {
                     }
                 }
                 return 0;
+            } else {
+                return lai_exec_parse(LAI_OBJECT_MODE, state);
             }
-
-            parse_mode = LAI_OBJECT_MODE;
         } else {
             LAI_ENSURE(item->cond_state == LAI_COND_BRANCH);
             if (block->pc == block->limit) {
                 lai_exec_pop_blkstack_back(state);
                 lai_exec_pop_stack_back(state);
                 return 0;
+            } else {
+                return lai_exec_parse(LAI_EXEC_MODE, state);
             }
         }
     } else
         lai_panic("unexpected lai_stackitem_t");
-
-    return lai_exec_parse(parse_mode, state);
 }
 
 static int lai_exec_parse(int parse_mode, lai_state_t *state) {
