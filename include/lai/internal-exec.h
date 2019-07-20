@@ -150,9 +150,6 @@ struct lai_operand {
 #define LAI_OP_STACKITEM               8 // Parse an operator.
 #define LAI_INVOKE_STACKITEM           9 // Parse a method invocation.
 #define LAI_RETURN_STACKITEM          10 // Parse a return operand
-// This implements lai_eval_operand(). // TODO: Eventually remove
-// lai_eval_operand() by moving all parsing functionality into lai_exec_run().
-#define LAI_EVALOPERAND_STACKITEM     11
 
 struct lai_invocation {
     lai_variable_t arg[7];

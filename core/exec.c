@@ -16,13 +16,6 @@
 static int debug_opcodes = 0;
 static int debug_stack = 0;
 
-/* ACPI Control Method Execution */
-/* Type1Opcode := DefBreak | DefBreakPoint | DefContinue | DefFatal | DefIfElse |
-   DefLoad | DefNoop | DefNotify | DefRelease | DefReset | DefReturn |
-   DefSignal | DefSleep | DefStall | DefUnload | DefWhile */
-
-static void lai_eval_operand(lai_variable_t *destination, lai_state_t *state);
-
 // Prepare the interpreter state for a control method call.
 // Param: lai_state_t *state - will store method name and arguments
 // Param: lai_nsnode_t *method - identifies the control method
@@ -646,13 +639,6 @@ static int lai_exec_run(lai_state_t *state) {
                 lai_exec_pop_stack_back(state);
                 continue;
             }
-        } else if (item->kind == LAI_EVALOPERAND_STACKITEM) {
-            if (state->opstack_ptr == item->opstack_frame + 1) {
-                lai_exec_pop_stack_back(state);
-                return 0;
-            }
-
-            parse_mode = LAI_OBJECT_MODE;
         } else if (item->kind == LAI_BUFFER_STACKITEM) {
             int k = state->opstack_ptr - item->opstack_frame;
             LAI_ENSURE(k <= 1);
@@ -2056,31 +2042,6 @@ int lai_eval_largs(lai_variable_t *result, lai_nsnode_t *handle, lai_state_t *st
 
 int lai_eval(lai_variable_t *result, lai_nsnode_t *handle, lai_state_t *state) {
     return lai_eval_args(result, handle, state, 0, NULL);
-}
-
-// Evaluates an AML expression recursively.
-// TODO: Eventually, we want to remove this function. However, this requires refactoring
-//       lai_exec_run() to avoid all kinds of recursion.
-
-static void lai_eval_operand(lai_variable_t *destination, lai_state_t *state) {
-    int opstack = state->opstack_ptr;
-
-    lai_stackitem_t *item = lai_exec_push_stack_or_die(state);
-    item->kind = LAI_EVALOPERAND_STACKITEM;
-    item->opstack_frame = opstack;
-
-    int status = lai_exec_run(state);
-    if (status)
-        lai_panic("lai_exec_run() failed in lai_eval_operand()");
-
-    if (state->opstack_ptr != opstack + 1) // This would be an internal error.
-        lai_panic("expected exactly one opstack item after operand evaluation");
-    struct lai_operand *result = lai_exec_get_opstack(state, opstack);
-    lai_variable_t objectref = {0};
-    lai_exec_get_objectref(state, result, &objectref);
-    lai_obj_clone(destination, &objectref);
-    lai_var_finalize(&objectref);
-    lai_exec_pop_opstack(state, 1);
 }
 
 void lai_enable_tracing(int enable) {
