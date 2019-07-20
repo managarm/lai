@@ -75,14 +75,14 @@ void lai_exec_get_integer(lai_state_t *, struct lai_operand *, lai_variable_t *)
 // Inline function for context stack manipulation.
 // --------------------------------------------------------------------------------------
 
-// Pushes a new item to the context stack and returns it.
-static inline struct lai_ctxitem *lai_exec_push_ctxstack_or_die(lai_state_t *state) {
-    state->ctxstack_ptr++;
-    if (state->ctxstack_ptr == state->ctxstack_capacity) {
+static inline int lai_exec_reserve_ctxstack(lai_state_t *state) {
+    if (state->ctxstack_ptr + 1 == state->ctxstack_capacity) {
         size_t new_capacity = 2 * state->ctxstack_capacity;
         struct lai_ctxitem *new_stack = laihost_malloc(new_capacity * sizeof(struct lai_ctxitem));
-        if (!new_stack)
-            lai_panic("failed to allocate memory for context stack");
+        if (!new_stack) {
+            lai_warn("failed to allocate memory for context stack");
+            return 1;
+        }
         memcpy(new_stack, state->ctxstack_base,
                state->ctxstack_capacity * sizeof(struct lai_ctxitem));
         if (state->ctxstack_base != state->small_ctxstack)
@@ -90,6 +90,14 @@ static inline struct lai_ctxitem *lai_exec_push_ctxstack_or_die(lai_state_t *sta
         state->ctxstack_base = new_stack;
         state->ctxstack_capacity = new_capacity;
     }
+    return 0;
+}
+
+// Pushes a new item to the context stack and returns it.
+static inline struct lai_ctxitem *lai_exec_push_ctxstack_or_die(lai_state_t *state) {
+    state->ctxstack_ptr++;
+    // Users are expected to call the reserve() function before this one.
+    LAI_ENSURE(state->ctxstack_ptr < state->ctxstack_capacity);
     memset(&state->ctxstack_base[state->ctxstack_ptr], 0, sizeof(struct lai_ctxitem));
     return &state->ctxstack_base[state->ctxstack_ptr];
 }
@@ -119,14 +127,14 @@ static inline void lai_exec_pop_ctxstack_back(lai_state_t *state) {
 // Inline function for block stack manipulation.
 // --------------------------------------------------------------------------------------
 
-// Pushes a new item to the block stack and returns it.
-static inline struct lai_blkitem *lai_exec_push_blkstack_or_die(lai_state_t *state) {
-    state->blkstack_ptr++;
-    if (state->blkstack_ptr == state->blkstack_capacity) {
+static inline int lai_exec_reserve_blkstack(lai_state_t *state) {
+    if (state->blkstack_ptr + 1 == state->blkstack_capacity) {
         size_t new_capacity = 2 * state->blkstack_capacity;
         struct lai_blkitem *new_stack = laihost_malloc(new_capacity * sizeof(struct lai_blkitem));
-        if (!new_stack)
-            lai_panic("failed to allocate memory for block stack");
+        if (!new_stack) {
+            lai_warn("failed to allocate memory for block stack");
+            return 1;
+        }
         memcpy(new_stack, state->blkstack_base,
                state->blkstack_capacity * sizeof(struct lai_blkitem));
         if (state->blkstack_base != state->small_blkstack)
@@ -134,6 +142,14 @@ static inline struct lai_blkitem *lai_exec_push_blkstack_or_die(lai_state_t *sta
         state->blkstack_base = new_stack;
         state->blkstack_capacity = new_capacity;
     }
+    return 0;
+}
+
+// Pushes a new item to the block stack and returns it.
+static inline struct lai_blkitem *lai_exec_push_blkstack_or_die(lai_state_t *state) {
+    state->blkstack_ptr++;
+    // Users are expected to call the reserve() function before this one.
+    LAI_ENSURE(state->blkstack_ptr < state->blkstack_capacity);
     memset(&state->blkstack_base[state->blkstack_ptr], 0, sizeof(struct lai_blkitem));
     return &state->blkstack_base[state->blkstack_ptr];
 }
@@ -155,14 +171,14 @@ static inline void lai_exec_pop_blkstack_back(lai_state_t *state) {
 // Inline function for execution stack manipulation.
 // --------------------------------------------------------------------------------------
 
-// Pushes a new item to the execution stack and returns it.
-static inline lai_stackitem_t *lai_exec_push_stack_or_die(lai_state_t *state) {
-    state->stack_ptr++;
-    if (state->stack_ptr == state->stack_capacity) {
+static inline int lai_exec_reserve_stack(lai_state_t *state) {
+    if (state->stack_ptr + 1 == state->stack_capacity) {
         size_t new_capacity = 2 * state->stack_capacity;
         lai_stackitem_t *new_stack = laihost_malloc(new_capacity * sizeof(lai_stackitem_t));
-        if (!new_stack)
-            lai_panic("failed to allocate memory for execution stack");
+        if (!new_stack) {
+            lai_warn("failed to allocate memory for execution stack");
+            return 1;
+        }
         memcpy(new_stack, state->stack_base,
                state->stack_capacity * sizeof(lai_stackitem_t));
         if (state->stack_base != state->small_stack)
@@ -170,6 +186,13 @@ static inline lai_stackitem_t *lai_exec_push_stack_or_die(lai_state_t *state) {
         state->stack_base = new_stack;
         state->stack_capacity = new_capacity;
     }
+    return 0;
+}
+
+// Pushes a new item to the execution stack and returns it.
+static inline lai_stackitem_t *lai_exec_push_stack_or_die(lai_state_t *state) {
+    state->stack_ptr++;
+    // Users are expected to call the reserve() function before this one.
     LAI_ENSURE(state->stack_ptr < state->stack_capacity);
     return &state->stack_base[state->stack_ptr];
 }
@@ -207,13 +230,14 @@ static inline void lai_exec_pop_stack_back(lai_state_t *state) {
 // Inline function for opstack manipulation.
 // --------------------------------------------------------------------------------------
 
-// Pushes a new item to the opstack and returns it.
-static inline struct lai_operand *lai_exec_push_opstack_or_die(lai_state_t *state) {
+static inline int lai_exec_reserve_opstack(lai_state_t *state) {
     if (state->opstack_ptr == state->opstack_capacity) {
         size_t new_capacity = 2 * state->opstack_capacity;
         struct lai_operand *new_stack = laihost_malloc(new_capacity * sizeof(struct lai_operand));
-        if (!new_stack)
-            lai_panic("failed to allocate memory for operand stack");
+        if (!new_stack) {
+            lai_warn("failed to allocate memory for operand stack");
+            return 1;
+        }
         // TODO: Here, we rely on the fact that moving lai_variable_t via memcpy() is OK.
         //       Implement a some sophisticated lai_operand_move()?
         memcpy(new_stack, state->opstack_base,
@@ -223,6 +247,13 @@ static inline struct lai_operand *lai_exec_push_opstack_or_die(lai_state_t *stat
         state->opstack_base = new_stack;
         state->opstack_capacity = new_capacity;
     }
+    return 0;
+}
+
+// Pushes a new item to the opstack and returns it.
+static inline struct lai_operand *lai_exec_push_opstack_or_die(lai_state_t *state) {
+    // Users are expected to call the reserve() function before this one.
+    LAI_ENSURE(state->opstack_ptr < state->opstack_capacity);
     struct lai_operand *object = &state->opstack_base[state->opstack_ptr];
     memset(object, 0, sizeof(struct lai_operand));
     state->opstack_ptr++;
@@ -231,8 +262,7 @@ static inline struct lai_operand *lai_exec_push_opstack_or_die(lai_state_t *stat
 
 // Returns the n-th item from the opstack.
 static inline struct lai_operand *lai_exec_get_opstack(lai_state_t *state, int n) {
-    if (n >= state->opstack_ptr)
-        lai_panic("opstack access out of bounds"); // This is an internal execution error.
+    LAI_ENSURE(n < state->opstack_ptr);
     return &state->opstack_base[n];
 }
 
