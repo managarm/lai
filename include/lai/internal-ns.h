@@ -54,7 +54,7 @@ typedef struct lai_nsnode
     // TODO: Find a good mechanism for locks.
     //lai_lock_t mutex;        // for Mutex
 
-    uint8_t cpu_id;            // for Processor
+                // for Processor
 
     union {
         struct lai_nsnode *al_target; // LAI_NAMESPACE_ALIAS.
@@ -76,6 +76,11 @@ typedef struct lai_nsnode
             struct lai_nsnode *bf_node;
             uint64_t bf_offset; // In bits.
             uint64_t bf_size;   // In bits.
+        };
+        struct { // LAI_NAMESPACE_PROCESSOR
+            uint8_t cpu_id;
+            uint32_t pblk_addr;
+            uint8_t pblk_len;
         };
     };
 

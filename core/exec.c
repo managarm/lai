@@ -1518,26 +1518,55 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
     }
     case (EXTOP_PREFIX << 8) | PROCESSOR: {
         pc += 2;            // skip over PROCESSOR_OP
-        size_t tmp_pc = pc;
 
         size_t pkgsize;
+        size_t nested_pc;
         struct lai_amlname amln;
-        tmp_pc += lai_parse_pkgsize(method + tmp_pc, &pkgsize);
-        tmp_pc += lai_amlname_parse(&amln, method + tmp_pc);
-        pc += pkgsize;
+        pc += lai_parse_pkgsize(method + pc, &pkgsize);
+        pc += lai_amlname_parse(&amln, method + pc);
 
+        uint8_t cpu_id = 0;
+        uint32_t pblk_addr = 0;
+        uint8_t pblk_len = 0;
+
+        cpu_id = *(method + pc);
+        pc++;
+        memcpy(&pblk_addr, method + pc, 4);
+        pc += 4;
+        pblk_len = *(method + pc);
+        pc++;
+        
+        nested_pc = pc;
+        pc = opcode_pc + 2 + pkgsize;
+
+        if (lai_exec_reserve_ctxstack(state)
+                || lai_exec_reserve_blkstack(state)
+                || lai_exec_reserve_stack(state))
+            return 1;
         lai_exec_commit_pc(state, pc);
 
         lai_nsnode_t *node = lai_create_nsnode_or_die();
         node->type = LAI_NAMESPACE_PROCESSOR;
-        node->cpu_id = *(method + tmp_pc);
-
-        // TODO: parse rest of Processor() data
+        node->cpu_id = cpu_id;
+        node->pblk_addr = pblk_addr;
+        node->pblk_len = pblk_len;
 
         lai_do_resolve_new_node(node, ctx_handle, &amln);
         lai_install_nsnode(node);
         if (invocation)
             lai_list_link(&invocation->per_method_list, &node->per_method_item);
+
+        struct lai_ctxitem *populate_ctxitem = lai_exec_push_ctxstack(state);
+        populate_ctxitem->amls = amls;
+        populate_ctxitem->code = method;
+        populate_ctxitem->handle = node;
+
+        struct lai_blkitem *blkitem = lai_exec_push_blkstack(state);
+        blkitem->pc = nested_pc;
+        blkitem->limit = opcode_pc + 2 + pkgsize;
+
+        lai_stackitem_t *item = lai_exec_push_stack(state);
+        item->kind = LAI_POPULATE_STACKITEM;
         break;
     }
     case (EXTOP_PREFIX << 8) | POWER_RES:
