@@ -419,7 +419,8 @@ enum lai_object_type lai_obj_get_type(lai_variable_t *object) {
                 lai_panic("undefined reference %s", lai_stringify_amlname(&amln));
             return lai_object_type_of_node(handle);
         }
-
+        case 0:
+            return LAI_TYPE_NONE;
         default:
             lai_panic("unexpected object type %d for lai_obj_get_type()", object->type);
     }
