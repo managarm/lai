@@ -89,6 +89,7 @@ static void lai_exec_reduce_node(int opcode, lai_state_t *state, struct lai_oper
                 lai_list_link(&ctxitem->invocation->per_method_list, &node->per_method_item);
             break;
         }
+        case BITFIELD_OP:
         case BYTEFIELD_OP:
         case WORDFIELD_OP:
         case DWORDFIELD_OP:
@@ -113,6 +114,7 @@ static void lai_exec_reduce_node(int opcode, lai_state_t *state, struct lai_oper
             node->bf_node = buffer_node;
 
             switch (opcode) {
+                case BITFIELD_OP: node->bf_size = 1; break;
                 case BYTEFIELD_OP: node->bf_size = 8; break;
                 case WORDFIELD_OP: node->bf_size = 16; break;
                 case DWORDFIELD_OP: node->bf_size = 32; break;
@@ -1691,6 +1693,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
             lai_list_link(&invocation->per_method_list, &node->per_method_item);
         break;
     }
+    case BITFIELD_OP:
     case BYTEFIELD_OP:
     case WORDFIELD_OP:
     case DWORDFIELD_OP:
