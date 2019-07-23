@@ -968,6 +968,30 @@ static int lai_exec_process(lai_state_t *state) {
         lai_panic("unexpected lai_stackitem_t");
 }
 
+static inline int lai_parse_u8(uint8_t *out, uint8_t *code, int *pc, int limit) {
+    if (*pc + 1 > limit)
+        return 1;
+    *out = code[*pc];
+    (*pc)++;
+    return 0;
+}
+
+static inline int lai_parse_u16(uint16_t *out, uint8_t *code, int *pc, int limit) {
+    if (*pc + 2 > limit)
+        return 1;
+    *out = code[*pc] | (code[*pc + 1] << 8);
+    *pc += 2;
+    return 0;
+}
+
+static inline int lai_parse_u32(uint32_t *out, uint8_t *code, int *pc, int limit) {
+    if (*pc + 4 > limit)
+        return 1;
+    *out = code[*pc] | (code[*pc + 1] << 8) | (code[*pc + 2] << 16) | (code[*pc + 3] << 24);
+    *pc += 4;
+    return 0;
+}
+
 // Advances the PC of the current block.
 // lai_exec_parse() calls this function after successfully parsing a full opcode.
 // Even if parsing fails, this mechanism makes sure that the PC never points to
@@ -990,6 +1014,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
     struct lai_invocation *invocation = ctxitem->invocation;
 
     int pc = block->pc;
+    int limit = block->limit;
 
     // Package-size encoding (and similar) needs to know the PC of the opcode.
     // If an opcode sequence contains a pkgsize, the sequence generally ends at:
@@ -1015,8 +1040,9 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
     int want_result = (parse_mode != LAI_EXEC_MODE);
 
     if (parse_mode == LAI_IMMEDIATE_BYTE_MODE) {
-        uint8_t value = method[pc];
-        pc++;
+        uint8_t value;
+        if (lai_parse_u8(&value, method, &pc, limit))
+            return 1;
 
         if (lai_exec_reserve_opstack(state))
             return 1;
@@ -1028,8 +1054,9 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         result->object.integer = value;
         return 0;
     } else if (parse_mode == LAI_IMMEDIATE_WORD_MODE) {
-        uint16_t value = (method[pc + 1] << 8) | method[pc];
-        pc += 2;
+        uint16_t value;
+        if (lai_parse_u16(&value, method, &pc, limit))
+            return 1;
 
         if (lai_exec_reserve_opstack(state))
             return 1;
@@ -1267,11 +1294,11 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
     {
         int data_pc;
         size_t encoded_size; // Size of the package initializer.
-        int num_ents; // The number of elements of the package.
+        uint8_t num_ents; // The number of elements of the package.
         pc++;
         pc += lai_parse_pkgsize(method + pc, &encoded_size);
-        num_ents = method[pc];
-        pc++;
+        if (lai_parse_u8(&num_ents, method, &pc, limit))
+            return 1;
         data_pc = pc;
         pc = opcode_pc + 1 + encoded_size;
 
@@ -1522,23 +1549,18 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         pc += 2;            // skip over PROCESSOR_OP
 
         size_t pkgsize;
-        size_t nested_pc;
         struct lai_amlname amln;
-        pc += lai_parse_pkgsize(method + pc, &pkgsize);
-        pc += lai_amlname_parse(&amln, method + pc);
-
         uint8_t cpu_id = 0;
         uint32_t pblk_addr = 0;
         uint8_t pblk_len = 0;
-
+        pc += lai_parse_pkgsize(method + pc, &pkgsize);
+        pc += lai_amlname_parse(&amln, method + pc);
         cpu_id = *(method + pc);
-        pc++;
-        memcpy(&pblk_addr, method + pc, 4);
-        pc += 4;
-        pblk_len = *(method + pc);
-        pc++;
-        
-        nested_pc = pc;
+        if (lai_parse_u8(&cpu_id, method, &pc, limit)
+                || lai_parse_u32(&pblk_addr, method, &pc, limit)
+                || lai_parse_u8(&pblk_len, method, &pc, limit))
+            return 1;
+        int nested_pc = pc;
         pc = opcode_pc + 2 + pkgsize;
 
         if (lai_exec_reserve_ctxstack(state)
