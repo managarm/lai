@@ -52,9 +52,9 @@ void lai_read_field(lai_variable_t *destination, lai_nsnode_t *field) {
     void *mmio;
 
     // these are for PCI
-    lai_variable_t bus_number = {0};
-    lai_variable_t seg_number = {0};
-    lai_variable_t address_number = {0};
+    LAI_CLEANUP_VAR lai_variable_t bus_number = LAI_VAR_INITIALIZER;
+    LAI_CLEANUP_VAR lai_variable_t seg_number = LAI_VAR_INITIALIZER;
+    LAI_CLEANUP_VAR lai_variable_t address_number = LAI_VAR_INITIALIZER;
     uint64_t bbn_result = 0; // When _BBN is not present, we assume PCI bus 0.
     uint64_t seg_result = 0; // When _SEG is not present, we default to Segment Group 0
     uint64_t adr_result = 0; // When _ADR is not present, again, default to zero.
@@ -91,8 +91,39 @@ void lai_read_field(lai_variable_t *destination, lai_nsnode_t *field) {
         pci_byte_offset = field->fld_offset % 4;
     }
 
-    // now read from either I/O ports, MMIO, or PCI config
-    if (opregion->op_address_space == OPREGION_IO) {
+    if(opregion->op_override){
+        switch (field->fld_flags & 0x0F) {
+        case FIELD_BYTE_ACCESS:
+            if(!opregion->op_override->readb)
+                lai_panic("Opregion override doesn't provide readb function");
+            value = opregion->op_override->readb(opregion->op_base + offset, opregion->op_userptr) >> bit_offset;
+            break;
+
+        case FIELD_WORD_ACCESS:
+            if(!opregion->op_override->readw)
+                lai_panic("Opregion override doesn't provide readw function");
+            value = opregion->op_override->readw(opregion->op_base + offset, opregion->op_userptr) >> bit_offset;
+            break;
+
+        case FIELD_DWORD_ACCESS:
+        case FIELD_ANY_ACCESS:
+            if(!opregion->op_override->readd)
+                lai_panic("Opregion override doesn't provide readd function");
+            value = opregion->op_override->readd(opregion->op_base + offset, opregion->op_userptr) >> bit_offset;
+            break;
+
+        case FIELD_QWORD_ACCESS:
+            if(!opregion->op_override->readq)
+                lai_panic("Opregion override doesn't provide readq function");
+            value = opregion->op_override->readq(opregion->op_base + offset, opregion->op_userptr) >> bit_offset;
+            break;
+        
+        default:
+            lai_panic("undefined field flags 0x%02x: %s", field->fld_flags,
+                          lai_stringify_node_path(field));
+            break;
+        }
+    } else if (opregion->op_address_space == OPREGION_IO) {
         // I/O port
         switch (field->fld_flags & 0x0F) {
             case FIELD_BYTE_ACCESS:
@@ -226,9 +257,9 @@ void lai_write_field(lai_nsnode_t *field, lai_variable_t *source) {
     void *mmio;
 
     // these are for PCI
-    lai_variable_t bus_number = {0};
-    lai_variable_t seg_number = {0};
-    lai_variable_t address_number = {0};
+    LAI_CLEANUP_VAR lai_variable_t bus_number = LAI_VAR_INITIALIZER;
+    LAI_CLEANUP_VAR lai_variable_t seg_number = LAI_VAR_INITIALIZER;
+    LAI_CLEANUP_VAR lai_variable_t address_number = LAI_VAR_INITIALIZER;
     uint64_t bbn_result = 0; // When _BBN is not present, we assume PCI bus 0.
     uint64_t seg_result = 0; // When _SEG is not present, we default to Segment Group 0
     uint64_t adr_result = 0; // When _ADR is not present, again, default to zero.
@@ -265,8 +296,39 @@ void lai_write_field(lai_nsnode_t *field, lai_variable_t *source) {
         pci_byte_offset = field->fld_offset % 4;
     }
 
-    // read from the field
-    if (opregion->op_address_space == OPREGION_IO) {
+    if(opregion->op_override){
+        switch (field->fld_flags & 0x0F) {
+        case FIELD_BYTE_ACCESS:
+            if(!opregion->op_override->readb)
+                lai_panic("Opregion override doesn't provide readb function");
+            value = opregion->op_override->readb(opregion->op_base + offset, opregion->op_userptr) >> bit_offset;
+            break;
+
+        case FIELD_WORD_ACCESS:
+            if(!opregion->op_override->readw)
+                lai_panic("Opregion override doesn't provide readw function");
+            value = opregion->op_override->readw(opregion->op_base + offset, opregion->op_userptr) >> bit_offset;
+            break;
+
+        case FIELD_DWORD_ACCESS:
+        case FIELD_ANY_ACCESS:
+            if(!opregion->op_override->readd)
+                lai_panic("Opregion override doesn't provide readd function");
+            value = opregion->op_override->readd(opregion->op_base + offset, opregion->op_userptr) >> bit_offset;
+            break;
+
+        case FIELD_QWORD_ACCESS:
+            if(!opregion->op_override->readq)
+                lai_panic("Opregion override doesn't provide readq function");
+            value = opregion->op_override->readq(opregion->op_base + offset, opregion->op_userptr) >> bit_offset;
+            break;
+        
+        default:
+            lai_panic("undefined field flags 0x%02x: %s", field->fld_flags,
+                          lai_stringify_node_path(field));
+            break;
+        }
+    } else if (opregion->op_address_space == OPREGION_IO) {
         // I/O port
         switch (field->fld_flags & 0x0F) {
             case FIELD_BYTE_ACCESS:
@@ -396,8 +458,39 @@ void lai_write_field(lai_nsnode_t *field, lai_variable_t *source) {
         value |= (source->integer << bit_offset);
     }
 
-    // finally, write to the field
-    if (opregion->op_address_space == OPREGION_IO) {
+    if(opregion->op_override) {
+        switch (field->fld_flags & 0x0F) {
+        case FIELD_BYTE_ACCESS:
+            if(!opregion->op_override->writeb)
+                lai_panic("Opregion override doesn't provide writeb function");
+            opregion->op_override->writeb(opregion->op_base + offset, value, opregion->op_userptr);
+            break;
+
+        case FIELD_WORD_ACCESS:
+            if(!opregion->op_override->writew)
+                lai_panic("Opregion override doesn't provide writew function");
+            opregion->op_override->writew(opregion->op_base + offset, value, opregion->op_userptr);
+            break;
+
+        case FIELD_DWORD_ACCESS:
+        case FIELD_ANY_ACCESS:
+            if(!opregion->op_override->writed)
+                lai_panic("Opregion override doesn't provide writed function");
+            opregion->op_override->writed(opregion->op_base + offset, value, opregion->op_userptr);
+            break;
+
+        case FIELD_QWORD_ACCESS:
+            if(!opregion->op_override->writeq)
+                lai_panic("Opregion override doesn't provide writeq function");
+            opregion->op_override->writeq(opregion->op_base + offset, value, opregion->op_userptr);
+            break;
+        
+        default:
+            lai_panic("undefined field flags 0x%02x: %s", field->fld_flags,
+                          lai_stringify_node_path(field));
+            break;
+        }
+    } else if (opregion->op_address_space == OPREGION_IO) {
         // I/O port
         switch (field->fld_flags & 0x0F) {
             case FIELD_BYTE_ACCESS:
