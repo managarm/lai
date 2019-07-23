@@ -17,6 +17,7 @@ library = static_library('lai',
         'helpers/resource.c',
         'helpers/sci.c',
         'helpers/sleep.c',
+        'drivers/ec.c',
     include_directories: include,
     pic: false)
 
