@@ -1673,11 +1673,32 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
     }
 
     // Leafs in the ACPI namespace.
-    case METHOD_OP:
-        pc += lai_create_method(ctx_handle, amls, method + pc);
+    case METHOD_OP: {
+        size_t encoded_size;
+        struct lai_amlname amln;
+        uint8_t flags;
+        pc++;
+        pc += lai_parse_pkgsize(method + pc, &encoded_size);
+        pc += lai_amlname_parse(&amln, method + pc);
+        if (lai_parse_u8(&flags, method, &pc, limit))
+            return 1;
+        int nested_pc = pc;
+        pc = opcode_pc + 1 + encoded_size;
 
         lai_exec_commit_pc(state, pc);
+
+        lai_nsnode_t *node = lai_create_nsnode_or_die();
+        node->type = LAI_NAMESPACE_METHOD;
+        lai_do_resolve_new_node(node, ctx_handle, &amln);
+        node->method_flags = flags;
+        node->amls = amls;
+        node->pointer = method + nested_pc;
+        node->size = pc - nested_pc;
+        lai_install_nsnode(node);
+        if (invocation)
+            lai_list_link(&invocation->per_method_list, &node->per_method_item);
         break;
+    }
     case NAME_OP: {
         pc++;
 

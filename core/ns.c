@@ -539,35 +539,6 @@ static struct lai_aml_segment *lai_load_table(void *ptr, int index) {
     return amls;
 }
 
-// Create a control method in the namespace.
-size_t lai_create_method(lai_nsnode_t *parent, struct lai_aml_segment *amls, void *data) {
-    uint8_t *method = (uint8_t *)data;
-    method++;        // skip over METHOD_OP
-
-    size_t size, pkgsize;
-    pkgsize = lai_parse_pkgsize(method, &size);
-    method += pkgsize;
-
-    // create a namespace object for the method
-    lai_nsnode_t *node = lai_create_nsnode_or_die();
-    size_t name_length = lai_resolve_new_node(node, parent, method);
-
-    // get the method's flags
-    method = (uint8_t *)data;
-    method += pkgsize + name_length + 1;
-
-    // create a node corresponding to this method,
-    // and add it to the namespace.
-    node->type = LAI_NAMESPACE_METHOD;
-    node->method_flags = method[0];
-    node->amls = amls;
-    node->pointer = (void *)(method + 1);
-    node->size = size - pkgsize - name_length - 1;
-
-    lai_install_nsnode(node);
-    return size + 1;
-}
-
 lai_nsnode_t *lai_resolve_path(lai_nsnode_t *ctx_handle, const char *path) {
     lai_nsnode_t *current = ctx_handle;
     if (!current)
