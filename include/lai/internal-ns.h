@@ -31,6 +31,7 @@ struct lai_aml_segment {
 #define LAI_NAMESPACE_THERMALZONE   11
 #define LAI_NAMESPACE_EVENT         12
 #define LAI_NAMESPACE_POWER_RES     13
+#define LAI_NAMESPACE_BANK_FIELD    14
 
 typedef struct lai_nsnode
 {
@@ -72,6 +73,15 @@ typedef struct lai_nsnode
             uint8_t idxf_flags;
             uint8_t idxf_size;
         };
+        struct { // LAI_NAMESPACE_BANK_FIELD.
+            uint64_t bkf_offset; // In bits.
+            struct lai_nsnode *bkf_region_node;
+            struct lai_nsnode *bkf_bank_node;
+            uint64_t bkf_value;
+            uint8_t bkf_flags;
+            uint8_t bkf_size;
+        };
+
         struct { // LAI_NAMESPACE_BUFFER_FIELD.
             struct lai_nsnode *bf_node;
             uint64_t bf_offset; // In bits.

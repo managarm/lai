@@ -246,6 +246,16 @@ static inline int lai_exec_reserve_opstack(lai_state_t *state) {
     return 0;
 }
 
+static inline int lai_exec_reserve_opstack_n(lai_state_t *state, int n) {
+    int err;
+    while (n) {
+        if ((err = lai_exec_reserve_opstack(state)))
+            return err;
+        n--;
+    }
+    return 0;
+}
+
 // Pushes a new item to the opstack and returns it.
 static inline struct lai_operand *lai_exec_push_opstack(lai_state_t *state) {
     // Users are expected to call the reserve() function before this one.

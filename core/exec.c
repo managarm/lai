@@ -964,6 +964,77 @@ static int lai_exec_process(lai_state_t *state) {
                 return lai_exec_parse(LAI_EXEC_MODE, state);
             }
         }
+    } else if (item->kind == LAI_BANKFIELD_STACKITEM) {
+        int k = state->opstack_ptr - item->opstack_frame;
+        LAI_ENSURE(k <= 3);
+        if(k == 3) { // there's already region_name and bank_name on there
+            LAI_CLEANUP_VAR lai_variable_t bank_value_var = LAI_VAR_INITIALIZER;
+            struct lai_operand *operand;
+
+            operand = lai_exec_get_opstack(state, item->opstack_frame);
+            lai_nsnode_t *region_node = operand->handle;
+
+            operand = lai_exec_get_opstack(state, item->opstack_frame + 1);
+            lai_nsnode_t *bank_node = operand->handle;
+
+            operand = lai_exec_get_opstack(state, item->opstack_frame + 2);
+            lai_exec_get_integer(state, operand, &bank_value_var);
+            uint64_t bank_value = bank_value_var.integer;
+
+            lai_exec_pop_opstack(state, 3);
+
+            int pc = block->pc;
+
+            uint8_t access_type = *(method + pc);
+            pc++;
+
+            // parse FieldList
+            struct lai_amlname field_amln;
+            uint64_t curr_off = 0;
+            size_t skip_bits;
+            while (pc < block->limit) {
+                switch (*(method + pc)) {
+                    case 0: // ReservedField
+                        pc++;
+                        pc += lai_parse_pkgsize(method + pc, &skip_bits);
+                        curr_off += skip_bits;
+                        break;
+                    case 1: // AccessField
+                        pc++;
+                        access_type = *(method + pc);
+                        pc += 2;
+                        break;
+                    case 2: // TODO: ConnectField
+                        lai_panic("ConnectField parsing isn't implemented");
+                        break;
+                    default: // NamedField
+                        pc += lai_amlname_parse(&field_amln, method + pc);
+                        pc += lai_parse_pkgsize(method + pc, &skip_bits);
+
+                        lai_nsnode_t *node = lai_create_nsnode_or_die();
+                        node->type = LAI_NAMESPACE_BANK_FIELD;
+                        node->bkf_region_node = region_node;
+                        node->bkf_bank_node = bank_node;
+                        node->bkf_flags = access_type;
+                        node->bkf_size = skip_bits;
+                        node->bkf_offset = curr_off;
+                        node->bkf_value = bank_value;
+                        lai_do_resolve_new_node(node, ctx_handle, &field_amln);
+                        lai_install_nsnode(node);
+                        if (invocation)
+                            lai_list_link(&invocation->per_method_list,
+                                          &node->per_method_item);
+
+                        curr_off += skip_bits;
+                }
+            }
+
+            lai_exec_pop_blkstack_back(state);
+            lai_exec_pop_stack_back(state);
+            return 0;
+        } else {
+            return lai_exec_parse(LAI_OBJECT_MODE, state);
+        }
     } else
         lai_panic("unexpected lai_stackitem_t");
 }
@@ -1896,6 +1967,47 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
             }
         }
         lai_exec_commit_pc(state, pc);
+
+        break;
+    }
+
+    case (EXTOP_PREFIX << 8) | BANKFIELD: {
+        struct lai_amlname region_amln;
+        struct lai_amlname bank_amln;
+        size_t pkgsize;
+        pc += lai_parse_pkgsize(method + pc, &pkgsize);
+        pc += lai_amlname_parse(&region_amln, method + pc);
+        pc += lai_amlname_parse(&bank_amln, method + pc);
+
+        int start_pc = pc;
+        pc = opcode_pc + 2 + pkgsize;
+
+        lai_nsnode_t *region_node = lai_do_resolve(ctx_handle, &region_amln);
+        lai_nsnode_t *bank_node = lai_do_resolve(ctx_handle, &bank_amln);
+        if (!region_node || !bank_node)
+            lai_panic("could not resolve region/bank of BankField()");
+
+        if (lai_exec_reserve_blkstack(state)
+                || lai_exec_reserve_stack(state)
+                || lai_exec_reserve_opstack_n(state, 2))
+            return 1;
+        lai_exec_commit_pc(state, pc);
+
+        struct lai_blkitem *blkitem = lai_exec_push_blkstack(state);
+        blkitem->pc = start_pc;
+        blkitem->limit = pc;
+
+        lai_stackitem_t *bankfield_item = lai_exec_push_stack(state);
+        bankfield_item->kind = LAI_BANKFIELD_STACKITEM;
+        bankfield_item->opstack_frame = state->opstack_ptr;
+
+        struct lai_operand *region_operand = lai_exec_push_opstack(state);
+        region_operand->tag = LAI_RESOLVED_NAME;
+        region_operand->handle = region_node;
+
+        struct lai_operand *bank_operand = lai_exec_push_opstack(state);
+        bank_operand->tag = LAI_RESOLVED_NAME;
+        bank_operand->handle = bank_node;
 
         break;
     }

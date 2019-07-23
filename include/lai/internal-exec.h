@@ -150,6 +150,7 @@ struct lai_operand {
 #define LAI_OP_STACKITEM               8 // Parse an operator.
 #define LAI_INVOKE_STACKITEM           9 // Parse a method invocation.
 #define LAI_RETURN_STACKITEM          10 // Parse a return operand
+#define LAI_BANKFIELD_STACKITEM       11 // Parse a BankValue and FieldList
 
 struct lai_invocation {
     lai_variable_t arg[7];

@@ -92,6 +92,7 @@
 #define POWER_RES           0x84
 #define THERMALZONE			0x85
 #define INDEXFIELD			0x86	// ACPI spec v5.0 section 19.5.60
+#define BANKFIELD			0x87
 
 // OpRegion Address Spaces
 #define OPREGION_MEMORY			0x00
