@@ -28,6 +28,7 @@ struct lai_resource_view {
 
     uint64_t base; // MMIO / IO / Generic Addresses
     uint64_t length;
+    uint64_t alignment;
     uint8_t flags;
 
     uint8_t address_space; // Generic Addresses

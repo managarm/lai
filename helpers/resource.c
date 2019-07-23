@@ -158,6 +158,13 @@ lai_api_error_t lai_resource_iterate(struct lai_resource_view *iterator){
             iterator->length = entry[3];
             iterator->skip_size = info.skip_size;
             return LAI_ERROR_NONE;
+        case ACPI_SMALL_IO: // TODO: Actually support min and max
+            iterator->flags = entry[1];
+            iterator->base = (entry[2] | (entry[3] << 8));
+            iterator->alignment = entry[6];
+            iterator->length = entry[7];
+            iterator->skip_size = info.skip_size;
+            return LAI_ERROR_NONE;
         case ACPI_SMALL_IRQ:
             iterator->entry_idx = 0;
             if(info.size == 2){
