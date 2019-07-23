@@ -1141,8 +1141,11 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         if (pc + 1 == block->limit)
             lai_panic("two-byte opcode on method boundary");
         opcode = (EXTOP_PREFIX << 8) | method[pc + 1];
-    } else
+        pc += 2;
+    } else {
         opcode = method[pc];
+        pc++;
+    }
     if (debug_opcodes) {
         lai_debug("parsing opcode 0x%02x [0x%x @ %c%c%c%c %d]", opcode, table_pc,
                 amls->table->header.signature[0],
@@ -1155,14 +1158,10 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
     // This switch handles the majority of all opcodes.
     switch (opcode) {
     case NOP_OP:
-        pc++;
-
         lai_exec_commit_pc(state, pc);
         break;
 
     case ZERO_OP:
-        pc++;
-
         if (lai_exec_reserve_opstack(state))
             return 1;
         lai_exec_commit_pc(state, pc);
@@ -1182,8 +1181,6 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         }
         break;
     case ONE_OP:
-        pc++;
-
         if (lai_exec_reserve_opstack(state))
             return 1;
         lai_exec_commit_pc(state, pc);
@@ -1199,8 +1196,6 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         }
         break;
     case ONES_OP:
-        pc++;
-
         if (lai_exec_reserve_opstack(state))
             return 1;
         lai_exec_commit_pc(state, pc);
@@ -1222,10 +1217,10 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
     case QWORDPREFIX:
     {
         uint64_t integer;
-        size_t integer_size = lai_parse_integer(method + pc, &integer);
+        size_t integer_size = lai_parse_integer(method + opcode_pc, &integer);
         if (!integer_size)
             lai_panic("failed to parse integer opcode");
-        pc += integer_size;
+        pc += integer_size - 1;
 
         if (lai_exec_reserve_opstack(state))
             return 1;
@@ -1244,7 +1239,6 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
     {
         int data_pc;
         size_t n = 0; // Length of null-terminated string.
-        pc++;
         while (pc + n < block->limit && method[pc + n])
             n++;
         if (pc + n == block->limit)
@@ -1270,7 +1264,6 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
     {
         int data_pc;
         size_t encoded_size; // Size of the buffer initializer.
-        pc++;
         pc += lai_parse_pkgsize(method + pc, &encoded_size);
         data_pc = pc;
         pc = opcode_pc + 1 + encoded_size;
@@ -1295,7 +1288,6 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         int data_pc;
         size_t encoded_size; // Size of the package initializer.
         uint8_t num_ents; // The number of elements of the package.
-        pc++;
         pc += lai_parse_pkgsize(method + pc, &encoded_size);
         if (lai_parse_u8(&num_ents, method, &pc, limit))
             return 1;
@@ -1331,8 +1323,6 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
     /* So we need to take this into consideration */
     case RETURN_OP:
     {
-        pc++;
-
         if (lai_exec_reserve_stack(state))
             return 1;
         lai_exec_commit_pc(state, pc);
@@ -1347,7 +1337,6 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
     {
         int body_pc;
         size_t loop_size;
-        pc++;
         pc += lai_parse_pkgsize(&method[pc], &loop_size);
         body_pc = pc;
         pc = opcode_pc + 1 + loop_size;
@@ -1439,7 +1428,6 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         int has_else = 0;
         size_t if_size;
         size_t else_size;
-        pc++;
         pc += lai_parse_pkgsize(method + pc, &if_size);
         if_pc = pc;
         pc = opcode_pc + 1 + if_size;
@@ -1479,7 +1467,6 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         int nested_pc;
         size_t encoded_size;
         struct lai_amlname amln;
-        pc++;
         pc += lai_parse_pkgsize(method + pc, &encoded_size);
         pc += lai_amlname_parse(&amln, method + pc);
         nested_pc = pc;
@@ -1513,7 +1500,6 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         int nested_pc;
         size_t encoded_size;
         struct lai_amlname amln;
-        pc += 2;
         pc += lai_parse_pkgsize(method + pc, &encoded_size);
         pc += lai_amlname_parse(&amln, method + pc);
         nested_pc = pc;
@@ -1546,8 +1532,6 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         break;
     }
     case (EXTOP_PREFIX << 8) | PROCESSOR: {
-        pc += 2;            // skip over PROCESSOR_OP
-
         size_t pkgsize;
         struct lai_amlname amln;
         uint8_t cpu_id = 0;
@@ -1598,7 +1582,6 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         int nested_pc;
         size_t encoded_size;
         struct lai_amlname amln;
-        pc += 2;
         pc += lai_parse_pkgsize(method + pc, &encoded_size);
         pc += lai_amlname_parse(&amln, method + pc);
 //            uint8_t system_level = method[pc];
@@ -1639,7 +1622,6 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         int nested_pc;
         size_t encoded_size;
         struct lai_amlname amln;
-        pc += 2;
         pc += lai_parse_pkgsize(method + pc, &encoded_size);
         pc += lai_amlname_parse(&amln, method + pc);
         nested_pc = pc;
@@ -1677,7 +1659,6 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         size_t encoded_size;
         struct lai_amlname amln;
         uint8_t flags;
-        pc++;
         pc += lai_parse_pkgsize(method + pc, &encoded_size);
         pc += lai_amlname_parse(&amln, method + pc);
         if (lai_parse_u8(&flags, method, &pc, limit))
@@ -1700,8 +1681,6 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         break;
     }
     case NAME_OP: {
-        pc++;
-
         if (lai_exec_reserve_stack(state))
             return 1;
         lai_exec_commit_pc(state, pc);
@@ -1718,7 +1697,6 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
     case ALIAS_OP: {
         struct lai_amlname target_amln;
         struct lai_amlname dest_amln;
-        pc++;
         pc += lai_amlname_parse(&target_amln, method + pc);
         pc += lai_amlname_parse(&dest_amln, method + pc);
 
@@ -1741,8 +1719,6 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
     case WORDFIELD_OP:
     case DWORDFIELD_OP:
     case QWORDFIELD_OP: {
-        pc++;
-
         if (lai_exec_reserve_stack(state))
             return 1;
         lai_exec_commit_pc(state, pc);
@@ -1759,7 +1735,6 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
     }
     case (EXTOP_PREFIX << 8) | MUTEX: {
         struct lai_amlname amln;
-        pc += 2;
         pc += lai_amlname_parse(&amln, method + pc);
         pc++; // skip over trailing 0x02
 
@@ -1775,7 +1750,6 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
     }
     case (EXTOP_PREFIX << 8) | EVENT: {
         struct lai_amlname amln;
-        pc += 2;
         pc += lai_amlname_parse(&amln, method + pc);
 
         lai_exec_commit_pc(state, pc);
@@ -1789,8 +1763,6 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         break;
     }
     case (EXTOP_PREFIX << 8) | OPREGION: {
-        pc += 2;
-
         if (lai_exec_reserve_stack(state))
             return 1;
         lai_exec_commit_pc(state, pc);
@@ -1809,7 +1781,6 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
     case (EXTOP_PREFIX << 8) | FIELD: {
         struct lai_amlname region_amln;
         size_t pkgsize;
-        pc += 2;
         pc += lai_parse_pkgsize(method + pc, &pkgsize);
         pc += lai_amlname_parse(&region_amln, method + pc);
 
@@ -1871,7 +1842,6 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         struct lai_amlname index_amln;
         struct lai_amlname data_amln;
         size_t pkgsize;
-        pc += 2;
         pc += lai_parse_pkgsize(method + pc, &pkgsize);
         pc += lai_amlname_parse(&index_amln, method + pc);
         pc += lai_amlname_parse(&data_amln, method + pc);
@@ -1937,8 +1907,6 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
     case ARG4_OP:
     case ARG5_OP:
     case ARG6_OP: {
-        pc++;
-
         if (lai_exec_reserve_opstack(state))
             return 1;
         lai_exec_commit_pc(state, pc);
@@ -1960,8 +1928,6 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
     case LOCAL5_OP:
     case LOCAL6_OP:
     case LOCAL7_OP: {
-        pc++;
-
         if (lai_exec_reserve_opstack(state))
             return 1;
         lai_exec_commit_pc(state, pc);
@@ -1976,8 +1942,6 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
     }
 
     case (EXTOP_PREFIX << 8) | DEBUG_OP: {
-        pc += 2;
-
         if (lai_exec_reserve_opstack(state))
             return 1;
         lai_exec_commit_pc(state, pc);
@@ -1992,8 +1956,6 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
 
     case STORE_OP:
     case NOT_OP: {
-        pc++;
-
         if (lai_exec_reserve_stack(state))
             return 1;
         lai_exec_commit_pc(state, pc);
@@ -2016,8 +1978,6 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
     case XOR_OP:
     case SHR_OP:
     case SHL_OP: {
-        pc++;
-
         if (lai_exec_reserve_stack(state))
             return 1;
         lai_exec_commit_pc(state, pc);
@@ -2034,8 +1994,6 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         break;
     }
     case DIVIDE_OP: {
-        pc++;
-
         if (lai_exec_reserve_stack(state))
             return 1;
         lai_exec_commit_pc(state, pc);
@@ -2055,8 +2013,6 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
 
     case INCREMENT_OP:
     case DECREMENT_OP: {
-        pc++;
-
         if (lai_exec_reserve_stack(state))
             return 1;
         lai_exec_commit_pc(state, pc);
@@ -2072,8 +2028,6 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
     }
 
     case LNOT_OP: {
-        pc++;
-
         if (lai_exec_reserve_stack(state))
             return 1;
         lai_exec_commit_pc(state, pc);
@@ -2092,8 +2046,6 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
     case LEQUAL_OP:
     case LLESS_OP:
     case LGREATER_OP: {
-        pc++;
-
         if (lai_exec_reserve_stack(state))
             return 1;
         lai_exec_commit_pc(state, pc);
@@ -2110,8 +2062,6 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
     }
 
     case INDEX_OP: {
-        pc++;
-
         if (lai_exec_reserve_stack(state))
             return 1;
         lai_exec_commit_pc(state, pc);
@@ -2129,8 +2079,6 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
     }
     case DEREF_OP:
     case SIZEOF_OP: {
-        pc++;
-
         if (lai_exec_reserve_stack(state))
             return 1;
         lai_exec_commit_pc(state, pc);
@@ -2145,8 +2093,6 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         break;
     }
     case (EXTOP_PREFIX << 8) | CONDREF_OP: {
-        pc += 2;
-
         if (lai_exec_reserve_stack(state))
             return 1;
         lai_exec_commit_pc(state, pc);
@@ -2164,8 +2110,6 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
     }
 
     case (EXTOP_PREFIX << 8) | SLEEP_OP: {
-        pc += 2;
-
         if (lai_exec_reserve_stack(state))
             return 1;
         lai_exec_commit_pc(state, pc);
@@ -2181,8 +2125,6 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
     }
 
     case (EXTOP_PREFIX << 8) | ACQUIRE_OP: {
-        pc += 2;
-
         if (lai_exec_reserve_stack(state))
             return 1;
         lai_exec_commit_pc(state, pc);
@@ -2198,8 +2140,6 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         break;
     }
     case (EXTOP_PREFIX << 8) | RELEASE_OP: {
-        pc += 2;
-
         if (lai_exec_reserve_stack(state))
             return 1;
         lai_exec_commit_pc(state, pc);
@@ -2216,8 +2156,8 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
 
     default:
         lai_panic("unexpected opcode in lai_exec_run(), sequence %02X %02X %02X %02X",
-                method[pc + 0], method[pc + 1],
-                method[pc + 2], method[pc + 3]);
+                method[opcode_pc + 0], method[opcode_pc + 1],
+                method[opcode_pc + 2], method[opcode_pc + 3]);
     }
     return 0;
 }
