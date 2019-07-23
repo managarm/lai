@@ -37,7 +37,7 @@ struct lai_resource_view {
     uint32_t gsi; // Large IRQs
 };
 
-#define LAI_RESOURCE_VIEW_INITIALIZER(crs_var) ({.entry = lai_exec_buffer_access(crs_var), .skip_size = 0, .entry_idx = 0, .crs_var = crs_var, .base = 0, .length = 0, .flags = 0, .address_space = 0, .bit_width = 0, .bit_offset = 0, .gsi = 0})
+#define LAI_RESOURCE_VIEW_INITIALIZER(crs) {.entry = lai_exec_buffer_access(crs), .skip_size = 0, .entry_idx = 0, .crs_var = crs, .base = 0, .length = 0, .flags = 0, .address_space = 0, .bit_width = 0, .bit_offset = 0, .gsi = 0}
 
 lai_api_error_t lai_resource_iterate(struct lai_resource_view *);
 
