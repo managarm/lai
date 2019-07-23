@@ -10,6 +10,7 @@
 #include <stdint.h>
 
 #include <acpispec/resources.h>
+#include <acpispec/hw.h>
 #include <acpispec/tables.h>
 #include <lai/host.h>
 #include <lai/internal-exec.h>
