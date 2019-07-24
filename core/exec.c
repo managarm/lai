@@ -538,32 +538,6 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
     lai_var_move(reduction_res, &result);
 }
 
-// TODO: Make this static.
-size_t lai_parse_integer(uint8_t *object, uint64_t *out) {
-    uint16_t u16;
-    uint32_t u32;
-    uint64_t u64;
-    switch (*object) {
-        case BYTEPREFIX:
-            *out = *(object + 1);
-            return 2;
-        case WORDPREFIX:
-            memcpy(&u16, object + 1, sizeof(uint16_t));
-            *out = u16;
-            return 3;
-        case DWORDPREFIX:
-            memcpy(&u32, object + 1, sizeof(uint32_t));
-            *out = u32;
-            return 5;
-        case QWORDPREFIX:
-            memcpy(&u64, object + 1, sizeof(uint64_t));
-            *out = u64;
-            return 9;
-        default:
-            lai_panic("unexpected prefix for lai_parse_integer()");
-    }
-}
-
 // lai_exec_run(): This is the main AML interpreter function.
 static int lai_exec_run(lai_state_t *state) {
     while (lai_exec_peek_stack_back(state)) {
@@ -1099,6 +1073,17 @@ static inline int lai_parse_u32(uint32_t *out, uint8_t *code, int *pc, int limit
     return 0;
 }
 
+static inline int lai_parse_u64(uint64_t *out, uint8_t *code, int *pc, int limit) {
+    if (*pc + 8 > limit)
+        return 1;
+    *out = ((uint64_t)code[*pc]) | (((uint64_t)code[*pc + 1]) << 8)
+           | (((uint64_t)code[*pc + 2]) << 16) | (((uint64_t)code[*pc + 3]) << 24)
+           | (((uint64_t)code[*pc + 4]) << 32) | (((uint64_t)code[*pc + 1]) << 40)
+           | (((uint64_t)code[*pc + 2]) << 48) | (((uint64_t)code[*pc + 3]) << 56);
+    *pc += 8;
+    return 0;
+}
+
 // Advances the PC of the current block.
 // lai_exec_parse() calls this function after successfully parsing a full opcode.
 // Even if parsing fails, this mechanism makes sure that the PC never points to
@@ -1321,13 +1306,36 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
     case BYTEPREFIX:
     case WORDPREFIX:
     case DWORDPREFIX:
-    case QWORDPREFIX:
-    {
-        uint64_t integer;
-        size_t integer_size = lai_parse_integer(method + opcode_pc, &integer);
-        if (!integer_size)
-            lai_panic("failed to parse integer opcode");
-        pc += integer_size - 1;
+    case QWORDPREFIX: {
+        uint64_t value;
+        switch (opcode) {
+            case BYTEPREFIX: {
+                uint8_t temp;
+                if (lai_parse_u8(&temp, method, &pc, limit))
+                    return 1;
+                value = temp;
+                break;
+            }
+            case WORDPREFIX: {
+                uint16_t temp;
+                if (lai_parse_u16(&temp, method, &pc, limit))
+                    return 1;
+                value = temp;
+                break;
+            }
+            case DWORDPREFIX: {
+                uint32_t temp;
+                if (lai_parse_u32(&temp, method, &pc, limit))
+                    return 1;
+                value = temp;
+                break;
+            }
+            case QWORDPREFIX: {
+                if (lai_parse_u64(&value, method, &pc, limit))
+                    return 1;
+                break;
+            }
+        }
 
         if (lai_exec_reserve_opstack(state))
             return 1;
@@ -1337,7 +1345,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
             struct lai_operand *result = lai_exec_push_opstack(state);
             result->tag = LAI_OPERAND_OBJECT;
             result->object.type = LAI_INTEGER;
-            result->object.integer = integer;
+            result->object.integer = value;
         } else
             LAI_ENSURE(parse_mode == LAI_EXEC_MODE);
         break;
