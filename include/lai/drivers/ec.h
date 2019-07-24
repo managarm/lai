@@ -19,3 +19,5 @@ void lai_init_ec(lai_nsnode_t *, struct lai_ec_driver *);
 uint8_t lai_read_ec(uint8_t, struct lai_ec_driver *);
 void lai_write_ec(uint8_t, uint8_t, struct lai_ec_driver *);
 uint8_t lai_query_ec(struct lai_ec_driver *);
+
+extern const struct lai_opregion_override lai_ec_opregion_override;

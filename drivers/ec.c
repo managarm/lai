@@ -10,8 +10,6 @@
 
 #include <lai/drivers/ec.h>
 
-#define ACPI_EC_PNP_ID "PNP0C09"
-
 void lai_init_ec(lai_nsnode_t *node, struct lai_ec_driver *driver){
     LAI_CLEANUP_STATE lai_state_t state;
     lai_init_state(&state);
@@ -50,7 +48,7 @@ void lai_init_ec(lai_nsnode_t *node, struct lai_ec_driver *driver){
         lai_warn("Unknown resource type while iterating EC _CRS: %02X", type);
         return;
     }
-    driver->cmd_port = crs_it.base;
+    driver->data_port = crs_it.base;
 
     error = lai_resource_iterate(&crs_it);
     if(error == LAI_ERROR_END_REACHED){
@@ -65,25 +63,71 @@ void lai_init_ec(lai_nsnode_t *node, struct lai_ec_driver *driver){
         lai_warn("Unknown resource type while iterating EC _CRS: %02X", type);
         return;
     }
-    driver->data_port = crs_it.base;
+    driver->cmd_port = crs_it.base;
+}
+
+static void poll_ibf(struct lai_ec_driver *driver){
+    while(1){
+        uint8_t status = laihost_inb(driver->cmd_port);
+        if((status & ACPI_EC_STATUS_IBF) == 0) 
+            return;
+    }
+}
+
+static void poll_obf(struct lai_ec_driver *driver){
+    while(1){
+        uint8_t status = laihost_inb(driver->cmd_port);
+        if((status & ACPI_EC_STATUS_OBF) != 0) 
+            return;
+    }
+}
+
+
+/* While the EC is in burst mode it won't generate any SMIs or SCIs that aren't critical
+ * This is to keep the speed of the operation up and to keep the EC state consistent while we are working
+ * However disabling interrupts or anything to guarantee that nothing bothers us while working with the EC is not neccesary -
+ * since the EC will automatically drop out of Burst mode (See ACPI 6.3 Specification 12.3.3) if it has been idle for too long -
+ * or has remained in burst mode for too long.
+ */
+static void enable_burst(struct lai_ec_driver *driver){
+    laihost_outb(driver->cmd_port, ACPI_EC_BURST_ENABLE); // Spec specifies that no interrupt will be generated for this command
+    poll_obf(driver);
+    if(laihost_inb(driver->data_port) != 0x90) 
+        lai_panic("Enabling EC Burst Mode Failed");
+
+    while((laihost_inb(driver->cmd_port) & ACPI_EC_STATUS_BURST) == 0)
+        ;
+}
+
+static void disable_burst(struct lai_ec_driver *driver){
+    poll_ibf(driver);
+    laihost_outb(driver->cmd_port, ACPI_EC_BURST_DISABLE);
+    while((laihost_inb(driver->cmd_port) & ACPI_EC_STATUS_BURST) != 0)
+        ;
 }
 
 uint8_t lai_read_ec(uint8_t offset, struct lai_ec_driver *driver){
     if(driver->cmd_port == 0 || driver->data_port == 0){
         lai_warn("EC driver has not yet been initialized");
-        return;
+        return 0;
     }
 
     if(!laihost_outb || !laihost_inb)
         lai_panic("host does not provide io functions required by lai_read_ec()");
 
-    while(laihost_inb(driver->cmd_port) & (1 << ACPI_EC_STATUS_IBF))
-        ;
+    enable_burst(driver);
+
+    poll_ibf(driver);
     laihost_outb(driver->cmd_port, ACPI_EC_READ);
+
+    poll_ibf(driver);
     laihost_outb(driver->data_port, offset);
-    while(!(laihost_inb(driver->cmd_port) & (1 << ACPI_EC_STATUS_OBF)))
-        ;
-    return laihost_inb(driver->data_port);
+    
+    poll_obf(driver);
+    uint8_t ret = laihost_inb(driver->data_port);
+
+    disable_burst(driver);
+    return ret;
 }
 
 void lai_write_ec(uint8_t offset, uint8_t value, struct lai_ec_driver *driver){
@@ -92,31 +136,47 @@ void lai_write_ec(uint8_t offset, uint8_t value, struct lai_ec_driver *driver){
         return;
     }
 
-    if(!laihost_outb)
+    if(!laihost_outb || !laihost_inb)
         lai_panic("host does not provide io functions required by lai_read_ec()");
 
-    while(laihost_inb(driver->cmd_port) & (1 << ACPI_EC_STATUS_IBF))
-        ;
+    enable_burst(driver);
+
+    poll_ibf(driver);
     laihost_outb(driver->cmd_port, ACPI_EC_WRITE);
-    while(laihost_inb(driver->cmd_port) & (1 << ACPI_EC_STATUS_IBF))
-        ;
+
+    poll_ibf(driver);
     laihost_outb(driver->data_port, offset);
-    while(laihost_inb(driver->cmd_port) & (1 << ACPI_EC_STATUS_IBF))
-        ;
+
+    poll_ibf(driver);
     laihost_outb(driver->data_port, value);
+
+    disable_burst(driver);
 }
 
 uint8_t lai_query_ec(struct lai_ec_driver *driver){
     if(driver->cmd_port == 0 || driver->data_port == 0){
         lai_warn("EC driver has not yet been initialized");
-        return;
+        return 0;
     }
 
     if(!laihost_outb || !laihost_inb)
         lai_panic("host does not provide io functions required by lai_read_ec()");
 
+    enable_burst(driver);
+
     laihost_outb(driver->cmd_port, ACPI_EC_QUERY); // Spec specifies that no interrupt will be generated for this command
-    while(!(laihost_inb(driver->cmd_port) & (1 << ACPI_EC_STATUS_OBF)))
-        ;
+    poll_obf(driver);
+
+    disable_burst(driver);
     return laihost_inb(driver->data_port);
 }
+
+static uint8_t read(uint64_t offset, void *userptr){
+    return lai_read_ec(offset, userptr);
+}
+
+static void write(uint64_t offset, uint8_t value, void *userptr){
+    lai_write_ec(offset, value, userptr);
+}
+
+const struct lai_opregion_override lai_ec_opregion_override = {.readb = read, .writeb = write};
