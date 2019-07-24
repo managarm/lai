@@ -28,29 +28,6 @@ int lai_is_name(char character) {
         return 0;
 }
 
-size_t lai_parse_pkgsize(uint8_t *data, size_t *destination) {
-    destination[0] = 0;
-
-    uint8_t bytecount = (data[0] >> 6) & 3;
-    if (!bytecount)
-        destination[0] = (size_t)(data[0] & 0x3F);
-    else if (bytecount == 1){
-        destination[0] = (size_t)(data[0] & 0x0F);
-        destination[0] |= (size_t)(data[1] << 4);
-    } else if (bytecount == 2) {
-        destination[0] = (size_t)(data[0] & 0x0F);
-        destination[0] |= (size_t)(data[1] << 4);
-        destination[0] |= (size_t)(data[2] << 12);
-    } else if (bytecount == 3) {
-        destination[0] = (size_t)(data[0] & 0x0F);
-        destination[0] |= (size_t)(data[1] << 4);
-        destination[0] |= (size_t)(data[2] << 12);
-        destination[0] |= (size_t)(data[3] << 20);
-    }
-
-    return (size_t)(bytecount + 1);
-}
-
 uint16_t bswap16(uint16_t word) {
     return (uint16_t)((word >> 8) & 0xFF) | ((word << 8) & 0xFF00);
 }

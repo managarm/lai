@@ -590,6 +590,38 @@ static int lai_exec_run(lai_state_t *state) {
     return 0;
 }
 
+static size_t lai_parse_varint(size_t *out, uint8_t *code, int *pc, int limit) {
+    if (*pc + 1 > limit)
+        return 1;
+    uint8_t sz = (code[*pc] >> 6) & 3;
+    if (!sz) {
+        *out = (size_t)(code[*pc] & 0x3F);
+        (*pc)++;
+        return 0;
+    } else if (sz == 1) {
+        if (*pc + 2 > limit)
+            return 1;
+        *out = (size_t)(code[*pc] & 0x0F) | (size_t)(code[*pc + 1] << 4);
+        *pc += 2;
+        return 0;
+    } else if (sz == 2) {
+        if (*pc + 3 > limit)
+            return 1;
+        *out = (size_t)(code[*pc] & 0x0F) | (size_t)(code[*pc + 1] << 4)
+                         | (size_t)(code[*pc + 2] << 12);
+        *pc += 3;
+        return 0;
+    } else {
+        LAI_ENSURE(sz == 3);
+        if (*pc + 4 > limit)
+            return 1;
+        *out = (size_t)(code[*pc] & 0x0F) | (size_t)(code[*pc + 1] << 4)
+                         | (size_t)(code[*pc + 2] << 12) | (size_t)(code[*pc + 3] << 20);
+        *pc += 4;
+        return 0;
+    }
+}
+
 // Process the top-most item of the execution stack.
 static int lai_exec_process(lai_state_t *state) {
     lai_stackitem_t *item = lai_exec_peek_stack_back(state);
@@ -606,6 +638,7 @@ static int lai_exec_process(lai_state_t *state) {
     // If an opcode sequence contains a pkgsize, the sequence generally ends at:
     //     opcode_pc + pkgsize + opcode size.
     int opcode_pc = block->pc;
+    int limit = block->limit;
 
     // PC relative to the start of the table.
     // This matches the offsets in the output of 'iasl -l'.
@@ -997,7 +1030,8 @@ static int lai_exec_process(lai_state_t *state) {
                 switch (*(method + pc)) {
                     case 0: // ReservedField
                         pc++;
-                        pc += lai_parse_pkgsize(method + pc, &skip_bits);
+                        if (lai_parse_varint(&skip_bits, method, &pc, limit))
+                            return 1;
                         curr_off += skip_bits;
                         break;
                     case 1: // AccessField
@@ -1010,7 +1044,8 @@ static int lai_exec_process(lai_state_t *state) {
                         break;
                     default: // NamedField
                         pc += lai_amlname_parse(&field_amln, method + pc);
-                        pc += lai_parse_pkgsize(method + pc, &skip_bits);
+                        if (lai_parse_varint(&skip_bits, method, &pc, limit))
+                            return 1;
 
                         lai_nsnode_t *node = lai_create_nsnode_or_die();
                         node->type = LAI_NAMESPACE_BANK_FIELD;
@@ -1336,7 +1371,8 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
     {
         int data_pc;
         size_t encoded_size; // Size of the buffer initializer.
-        pc += lai_parse_pkgsize(method + pc, &encoded_size);
+        if (lai_parse_varint(&encoded_size, method, &pc, limit))
+            return 1;
         data_pc = pc;
         pc = opcode_pc + 1 + encoded_size;
 
@@ -1360,8 +1396,8 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         int data_pc;
         size_t encoded_size; // Size of the package initializer.
         uint8_t num_ents; // The number of elements of the package.
-        pc += lai_parse_pkgsize(method + pc, &encoded_size);
-        if (lai_parse_u8(&num_ents, method, &pc, limit))
+        if (lai_parse_varint(&encoded_size, method, &pc, limit)
+                || lai_parse_u8(&num_ents, method, &pc, limit))
             return 1;
         data_pc = pc;
         pc = opcode_pc + 1 + encoded_size;
@@ -1409,7 +1445,8 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
     {
         int body_pc;
         size_t loop_size;
-        pc += lai_parse_pkgsize(&method[pc], &loop_size);
+        if (lai_parse_varint(&loop_size, method, &pc, limit))
+            return 1;
         body_pc = pc;
         pc = opcode_pc + 1 + loop_size;
 
@@ -1500,13 +1537,15 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         int has_else = 0;
         size_t if_size;
         size_t else_size;
-        pc += lai_parse_pkgsize(method + pc, &if_size);
+        if (lai_parse_varint(&if_size, method, &pc, limit))
+            return 1;
         if_pc = pc;
         pc = opcode_pc + 1 + if_size;
         if (pc < block->limit && method[pc] == ELSE_OP) {
             has_else = 1;
             pc++;
-            pc += lai_parse_pkgsize(method + pc, &else_size);
+            if (lai_parse_varint(&else_size, method, &pc, limit))
+                return 1;
             else_pc = pc;
             pc = opcode_pc + 1 + if_size + 1 + else_size;
         }
@@ -1539,7 +1578,8 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         int nested_pc;
         size_t encoded_size;
         struct lai_amlname amln;
-        pc += lai_parse_pkgsize(method + pc, &encoded_size);
+        if (lai_parse_varint(&encoded_size, method, &pc, limit))
+            return 1;
         pc += lai_amlname_parse(&amln, method + pc);
         nested_pc = pc;
         pc = opcode_pc + 1 + encoded_size;
@@ -1572,7 +1612,8 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         int nested_pc;
         size_t encoded_size;
         struct lai_amlname amln;
-        pc += lai_parse_pkgsize(method + pc, &encoded_size);
+        if (lai_parse_varint(&encoded_size, method, &pc, limit))
+            return 1;
         pc += lai_amlname_parse(&amln, method + pc);
         nested_pc = pc;
         pc = opcode_pc + 2 + encoded_size;
@@ -1606,12 +1647,12 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
     case (EXTOP_PREFIX << 8) | PROCESSOR: {
         size_t pkgsize;
         struct lai_amlname amln;
-        uint8_t cpu_id = 0;
-        uint32_t pblk_addr = 0;
-        uint8_t pblk_len = 0;
-        pc += lai_parse_pkgsize(method + pc, &pkgsize);
+        uint8_t cpu_id;
+        uint32_t pblk_addr;
+        uint8_t pblk_len;
+        if (lai_parse_varint(&pkgsize, method, &pc, limit))
+            return 1;
         pc += lai_amlname_parse(&amln, method + pc);
-        cpu_id = *(method + pc);
         if (lai_parse_u8(&cpu_id, method, &pc, limit)
                 || lai_parse_u32(&pblk_addr, method, &pc, limit)
                 || lai_parse_u8(&pblk_len, method, &pc, limit))
@@ -1654,7 +1695,8 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         int nested_pc;
         size_t encoded_size;
         struct lai_amlname amln;
-        pc += lai_parse_pkgsize(method + pc, &encoded_size);
+        if (lai_parse_varint(&encoded_size, method, &pc, limit))
+            return 1;
         pc += lai_amlname_parse(&amln, method + pc);
 //            uint8_t system_level = method[pc];
         pc++;
@@ -1694,7 +1736,8 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         int nested_pc;
         size_t encoded_size;
         struct lai_amlname amln;
-        pc += lai_parse_pkgsize(method + pc, &encoded_size);
+        if (lai_parse_varint(&encoded_size, method, &pc, limit))
+            return 1;
         pc += lai_amlname_parse(&amln, method + pc);
         nested_pc = pc;
         pc = opcode_pc + 2 + encoded_size;
@@ -1731,7 +1774,8 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         size_t encoded_size;
         struct lai_amlname amln;
         uint8_t flags;
-        pc += lai_parse_pkgsize(method + pc, &encoded_size);
+        if (lai_parse_varint(&encoded_size, method, &pc, limit))
+            return 1;
         pc += lai_amlname_parse(&amln, method + pc);
         if (lai_parse_u8(&flags, method, &pc, limit))
             return 1;
@@ -1851,9 +1895,10 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         break;
     }
     case (EXTOP_PREFIX << 8) | FIELD: {
-        struct lai_amlname region_amln;
         size_t pkgsize;
-        pc += lai_parse_pkgsize(method + pc, &pkgsize);
+        struct lai_amlname region_amln;
+        if (lai_parse_varint(&pkgsize, method, &pc, limit))
+            return 1;
         pc += lai_amlname_parse(&region_amln, method + pc);
 
         int end_pc = opcode_pc + 2 + pkgsize;
@@ -1876,7 +1921,8 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
             switch (*(method + pc)) {
                 case 0: // ReservedField
                     pc++;
-                    pc += lai_parse_pkgsize(method + pc, &skip_bits);
+                    if (lai_parse_varint(&skip_bits, method, &pc, limit))
+                        return 1;
                     curr_off += skip_bits;
                     break;
                 case 1: // AccessField
@@ -1889,7 +1935,8 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
                     break;
                 default: // NamedField
                     pc += lai_amlname_parse(&field_amln, method + pc);
-                    pc += lai_parse_pkgsize(method + pc, &skip_bits);
+                    if (lai_parse_varint(&skip_bits, method, &pc, limit))
+                        return 1;
 
                     lai_nsnode_t *node = lai_create_nsnode_or_die();
                     node->type = LAI_NAMESPACE_FIELD;
@@ -1911,10 +1958,11 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         break;
     }
     case (EXTOP_PREFIX << 8) | INDEXFIELD: {
+        size_t pkgsize;
         struct lai_amlname index_amln;
         struct lai_amlname data_amln;
-        size_t pkgsize;
-        pc += lai_parse_pkgsize(method + pc, &pkgsize);
+        if (lai_parse_varint(&pkgsize, method, &pc, limit))
+            return 1;
         pc += lai_amlname_parse(&index_amln, method + pc);
         pc += lai_amlname_parse(&data_amln, method + pc);
 
@@ -1936,7 +1984,8 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
             switch (*(method + pc)) {
                 case 0: // ReservedField
                     pc++;
-                    pc += lai_parse_pkgsize(method + pc, &skip_bits);
+                    if (lai_parse_varint(&skip_bits, method, &pc, limit))
+                        return 1;
                     curr_off += skip_bits;
                     break;
                 case 1: // AccessField
@@ -1949,7 +1998,8 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
                     break;
                 default: // NamedField
                     pc += lai_amlname_parse(&field_amln, method + pc);
-                    pc += lai_parse_pkgsize(method + pc, &skip_bits);
+                    if (lai_parse_varint(&skip_bits, method, &pc, limit))
+                        return 1;
 
                     lai_nsnode_t *node = lai_create_nsnode_or_die();
                     node->type = LAI_NAMESPACE_INDEXFIELD;
@@ -1973,10 +2023,11 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
     }
 
     case (EXTOP_PREFIX << 8) | BANKFIELD: {
+        size_t pkgsize;
         struct lai_amlname region_amln;
         struct lai_amlname bank_amln;
-        size_t pkgsize;
-        pc += lai_parse_pkgsize(method + pc, &pkgsize);
+        if (lai_parse_varint(&pkgsize, method, &pc, limit))
+            return 1;
         pc += lai_amlname_parse(&region_amln, method + pc);
         pc += lai_amlname_parse(&bank_amln, method + pc);
 
