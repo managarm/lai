@@ -8,8 +8,6 @@
 /* OperationRegions allow ACPI's AML to access I/O ports, system memory, system
  * CMOS, PCI config, and other hardware used for I/O with the chipset. */
 
-// TODO: Implement support for the embedded controller, because some hardware uses it.
-
 #include <lai/core.h>
 #include "aml_opcodes.h"
 #include "libc.h"
