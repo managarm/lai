@@ -18,6 +18,18 @@ struct lai_aml_segment {
     size_t index;
 };
 
+struct lai_opregion_override {
+    uint8_t  (*readb)(uint64_t, void *);
+    uint16_t (*readw)(uint64_t, void *);
+    uint32_t (*readd)(uint64_t, void *);
+    uint64_t (*readq)(uint64_t, void *);
+
+    void (*writeb)(uint64_t, uint8_t,  void *);
+    void (*writew)(uint64_t, uint16_t, void *);
+    void (*writed)(uint64_t, uint32_t, void *);
+    void (*writeq)(uint64_t, uint64_t, void *);
+};
+
 #define LAI_NAMESPACE_ROOT          1
 #define LAI_NAMESPACE_NAME          2
 #define LAI_NAMESPACE_ALIAS         3
@@ -32,6 +44,7 @@ struct lai_aml_segment {
 #define LAI_NAMESPACE_EVENT         12
 #define LAI_NAMESPACE_POWER_RES     13
 #define LAI_NAMESPACE_BANK_FIELD    14
+#define LAI_NAMESPACE_OPREGION      15
 
 typedef struct lai_nsnode
 {
@@ -44,18 +57,12 @@ typedef struct lai_nsnode
 
     lai_variable_t object;        // for Name()
 
-    uint8_t op_address_space;    // for OpRegions only
-    uint64_t op_base;        // for OpRegions only
-    uint64_t op_length;        // for OpRegions only
-
     uint8_t method_flags;        // for Methods only, includes ARG_COUNT in lowest three bits
     // Allows the OS to override methods. Mainly useful for _OSI, _OS and _REV.
     int (*method_override)(lai_variable_t *args, lai_variable_t *result);
 
     // TODO: Find a good mechanism for locks.
     //lai_lock_t mutex;        // for Mutex
-
-                // for Processor
 
     union {
         struct lai_nsnode *al_target; // LAI_NAMESPACE_ALIAS.
@@ -91,6 +98,13 @@ typedef struct lai_nsnode
             uint8_t cpu_id;
             uint32_t pblk_addr;
             uint8_t pblk_len;
+        };
+        struct { // LAI_NAMESPACE_OPREGION
+            uint8_t op_address_space;
+            uint64_t op_base;
+            uint64_t op_length;
+            const struct lai_opregion_override *op_override;
+            void *op_userptr;
         };
     };
 

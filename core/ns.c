@@ -691,3 +691,14 @@ lai_nsnode_t *lai_ns_child_iterate(struct lai_ns_child_iterator *iter) {
 
     return NULL;
 }
+
+lai_api_error_t lai_ns_override_opregion(lai_nsnode_t *node, const struct lai_opregion_override *override, void *userptr){
+    if(node->type != LAI_NAMESPACE_OPREGION){
+        lai_warn("Tried to override opregion functions for non-opregion");
+        return LAI_ERROR_TYPE_MISMATCH;
+    }
+
+    node->op_override = override;
+    node->op_userptr = userptr;
+    return LAI_ERROR_NONE;
+}

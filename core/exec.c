@@ -142,6 +142,7 @@ static void lai_exec_reduce_node(int opcode, lai_state_t *state, struct lai_oper
 
             lai_nsnode_t *node = lai_create_nsnode_or_die();
             lai_do_resolve_new_node(node, ctx_handle, &amln);
+            node->type = LAI_NAMESPACE_OPREGION;
             node->op_address_space = operands[1].object.integer;
             node->op_base = base.integer;
             node->op_length = size.integer;
