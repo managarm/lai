@@ -693,6 +693,10 @@ lai_nsnode_t *lai_ns_child_iterate(struct lai_ns_child_iterator *iter) {
 }
 
 lai_api_error_t lai_ns_override_opregion(lai_nsnode_t *node, const struct lai_opregion_override *override, void *userptr){
+    if(node == NULL){
+        lai_warn("node passed to lai_ns_override_opregion is NULL");
+        return LAI_ERROR_ILLEGAL_ARGUMENTS;
+    }
     if(node->type != LAI_NAMESPACE_OPREGION){
         lai_warn("Tried to override opregion functions for non-opregion");
         return LAI_ERROR_TYPE_MISMATCH;
@@ -701,4 +705,45 @@ lai_api_error_t lai_ns_override_opregion(lai_nsnode_t *node, const struct lai_op
     node->op_override = override;
     node->op_userptr = userptr;
     return LAI_ERROR_NONE;
+}
+
+enum lai_node_type lai_ns_get_node_type(lai_nsnode_t *node){
+    if(node == NULL){
+        lai_warn("node passed to lai_ns_get_node_type is NULL");
+        return LAI_ERROR_ILLEGAL_ARGUMENTS;
+    }
+
+    switch (node->type){
+    case LAI_NAMESPACE_ROOT:
+        return LAI_NODETYPE_ROOT;
+    case LAI_NAMESPACE_NAME:
+        return LAI_NODETYPE_EVALUATABLE;
+    case LAI_NAMESPACE_ALIAS:
+        return LAI_NODETYPE_EVALUATABLE;
+    case LAI_NAMESPACE_FIELD:
+        return LAI_NODETYPE_EVALUATABLE;
+    case LAI_NAMESPACE_METHOD:
+        return LAI_NODETYPE_EVALUATABLE;
+    case LAI_NAMESPACE_DEVICE:
+        return LAI_NODETYPE_DEVICE;
+    case LAI_NAMESPACE_MUTEX:
+        return LAI_NODETYPE_MUTEX;
+    case LAI_NAMESPACE_PROCESSOR:
+        return LAI_NODETYPE_PROCESSOR;
+    case LAI_NAMESPACE_BUFFER_FIELD:
+        return LAI_NODETYPE_EVALUATABLE;
+    case LAI_NAMESPACE_THERMALZONE:
+        return LAI_NODETYPE_THERMALZONE;
+    case LAI_NAMESPACE_EVENT:
+        return LAI_NODETYPE_EVENT;
+    case LAI_NAMESPACE_POWERRESOURCE:
+        return LAI_NODETYPE_POWERRESOURCE;
+    case LAI_NAMESPACE_BANK_FIELD:
+        return LAI_NODETYPE_EVALUATABLE;
+    case LAI_NAMESPACE_OPREGION:
+        return LAI_NODETYPE_OPREGION;
+    default:
+        return LAI_NODETYPE_NULL;
+        break;
+    }
 }

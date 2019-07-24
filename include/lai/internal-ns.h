@@ -30,6 +30,19 @@ struct lai_opregion_override {
     void (*writeq)(uint64_t, uint64_t, void *);
 };
 
+enum lai_node_type {
+    LAI_NODETYPE_NULL,
+    LAI_NODETYPE_ROOT,
+    LAI_NODETYPE_EVALUATABLE,
+    LAI_NODETYPE_DEVICE,
+    LAI_NODETYPE_MUTEX,
+    LAI_NODETYPE_PROCESSOR,
+    LAI_NODETYPE_THERMALZONE,
+    LAI_NODETYPE_EVENT,
+    LAI_NODETYPE_POWERRESOURCE,
+    LAI_NODETYPE_OPREGION,
+};
+
 #define LAI_NAMESPACE_ROOT          1
 #define LAI_NAMESPACE_NAME          2
 #define LAI_NAMESPACE_ALIAS         3
@@ -42,7 +55,7 @@ struct lai_opregion_override {
 #define LAI_NAMESPACE_BUFFER_FIELD  10
 #define LAI_NAMESPACE_THERMALZONE   11
 #define LAI_NAMESPACE_EVENT         12
-#define LAI_NAMESPACE_POWER_RES     13
+#define LAI_NAMESPACE_POWERRESOURCE 13
 #define LAI_NAMESPACE_BANK_FIELD    14
 #define LAI_NAMESPACE_OPREGION      15
 

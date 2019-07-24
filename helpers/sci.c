@@ -135,7 +135,7 @@ void lai_init_children(lai_nsnode_t *parent) {
     struct lai_ns_child_iterator iter = LAI_NS_CHILD_ITERATOR_INITIALIZER(parent);
 
     while ((node = lai_ns_child_iterate(&iter))) {
-        if (node->type == LAI_NAMESPACE_DEVICE) {
+        if (lai_ns_get_node_type(node) == LAI_NODETYPE_DEVICE) {
             int sta = lai_evaluate_sta(node);
 
             /* if device is present, evaluate its _INI */

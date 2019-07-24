@@ -1725,7 +1725,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         lai_exec_commit_pc(state, pc);
 
         lai_nsnode_t *node = lai_create_nsnode_or_die();
-        node->type = LAI_NAMESPACE_POWER_RES;
+        node->type = LAI_NAMESPACE_POWERRESOURCE;
         lai_do_resolve_new_node(node, ctx_handle, &amln);
         lai_install_nsnode(node);
         if (invocation)
