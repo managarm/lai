@@ -10,6 +10,30 @@
 
 #include <lai/drivers/ec.h>
 
+void lai_early_init_ec(struct lai_ec_driver *driver){
+    if(!laihost_scan)
+        lai_panic("host does not implement laihost_scan required for lai_early_init_ec");
+
+    acpi_ecdt_t *ecdt = laihost_scan(ACPI_ECDT_ID, 0);
+    if(!ecdt) {
+        lai_warn("Couldn't find ECDT for initializing EC");
+        return;
+    }
+
+    // TODO: Support MMIO like the spec states
+    if(ecdt->ec_control.address_space != ACPI_GAS_IO) {
+        lai_warn("Unsupported ECDT Command address space %02X", ecdt->ec_control.address_space);
+        return;
+    }
+    driver->cmd_port = ecdt->ec_control.base;
+
+    if(ecdt->ec_data.address_space != ACPI_GAS_IO) {
+        lai_warn("Unsupported ECDT Data address space %02X", ecdt->ec_data.address_space);
+        return;
+    }
+    driver->data_port = ecdt->ec_data.base;
+}
+
 void lai_init_ec(lai_nsnode_t *node, struct lai_ec_driver *driver){
     LAI_CLEANUP_STATE lai_state_t state;
     lai_init_state(&state);

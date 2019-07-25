@@ -5,6 +5,9 @@
 
 #pragma once
 
+// Embedded Controller Table ID
+#define ACPI_ECDT_ID "ECDT"
+
 // Embedded Controller Plug-n-Play ID
 #define ACPI_EC_PNP_ID "PNP0C09"
 

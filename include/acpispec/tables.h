@@ -128,6 +128,15 @@ typedef struct acpi_fadt_t
     acpi_gas_t x_gpe1_block;
 }__attribute__((packed)) acpi_fadt_t;
 
+typedef struct acpi_ecdt_t {
+    acpi_header_t header;
+    acpi_gas_t ec_control;
+    acpi_gas_t ec_data;
+    uint32_t uid;
+    uint8_t gpe_bit;
+    uint8_t ec_id[];
+}__attribute__((packed)) acpi_ecdt_t;
+
 typedef struct acpi_aml_t        // AML tables, DSDT and SSDT
 {
     acpi_header_t header;
