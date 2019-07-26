@@ -175,6 +175,21 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
         lai_var_finalize(&out);
         break;
     }
+    case COPYOBJECT_OP: {
+        lai_variable_t objectref = {0};
+        lai_variable_t out = {0};
+        lai_exec_get_objectref(state, &operands[0], &objectref);
+
+        lai_obj_clone(&result, &objectref);
+
+        // Store a copy to the target operand.
+        lai_obj_clone(&out, &result);
+        lai_operand_store_overwrite(state, &operands[1], &result);
+
+        lai_var_finalize(&objectref);
+        lai_var_finalize(&out);
+        break;
+    }
     case NOT_OP:
     {
         lai_variable_t operand = {0};
@@ -2166,6 +2181,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
     }
 
     case STORE_OP:
+    case COPYOBJECT_OP:
     case NOT_OP: {
         if (lai_exec_reserve_stack(state))
             return 1;

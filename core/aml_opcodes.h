@@ -67,6 +67,7 @@
 #define LEQUAL_OP			0x93
 #define LGREATER_OP			0x94
 #define LLESS_OP			0x95
+#define COPYOBJECT_OP		0x9D
 #define CONTINUE_OP			0x9F
 #define IF_OP				0xA0
 #define ELSE_OP				0xA1
