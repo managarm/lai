@@ -440,6 +440,17 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
         lai_exec_get_objectref(state, &operands[0], &ref);
 
         switch (ref.type) {
+            // TODO: DeRefOf() can take strings!
+            //       It resolves them to objects and returns the contents.
+            case LAI_ARG_REF:
+                lai_obj_clone(&result, &ref.iref_invocation->arg[ref.iref_index]);
+                break;
+            case LAI_LOCAL_REF:
+                lai_obj_clone(&result, &ref.iref_invocation->local[ref.iref_index]);
+                break;
+            case LAI_NODE_REF:
+                lai_exec_access(&result, ref.handle);
+                break;
             case LAI_STRING_INDEX: {
                 char *window = ref.string_ptr->content;
                 result.type = LAI_INTEGER;
@@ -453,10 +464,11 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
                 break;
             }
             case LAI_PACKAGE_INDEX:
+                // TODO: We need to panic if we load an uninitialized entry.
                 lai_exec_pkg_var_load(&result, ref.pkg_ptr, ref.integer);
                 break;
             default:
-                lai_panic("DeRefOf() is only defined for references");
+                lai_panic("Unexpected object type %d for DeRefOf()", ref.type);
         }
 
         break;
@@ -485,24 +497,54 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
 
         break;
     }
-    case (EXTOP_PREFIX << 8) | CONDREF_OP:
-    {
+    case REFOF_OP: {
+        struct lai_operand *operand = &operands[0];
+
+        // TODO: The resolution code should be shared with CONDREF_OP.
+        lai_variable_t ref = {0};
+        switch (operand->tag) {
+            case LAI_ARG_NAME: {
+                struct lai_ctxitem *ctxitem = lai_exec_peek_ctxstack_back(state);
+                LAI_ENSURE(ctxitem->invocation);
+                ref.type = LAI_ARG_REF;
+                ref.iref_invocation = ctxitem->invocation;
+                ref.iref_index = operand->index;
+                break;
+            }
+            case LAI_LOCAL_NAME: {
+                struct lai_ctxitem *ctxitem = lai_exec_peek_ctxstack_back(state);
+                LAI_ENSURE(ctxitem->invocation);
+                ref.type = LAI_LOCAL_REF;
+                ref.iref_invocation = ctxitem->invocation;
+                ref.iref_index = operand->index;
+                break;
+            }
+            case LAI_RESOLVED_NAME:
+                ref.type = LAI_NODE_REF;
+                ref.handle = operand->handle;
+                break;
+            default:
+                lai_panic("Unexpected operand tag %d for RefOf()", operand->tag);
+        }
+
+        lai_var_move(&result, &ref);
+        break;
+    }
+    case (EXTOP_PREFIX << 8) | CONDREF_OP: {
         struct lai_operand *operand = &operands[0];
         struct lai_operand *target = &operands[1];
 
-        // TODO: The resolution code should be shared with REF_OP.
+        // TODO: The resolution code should be shared with REFOF_OP.
         lai_variable_t ref = {0};
         switch (operand->tag) {
             case LAI_RESOLVED_NAME:
-            {
                 if (operand->handle) {
                     ref.type = LAI_HANDLE;
                     ref.handle = operand->handle;
                 }
                 break;
-            }
             default:
-                lai_panic("Unexpected operand tag %d for CondRefOp()", operand->tag);
+                lai_panic("Unexpected operand tag %d for CondRefOf()", operand->tag);
         }
 
         if (ref.type) {
@@ -2315,6 +2357,20 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         op_item->op_opcode = opcode;
         op_item->opstack_frame = state->opstack_ptr;
         op_item->op_arg_modes[0] = LAI_OBJECT_MODE;
+        op_item->op_arg_modes[1] = 0;
+        op_item->op_want_result = want_result;
+        break;
+    }
+    case REFOF_OP: {
+        if (lai_exec_reserve_stack(state))
+            return 1;
+        lai_exec_commit_pc(state, pc);
+
+        lai_stackitem_t *op_item = lai_exec_push_stack(state);
+        op_item->kind = LAI_OP_STACKITEM;
+        op_item->op_opcode = opcode;
+        op_item->opstack_frame = state->opstack_ptr;
+        op_item->op_arg_modes[0] = LAI_REFERENCE_MODE;
         op_item->op_arg_modes[1] = 0;
         op_item->op_want_result = want_result;
         break;

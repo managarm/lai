@@ -11,6 +11,16 @@
 // struct lai_variable.
 // ----------------------------------------------------------------------------
 
+/* There are several things to note about handles, references and indices:
+ * - Handles and references are distinct types!
+ *   For example, handles to methods can be created in constant package data.
+ *   Those handles are distinct from references returned by RefOf(MTHD).
+ * - References bind to the variable (LOCALx, ARGx or the namespace node),
+ *   while indices bind to the object (e.g., the package inside a LOCALx).
+ *   This means that, if a package in a LOCALx variable is replaced by another package,
+ *   existing indices still refer to the old package, while existing references
+ *   will see the new package. */
+
 // Value types: integer, string, buffer, package.
 #define LAI_INTEGER            1
 #define LAI_STRING             2
@@ -19,10 +29,14 @@
 // Handle type: this is used to represent device (and other) namespace nodes.
 #define LAI_HANDLE             5
 #define LAI_LAZY_HANDLE        6
-// Reference types: obtained from RefOp() or Index().
-#define LAI_STRING_INDEX       7
-#define LAI_BUFFER_INDEX       8
-#define LAI_PACKAGE_INDEX      9
+// Reference types: obtained from RefOf() or CondRefOf()
+#define LAI_ARG_REF            7
+#define LAI_LOCAL_REF          8
+#define LAI_NODE_REF           9
+// Index types: obtained from Index().
+#define LAI_STRING_INDEX      10
+#define LAI_BUFFER_INDEX      11
+#define LAI_PACKAGE_INDEX     12
 
 typedef struct lai_variable_t
 {
@@ -36,6 +50,10 @@ typedef struct lai_variable_t
         struct {
             struct lai_nsnode *unres_ctx_handle;
             const uint8_t *unres_aml;
+        };
+        struct { // LAI_ARG_REF and LAI_LOCAL_REF.
+            struct lai_invocation *iref_invocation;
+            int iref_index;
         };
     };
 

@@ -41,6 +41,7 @@
 #define ARG5_OP				0x6D
 #define ARG6_OP				0x6E
 #define STORE_OP			0x70
+#define REFOF_OP			0x71
 #define ADD_OP				0x72
 #define SUBTRACT_OP			0x74
 #define INCREMENT_OP			0x75
