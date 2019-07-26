@@ -96,22 +96,17 @@ static void lai_exec_reduce_node(int opcode, lai_state_t *state, struct lai_oper
         case QWORDFIELD_OP: {
             lai_variable_t offset = {0};
             lai_exec_get_integer(state, &operands[1], &offset);
-            LAI_ENSURE(operands[0].tag == LAI_UNRESOLVED_NAME);
+            LAI_ENSURE(operands[0].tag == LAI_RESOLVED_NAME);
             LAI_ENSURE(operands[2].tag == LAI_UNRESOLVED_NAME);
 
-            struct lai_amlname buffer_amln;
             struct lai_amlname node_amln;
-            lai_amlname_parse(&buffer_amln, operands[0].unres_aml);
             lai_amlname_parse(&node_amln, operands[2].unres_aml);
 
             lai_nsnode_t *node = lai_create_nsnode_or_die();
             node->type = LAI_NAMESPACE_BUFFER_FIELD;
             lai_do_resolve_new_node(node, operands[2].unres_ctx_handle, &node_amln);
 
-            lai_nsnode_t *buffer_node = lai_do_resolve(operands[0].unres_ctx_handle, &buffer_amln);
-            if (!buffer_node)
-                lai_panic("could not resolve buffer of buffer field");
-            node->bf_node = buffer_node;
+            node->bf_node = operands[0].handle;
 
             switch (opcode) {
                 case BITFIELD_OP: node->bf_size = 1; break;
@@ -174,7 +169,7 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
         // Store a copy to the target operand.
         // TODO: Verify that we HAVE to make a copy.
         lai_obj_clone(&out, &result);
-        lai_store(state, &operands[1], &result);
+        lai_operand_store_implicit(state, &operands[1], &result);
 
         lai_var_finalize(&objectref);
         lai_var_finalize(&out);
@@ -187,7 +182,7 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
 
         result.type = LAI_INTEGER;
         result.integer = ~operand.integer;
-        lai_store(state, &operands[1], &result);
+        lai_operand_store_implicit(state, &operands[1], &result);
         break;
     }
     case ADD_OP:
@@ -199,7 +194,7 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
 
         result.type = LAI_INTEGER;
         result.integer = lhs.integer + rhs.integer;
-        lai_store(state, &operands[2], &result);
+        lai_operand_store_implicit(state, &operands[2], &result);
         break;
     }
     case SUBTRACT_OP:
@@ -211,7 +206,7 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
 
         result.type = LAI_INTEGER;
         result.integer = lhs.integer - rhs.integer;
-        lai_store(state, &operands[2], &result);
+        lai_operand_store_implicit(state, &operands[2], &result);
         break;
     }
     case MULTIPLY_OP:
@@ -223,7 +218,7 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
 
         result.type = LAI_INTEGER;
         result.integer = lhs.integer * rhs.integer;
-        lai_store(state, &operands[2], &result);
+        lai_operand_store_implicit(state, &operands[2], &result);
         break;
     }
     case AND_OP:
@@ -235,7 +230,7 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
 
         result.type = LAI_INTEGER;
         result.integer = lhs.integer & rhs.integer;
-        lai_store(state, &operands[2], &result);
+        lai_operand_store_implicit(state, &operands[2], &result);
         break;
     }
     case OR_OP:
@@ -247,7 +242,7 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
 
         result.type = LAI_INTEGER;
         result.integer = lhs.integer | rhs.integer;
-        lai_store(state, &operands[2], &result);
+        lai_operand_store_implicit(state, &operands[2], &result);
         break;
     }
     case XOR_OP:
@@ -259,7 +254,7 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
 
         result.type = LAI_INTEGER;
         result.integer = lhs.integer ^ rhs.integer;
-        lai_store(state, &operands[2], &result);
+        lai_operand_store_implicit(state, &operands[2], &result);
         break;
     }
     case SHL_OP:
@@ -271,7 +266,7 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
 
         result.type = LAI_INTEGER;
         result.integer = lhs.integer << rhs.integer;
-        lai_store(state, &operands[2], &result);
+        lai_operand_store_implicit(state, &operands[2], &result);
         break;
     }
     case SHR_OP:
@@ -283,7 +278,7 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
 
         result.type = LAI_INTEGER;
         result.integer = lhs.integer >> rhs.integer;
-        lai_store(state, &operands[2], &result);
+        lai_operand_store_implicit(state, &operands[2], &result);
         break;
     }
     case DIVIDE_OP:
@@ -299,20 +294,24 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
         div.type = LAI_INTEGER;
         mod.integer = lhs.integer % rhs.integer;
         div.integer = lhs.integer / rhs.integer;
-        lai_store(state, &operands[2], &mod);
-        lai_store(state, &operands[3], &div);
+        lai_operand_store_implicit(state, &operands[2], &mod);
+        lai_operand_store_implicit(state, &operands[3], &div);
         break;
     }
-    case INCREMENT_OP:
-        lai_exec_get_integer(state, operands, &result);
+    case INCREMENT_OP: {
+        lai_operand_load(state, operands, &result);
+        LAI_ENSURE(result.type == LAI_INTEGER);
         result.integer++;
-        lai_store(state, operands, &result);
+        lai_operand_store_implicit(state, operands, &result);
         break;
-    case DECREMENT_OP:
-        lai_exec_get_integer(state, operands, &result);
+    }
+    case DECREMENT_OP: {
+        lai_operand_load(state, operands, &result);
+        LAI_ENSURE(result.type == LAI_INTEGER);
         result.integer--;
-        lai_store(state, operands, &result);
+        lai_operand_store_implicit(state, operands, &result);
         break;
+    }
     case LNOT_OP:
     {
         lai_variable_t operand = {0};
@@ -417,7 +416,7 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
         lai_var_finalize(&object);
 
         // TODO: Verify that we do NOT have to make a copy.
-        lai_store(state, &operands[2], &result);
+        lai_operand_store_implicit(state, &operands[2], &result);
         break;
     }
     case DEREF_OP:
@@ -479,26 +478,22 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
         // TODO: The resolution code should be shared with REF_OP.
         lai_variable_t ref = {0};
         switch (operand->tag) {
-            case LAI_UNRESOLVED_NAME:
+            case LAI_RESOLVED_NAME:
             {
-                struct lai_amlname amln;
-                lai_amlname_parse(&amln, operand->unres_aml);
-
-                lai_nsnode_t *handle = lai_do_resolve(operand->unres_ctx_handle, &amln);
-                if (handle) {
+                if (operand->handle) {
                     ref.type = LAI_HANDLE;
-                    ref.handle = handle;
+                    ref.handle = operand->handle;
                 }
                 break;
             }
             default:
-                lai_panic("CondRefOp() is only defined for names");
+                lai_panic("Unexpected operand tag %d for CondRefOp()", operand->tag);
         }
 
         if (ref.type) {
             result.type = LAI_INTEGER;
             result.integer = 1;
-            lai_store(state, target, &ref);
+            lai_operand_store_implicit(state, target, &ref);
         } else {
             result.type = LAI_INTEGER;
             result.integer = 0;
@@ -1181,7 +1176,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         if (debug_opcodes)
             path = lai_stringify_amlname(&amln);
 
-        if (parse_mode == LAI_REFERENCE_MODE) {
+        if (parse_mode == LAI_UNRESOLVED_MODE) {
             if (debug_opcodes)
                 lai_debug("parsing name %s [@ 0x%x]", path, table_pc);
 
@@ -1189,6 +1184,19 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
             opstack_res->tag = LAI_UNRESOLVED_NAME;
             opstack_res->unres_ctx_handle = ctx_handle;
             opstack_res->unres_aml = method + opcode_pc;
+        } else if (parse_mode == LAI_REFERENCE_MODE
+                || parse_mode == LAI_OPTIONAL_REFERENCE_MODE) {
+            if (debug_opcodes)
+                lai_debug("parsing name %s [@ 0x%x]", path, table_pc);
+
+            lai_nsnode_t *handle = lai_do_resolve(ctx_handle, &amln);
+            if (parse_mode == LAI_REFERENCE_MODE && !handle)
+                lai_panic("undefined reference %s in object mode",
+                        lai_stringify_amlname(&amln));
+
+            struct lai_operand *opstack_res = lai_exec_push_opstack(state);
+            opstack_res->tag = LAI_RESOLVED_NAME;
+            opstack_res->handle = handle;
         }else if (parse_mode == LAI_DATA_MODE) {
             if (debug_opcodes)
                 lai_debug("parsing name %s [@ 0x%x]", path, table_pc);
@@ -1223,10 +1231,13 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
                 if (debug_opcodes)
                     lai_debug("parsing name %s [@ 0x%x]", path, table_pc);
 
+                LAI_CLEANUP_VAR lai_variable_t result = LAI_VAR_INITIALIZER;
+                lai_exec_access(&result, handle);
+
                 if (want_result) {
                     struct lai_operand *opstack_res = lai_exec_push_opstack(state);
-                    opstack_res->tag = LAI_RESOLVED_NAME;
-                    opstack_res->handle = handle;
+                    opstack_res->tag = LAI_OPERAND_OBJECT;
+                    lai_var_move(&opstack_res->object, &result);
                 }
             }
         }
@@ -1269,7 +1280,8 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
             result->tag = LAI_OPERAND_OBJECT;
             result->object.type = LAI_INTEGER;
             result->object.integer = 0;
-        } else if (parse_mode == LAI_REFERENCE_MODE) {
+        } else if (parse_mode == LAI_REFERENCE_MODE
+                || parse_mode == LAI_OPTIONAL_REFERENCE_MODE) {
             // In target mode, ZERO_OP generates a null target and not an integer!
             struct lai_operand *result = lai_exec_push_opstack(state);
             result->tag = LAI_NULL_NAME;
@@ -1818,7 +1830,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         node_item->kind = LAI_NODE_STACKITEM;
         node_item->node_opcode = opcode;
         node_item->opstack_frame = state->opstack_ptr;
-        node_item->node_arg_modes[0] = LAI_REFERENCE_MODE;
+        node_item->node_arg_modes[0] = LAI_UNRESOLVED_MODE;
         node_item->node_arg_modes[1] = LAI_OBJECT_MODE;
         node_item->node_arg_modes[2] = 0;
         break;
@@ -1859,7 +1871,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         node_item->opstack_frame = state->opstack_ptr;
         node_item->node_arg_modes[0] = LAI_REFERENCE_MODE;
         node_item->node_arg_modes[1] = LAI_OBJECT_MODE;
-        node_item->node_arg_modes[2] = LAI_REFERENCE_MODE;
+        node_item->node_arg_modes[2] = LAI_UNRESOLVED_MODE;
         node_item->node_arg_modes[3] = 0;
         break;
     }
@@ -1903,7 +1915,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         node_item->kind = LAI_NODE_STACKITEM;
         node_item->node_opcode = opcode;
         node_item->opstack_frame = state->opstack_ptr;
-        node_item->node_arg_modes[0] = LAI_REFERENCE_MODE;
+        node_item->node_arg_modes[0] = LAI_UNRESOLVED_MODE;
         node_item->node_arg_modes[1] = LAI_IMMEDIATE_BYTE_MODE;
         node_item->node_arg_modes[2] = LAI_OBJECT_MODE;
         node_item->node_arg_modes[3] = LAI_OBJECT_MODE;
@@ -2091,11 +2103,17 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
             return 1;
         lai_exec_commit_pc(state, pc);
 
-        if (parse_mode == LAI_OBJECT_MODE
-                || parse_mode == LAI_REFERENCE_MODE) {
-            struct lai_operand *result = lai_exec_push_opstack(state);
-            result->tag = LAI_ARG_NAME;
-            result->index = opcode - ARG0_OP;
+        if (parse_mode == LAI_REFERENCE_MODE
+                || parse_mode == LAI_OPTIONAL_REFERENCE_MODE) {
+            struct lai_operand *opstack_res = lai_exec_push_opstack(state);
+            opstack_res->tag = LAI_ARG_NAME;
+            opstack_res->index = opcode - ARG0_OP;
+        } else {
+            LAI_ENSURE(parse_mode == LAI_OBJECT_MODE);
+            struct lai_operand *opstack_res = lai_exec_push_opstack(state);
+            opstack_res->tag = LAI_OPERAND_OBJECT;
+            LAI_ENSURE(invocation);
+            lai_var_assign(&opstack_res->object, &invocation->arg[opcode - ARG0_OP]);
         }
         break;
     }
@@ -2112,11 +2130,17 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
             return 1;
         lai_exec_commit_pc(state, pc);
 
-        if(parse_mode == LAI_OBJECT_MODE
-                || parse_mode == LAI_REFERENCE_MODE) {
-            struct lai_operand *result = lai_exec_push_opstack(state);
-            result->tag = LAI_LOCAL_NAME;
-            result->index = opcode - LOCAL0_OP;
+        if(parse_mode == LAI_REFERENCE_MODE
+                || parse_mode == LAI_OPTIONAL_REFERENCE_MODE) {
+            struct lai_operand *opstack_res = lai_exec_push_opstack(state);
+            opstack_res->tag = LAI_LOCAL_NAME;
+            opstack_res->index = opcode - LOCAL0_OP;
+        } else {
+            LAI_ENSURE(parse_mode == LAI_OBJECT_MODE);
+            struct lai_operand *opstack_res = lai_exec_push_opstack(state);
+            opstack_res->tag = LAI_OPERAND_OBJECT;
+            LAI_ENSURE(invocation);
+            lai_var_assign(&opstack_res->object, &invocation->local[opcode - LOCAL0_OP]);
         }
         break;
     }
@@ -2133,11 +2157,11 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
             return 1;
         lai_exec_commit_pc(state, pc);
 
-        if(parse_mode == LAI_OBJECT_MODE
-                || parse_mode == LAI_REFERENCE_MODE) {
-            struct lai_operand *result = lai_exec_push_opstack(state);
-            result->tag = LAI_DEBUG_NAME;
-        }
+        // Accessing (i.e., loading from) the Debug object is not supported yet.
+        LAI_ENSURE(parse_mode == LAI_REFERENCE_MODE
+                   || parse_mode == LAI_OPTIONAL_REFERENCE_MODE);
+        struct lai_operand *result = lai_exec_push_opstack(state);
+        result->tag = LAI_DEBUG_NAME;
         break;
     }
 
@@ -2288,8 +2312,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         op_item->kind = LAI_OP_STACKITEM;
         op_item->op_opcode = opcode;
         op_item->opstack_frame = state->opstack_ptr;
-        // TODO: There should be a NAME_MODE that allows only names to be parsed.
-        op_item->op_arg_modes[0] = LAI_REFERENCE_MODE;
+        op_item->op_arg_modes[0] = LAI_OPTIONAL_REFERENCE_MODE;
         op_item->op_arg_modes[1] = LAI_REFERENCE_MODE;
         op_item->op_arg_modes[2] = 0;
         op_item->op_want_result = want_result;

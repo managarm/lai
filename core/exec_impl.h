@@ -55,9 +55,11 @@ void lai_do_resolve_new_node(lai_nsnode_t *node,
 #define LAI_OBJECT_MODE 2
 // Like LAI_OBJECT_MODE, but discard the result.
 #define LAI_EXEC_MODE 3
-#define LAI_REFERENCE_MODE 4
-#define LAI_IMMEDIATE_BYTE_MODE 5
-#define LAI_IMMEDIATE_WORD_MODE 6
+#define LAI_UNRESOLVED_MODE 4
+#define LAI_REFERENCE_MODE 5
+#define LAI_OPTIONAL_REFERENCE_MODE 6
+#define LAI_IMMEDIATE_BYTE_MODE 7
+#define LAI_IMMEDIATE_WORD_MODE 8
 
 // Allocate a new package.
 int lai_create_string(lai_variable_t *, size_t);
@@ -65,8 +67,11 @@ int lai_create_c_string(lai_variable_t *, const char *);
 int lai_create_buffer(lai_variable_t *, size_t);
 int lai_create_pkg(lai_variable_t *, size_t);
 
-void lai_load(lai_state_t *, struct lai_operand *, lai_variable_t *);
-void lai_store(lai_state_t *, struct lai_operand *, lai_variable_t *);
+void lai_exec_access(lai_variable_t *, lai_nsnode_t *);
+
+void lai_operand_load(lai_state_t *, struct lai_operand *, lai_variable_t *);
+void lai_operand_store_implicit(lai_state_t *, struct lai_operand *, lai_variable_t *);
+void lai_operand_store_overwrite(lai_state_t *, struct lai_operand *, lai_variable_t *);
 
 void lai_exec_get_objectref(lai_state_t *, struct lai_operand *, lai_variable_t *);
 void lai_exec_get_integer(lai_state_t *, struct lai_operand *, lai_variable_t *);

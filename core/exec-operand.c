@@ -26,7 +26,12 @@ void lai_exec_pkg_var_store(lai_variable_t *in, struct lai_pkg_head *head, size_
 
 static void lai_write_buffer(lai_nsnode_t *handle, lai_variable_t *source);
 
-static void lai_load_ns(lai_nsnode_t *src, lai_variable_t *object) {
+// --------------------------------------------------------------------------------------
+// lai_exec_access().
+// --------------------------------------------------------------------------------------
+
+// lai_exec_access() loads an object from a namespace node.
+void lai_exec_access(lai_variable_t *object, lai_nsnode_t *src) {
     switch (src->type) {
         case LAI_NAMESPACE_NAME:
             lai_var_assign(object, &src->object);
@@ -40,7 +45,40 @@ static void lai_load_ns(lai_nsnode_t *src, lai_variable_t *object) {
             object->handle = src;
             break;
         default:
-            lai_panic("unexpected type %d of named object in lai_load_ns()", src->type);
+            lai_panic("unexpected type %d of named object in lai_exec_access()", src->type);
+    }
+}
+
+// --------------------------------------------------------------------------------------
+// lai_operand_load() and lai_operand_store().
+// --------------------------------------------------------------------------------------
+
+/* lai_operand_load() / lai_operand_store() perform loads / stores of operands.
+ * In this sense, they are complimentary. HOWEVER, the operations are asymmetric in subtle ways!
+ * Furthermore, the functions are also implemented and called in an asymmetric way:
+ * lai_operand_store() is often called during operator reductions; on the other hand,
+ * it is almost never necessary to call lai_operand_load() as the interpreter usually
+ * handles loads directly via lai_exec_access(). */
+
+void lai_operand_load(lai_state_t *state, struct lai_operand *src, lai_variable_t *object) {
+    switch (src->tag) {
+        case LAI_ARG_NAME: {
+            struct lai_ctxitem *ctxitem = lai_exec_peek_ctxstack_back(state);
+            LAI_ENSURE(ctxitem->invocation);
+            lai_var_assign(object, &ctxitem->invocation->arg[src->index]);
+            break;
+        }
+        case LAI_LOCAL_NAME: {
+            struct lai_ctxitem *ctxitem = lai_exec_peek_ctxstack_back(state);
+            LAI_ENSURE(ctxitem->invocation);
+            lai_var_assign(object, &ctxitem->invocation->local[src->index]);
+            break;
+        }
+        case LAI_RESOLVED_NAME:
+            lai_exec_access(object, src->handle);
+            break;
+        default:
+            lai_panic("tag %d is not valid for lai_load()", src->tag);
     }
 }
 
@@ -61,43 +99,17 @@ static void lai_store_ns(lai_nsnode_t *target, lai_variable_t *object) {
     }
 }
 
-// Loads from a name.
-// Returns a view of an existing object and not a clone of the object.
-void lai_load(lai_state_t *state, struct lai_operand *src, lai_variable_t *object) {
-    switch (src->tag) {
-        case LAI_ARG_NAME: {
-            struct lai_ctxitem *ctxitem = lai_exec_peek_ctxstack_back(state);
-            LAI_ENSURE(ctxitem->invocation);
-            lai_var_assign(object, &ctxitem->invocation->arg[src->index]);
-            break;
-        }
-        case LAI_LOCAL_NAME: {
-            struct lai_ctxitem *ctxitem = lai_exec_peek_ctxstack_back(state);
-            LAI_ENSURE(ctxitem->invocation);
-            lai_var_assign(object, &ctxitem->invocation->local[src->index]);
-            break;
-        }
-        case LAI_UNRESOLVED_NAME:
-        {
-            struct lai_amlname amln;
-            lai_amlname_parse(&amln, src->unres_aml);
-
-            lai_nsnode_t *node = lai_do_resolve(src->unres_ctx_handle, &amln);
-            if (!node)
-                lai_panic("undefined reference %s", lai_stringify_amlname(&amln));
-            lai_load_ns(node, object);
-            break;
-        }
-        case LAI_RESOLVED_NAME:
-            lai_load_ns(src->handle, object);
-            break;
-        default:
-            lai_panic("tag %d is not valid for lai_load()", src->tag);
-    }
+// lai_operand_store_implicit(): Stores a copy of the object to an operand.
+//                       This is the type of store used by Store() and arithmetic operators.
+void lai_operand_store_implicit(lai_state_t *state,
+                                struct lai_operand *dest, lai_variable_t *object) {
+    lai_operand_store_overwrite(state, dest, object);
 }
 
-// lai_store(): Stores a copy of the object to a reference.
-void lai_store(lai_state_t *state, struct lai_operand *dest, lai_variable_t *object) {
+// lai_operand_store_overwrite(): Stores a copy of the object to a reference.
+//                        This is used by CopyObject() and type conversion operators.
+void lai_operand_store_overwrite(lai_state_t *state,
+                                 struct lai_operand *dest, lai_variable_t *object) {
     // First, handle stores to AML references (returned by Index() and friends).
     if (dest->tag == LAI_OPERAND_OBJECT) {
         switch (dest->object.type) {
@@ -119,7 +131,7 @@ void lai_store(lai_state_t *state, struct lai_operand *dest, lai_variable_t *obj
                 break;
             }
             default:
-                lai_panic("unexpected object type %d for lai_store()", dest->object.type);
+                lai_panic("unexpected object type %d for lai_store_overwrite()", dest->object.type);
         }
         return;
     }
@@ -174,7 +186,7 @@ void lai_store(lai_state_t *state, struct lai_operand *dest, lai_variable_t *obj
             }
             break;
         default:
-            lai_panic("tag %d is not valid for lai_store()", dest->tag);
+            lai_panic("tag %d is not valid for lai_store_overwrite()", dest->tag);
     }
 }
 
@@ -183,24 +195,16 @@ void lai_store(lai_state_t *state, struct lai_operand *dest, lai_variable_t *obj
 // Returns immediate objects and indices as-is (i.e., without load from a name).
 // Returns a view of an existing object and not a clone of the object.
 void lai_exec_get_objectref(lai_state_t *state, struct lai_operand *src, lai_variable_t *object) {
-    lai_variable_t temp = {0};
-    if (src->tag == LAI_OPERAND_OBJECT) {
-        lai_var_assign(&temp, &src->object);
-    } else {
-        lai_load(state, src, &temp);
-    }
-    lai_var_move(object, &temp);
+    LAI_ENSURE(src->tag == LAI_OPERAND_OBJECT);
+    lai_var_assign(object, &src->object);
 }
 
 // Load an integer.
 // Returns immediate objects as-is.
 void lai_exec_get_integer(lai_state_t *state, struct lai_operand *src, lai_variable_t *object) {
+    LAI_ENSURE(src->tag == LAI_OPERAND_OBJECT);
     lai_variable_t temp = {0};
-    if (src->tag == LAI_OPERAND_OBJECT) {
-        lai_var_assign(&temp, &src->object);
-    } else {
-        lai_load(state, src, &temp);
-    }
+    lai_var_assign(&temp, &src->object);
     if(temp.type != LAI_INTEGER)
         lai_panic("lai_load_integer() expects an integer, not a value of type %d", temp.type);
     lai_var_move(object, &temp);
