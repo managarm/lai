@@ -74,6 +74,7 @@
 #define NOP_OP				0xA3
 #define RETURN_OP			0xA4
 #define BREAK_OP			0xA5
+#define BREAKPOINT_OP       0xCC
 #define ONES_OP				0xFF
 
 // Extended opcodes

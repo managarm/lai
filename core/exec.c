@@ -2121,6 +2121,13 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         break;
     }
 
+    case BREAKPOINT_OP: {
+        pc += 2;
+        lai_exec_commit_pc(state, pc);
+        lai_debug("Encountered BreakPointOp");
+        break;
+    }
+
     case (EXTOP_PREFIX << 8) | DEBUG_OP: {
         if (lai_exec_reserve_opstack(state))
             return 1;
