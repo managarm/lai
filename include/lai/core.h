@@ -40,6 +40,18 @@ typedef enum lai_api_error {
 // Convert a lai_api_error_t to a human readable string
 const char *lai_api_error_to_string(lai_api_error_t);
 
+struct lai_instance {
+    lai_nsnode_t *root_node;
+
+    lai_nsnode_t **ns_array;
+    size_t ns_size;
+    size_t ns_capacity;
+
+    acpi_fadt_t *fadt;
+};
+
+struct lai_instance *lai_current_instance();
+
 void lai_init_state(lai_state_t *);
 void lai_finalize_state(lai_state_t *);
 
@@ -57,9 +69,6 @@ struct lai_ns_child_iterator {
 #define LAI_NS_ITERATOR_INITIALIZER {0}
 #define LAI_NS_CHILD_ITERATOR_INITIALIZER(x) {0, x}
 
-// TODO: The following functions are not API functions.
-extern acpi_fadt_t *lai_fadt;
-extern size_t lai_ns_size;
 extern volatile uint16_t lai_last_event;
 
 // The remaining of these functions are OS independent!

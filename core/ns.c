@@ -14,9 +14,6 @@
 #include "eval.h"
 #include "util-hash.h"
 
-#define CODE_WINDOW            131072
-#define NAMESPACE_WINDOW       8192
-
 static int debug_namespace = 0;
 static int debug_resolution = 0;
 
@@ -24,14 +21,12 @@ int lai_do_osi_method(lai_variable_t *args, lai_variable_t *result);
 int lai_do_os_method(lai_variable_t *args, lai_variable_t *result);
 int lai_do_rev_method(lai_variable_t *args, lai_variable_t *result);
 
-lai_nsnode_t *lai_root_node;
-lai_nsnode_t **lai_namespace;
-size_t lai_ns_size = 0;
-size_t lai_ns_capacity = 0;
-
-acpi_fadt_t *lai_fadt;
-
 static struct lai_aml_segment *lai_load_table(void *ptr, int index);
+
+struct lai_instance *lai_current_instance() {
+    static struct lai_instance global_instance;
+    return &global_instance;
+}
 
 static unsigned int lai_hash_string(const char *str, size_t n) {
     // Simple djb2 hash function. TODO: Replace by SipHash for DoS resilience.
@@ -60,24 +55,26 @@ lai_nsnode_t *lai_create_nsnode_or_die(void) {
 
 // Installs the nsnode to the namespace.
 void lai_install_nsnode(lai_nsnode_t *node) {
+    struct lai_instance *instance = lai_current_instance();
+
     if (debug_namespace) {
         LAI_CLEANUP_FREE_STRING char *fullpath = lai_stringify_node_path(node);
         lai_debug("created %s", fullpath);
     }
 
-    if (lai_ns_size == lai_ns_capacity) {
-        size_t new_capacity = lai_ns_capacity * 2;
+    if (instance->ns_size == instance->ns_capacity) {
+        size_t new_capacity = instance->ns_capacity * 2;
         if (!new_capacity)
-            new_capacity = NAMESPACE_WINDOW;
+            new_capacity = 128;
         lai_nsnode_t **new_array;
-        new_array = laihost_realloc(lai_namespace, sizeof(lai_nsnode_t *) * new_capacity);
+        new_array = laihost_realloc(instance->ns_array, sizeof(lai_nsnode_t *) * new_capacity);
         if (!new_array)
             lai_panic("could not reallocate namespace table");
-        lai_namespace = new_array;
-        lai_ns_capacity = new_capacity;
+        instance->ns_array = new_array;
+        instance->ns_capacity = new_capacity;
     }
 
-    lai_namespace[lai_ns_size++] = node;
+    instance->ns_array[instance->ns_size++] = node;
 
     // Insert the node into its parent's hash table.
     lai_nsnode_t *parent = node->parent;
@@ -98,9 +95,11 @@ void lai_install_nsnode(lai_nsnode_t *node) {
 }
 
 void lai_uninstall_nsnode(lai_nsnode_t *node) {
-    for (size_t i = 0; i < lai_ns_size; i++) {
-        if (lai_namespace[i] == node)
-            lai_namespace[i] = NULL;
+    struct lai_instance *instance = lai_current_instance();
+
+    for (size_t i = 0; i < instance->ns_size; i++) {
+        if (instance->ns_array[i] == node)
+            instance->ns_array[i] = NULL;
     }
 
     // Remove the node from its parent's hash table.
@@ -130,7 +129,7 @@ void lai_uninstall_nsnode(lai_nsnode_t *node) {
 }
 
 lai_nsnode_t *lai_ns_get_root() {
-    return lai_root_node;
+    return lai_current_instance()->root_node;
 }
 
 lai_nsnode_t *lai_ns_get_parent(lai_nsnode_t *node) {
@@ -402,48 +401,50 @@ size_t lai_resolve_new_node(lai_nsnode_t *node, lai_nsnode_t *ctx_handle, void *
 }
 
 lai_nsnode_t *lai_create_root(void) {
-    lai_root_node = lai_create_nsnode_or_die();
-    lai_root_node->type = LAI_NAMESPACE_ROOT;
-    lai_namecpy(lai_root_node->name, "\\___");
-    lai_root_node->parent = NULL;
+    struct lai_instance *instance = lai_current_instance();
+
+    instance->root_node = lai_create_nsnode_or_die();
+    instance->root_node->type = LAI_NAMESPACE_ROOT;
+    lai_namecpy(instance->root_node->name, "\\___");
+    instance->root_node->parent = NULL;
 
     // Create the predefined objects.
     lai_nsnode_t *sb_node = lai_create_nsnode_or_die();
     sb_node->type = LAI_NAMESPACE_DEVICE;
     lai_namecpy(sb_node->name, "_SB_");
-    sb_node->parent = lai_root_node;
+    sb_node->parent = instance->root_node;
     lai_install_nsnode(sb_node);
 
     lai_nsnode_t *si_node = lai_create_nsnode_or_die();
     si_node->type = LAI_NAMESPACE_DEVICE;
     lai_namecpy(si_node->name, "_SI_");
-    si_node->parent = lai_root_node;
+    si_node->parent = instance->root_node;
     lai_install_nsnode(si_node);
 
     lai_nsnode_t *gpe_node = lai_create_nsnode_or_die();
     gpe_node->type = LAI_NAMESPACE_DEVICE;
     lai_namecpy(gpe_node->name, "_GPE");
-    gpe_node->parent = lai_root_node;
+    gpe_node->parent = instance->root_node;
     lai_install_nsnode(gpe_node);
 
     // Create nodes for compatibility with ACPI 1.0.
     lai_nsnode_t *pr_node = lai_create_nsnode_or_die();
     pr_node->type = LAI_NAMESPACE_DEVICE;
     lai_namecpy(pr_node->name, "_PR_");
-    pr_node->parent = lai_root_node;
+    pr_node->parent = instance->root_node;
     lai_install_nsnode(pr_node);
 
     lai_nsnode_t *tz_node = lai_create_nsnode_or_die();
     tz_node->type = LAI_NAMESPACE_DEVICE;
     lai_namecpy(tz_node->name, "_TZ_");
-    tz_node->parent = lai_root_node;
+    tz_node->parent = instance->root_node;
     lai_install_nsnode(tz_node);
 
     // Create the OS-defined objects.
     lai_nsnode_t *osi_node = lai_create_nsnode_or_die();
     osi_node->type = LAI_NAMESPACE_METHOD;
     lai_namecpy(osi_node->name, "_OSI");
-    osi_node->parent = lai_root_node;
+    osi_node->parent = instance->root_node;
     osi_node->method_flags = 0x01;
     osi_node->method_override = &lai_do_osi_method;
     lai_install_nsnode(osi_node);
@@ -451,7 +452,7 @@ lai_nsnode_t *lai_create_root(void) {
     lai_nsnode_t *os_node = lai_create_nsnode_or_die();
     os_node->type = LAI_NAMESPACE_METHOD;
     lai_namecpy(os_node->name, "_OS_");
-    os_node->parent = lai_root_node;
+    os_node->parent = instance->root_node;
     os_node->method_flags = 0x00;
     os_node->method_override = &lai_do_os_method;
     lai_install_nsnode(os_node);
@@ -459,12 +460,12 @@ lai_nsnode_t *lai_create_root(void) {
     lai_nsnode_t *rev_node = lai_create_nsnode_or_die();
     rev_node->type = LAI_NAMESPACE_METHOD;
     lai_namecpy(rev_node->name, "_REV");
-    rev_node->parent = lai_root_node;
+    rev_node->parent = instance->root_node;
     rev_node->method_flags = 0x00;
     rev_node->method_override = &lai_do_rev_method;
     lai_install_nsnode(rev_node);
 
-    return lai_root_node;
+    return instance->root_node;
 }
 
 // Creates the ACPI namespace. Requires the ability to scan for ACPI tables - ensure this is
@@ -473,13 +474,11 @@ void lai_create_namespace(void) {
     if (!laihost_scan)
         lai_panic("lai_create_namespace() needs table management functions");
 
-    lai_namespace = lai_calloc(sizeof(lai_nsnode_t *), NAMESPACE_WINDOW);
-    if (!lai_namespace)
-        lai_panic("unable to allocate memory.");
+    struct lai_instance *instance = lai_current_instance();
 
     // we need the FADT
-    lai_fadt = laihost_scan("FACP", 0);
-    if (!lai_fadt) {
+    instance->fadt = laihost_scan("FACP", 0);
+    if (!instance->fadt) {
         lai_panic("unable to find ACPI FADT.");
     }
 
@@ -518,7 +517,7 @@ void lai_create_namespace(void) {
         index++;
     }
 
-    lai_debug("ACPI namespace created, total of %d predefined objects.", lai_ns_size);
+    lai_debug("ACPI namespace created, total of %d predefined objects.", instance->ns_size);
 }
 
 static struct lai_aml_segment *lai_load_table(void *ptr, int index) {
@@ -542,7 +541,7 @@ static struct lai_aml_segment *lai_load_table(void *ptr, int index) {
 lai_nsnode_t *lai_resolve_path(lai_nsnode_t *ctx_handle, const char *path) {
     lai_nsnode_t *current = ctx_handle;
     if (!current)
-        current = lai_root_node;
+        current = lai_current_instance()->root_node;
 
     if (*path == '\\') {
         while (current->parent)
@@ -673,8 +672,10 @@ int lai_check_device_pnp_id(lai_nsnode_t *dev, lai_variable_t *pnp_id,
 }
 
 lai_nsnode_t *lai_ns_iterate(struct lai_ns_iterator *iter) {
-    while (iter->i < lai_ns_size) {
-        lai_nsnode_t *n = lai_namespace[iter->i++];
+    struct lai_instance *instance = lai_current_instance();
+
+    while (iter->i < instance->ns_size) {
+        lai_nsnode_t *n = instance->ns_array[iter->i++];
         if (n)
             return n;
     }

@@ -20,6 +20,8 @@ int lai_enter_sleep(uint8_t sleep_state)
     if(!laihost_inw || !laihost_outw)
         lai_panic("lai_enter_sleep() requires port I/O");
 
+    struct lai_instance *instance = lai_current_instance();
+
     LAI_CLEANUP_STATE lai_state_t state;
     lai_init_state(&state);
 
@@ -91,16 +93,16 @@ int lai_enter_sleep(uint8_t sleep_state)
 
     // and go to sleep
     uint16_t data;
-    data = laihost_inw(lai_fadt->pm1a_control_block);
+    data = laihost_inw(instance->fadt->pm1a_control_block);
     data &= 0xE3FF;
     data |= (slp_typa.integer << 10) | ACPI_SLEEP;
-    laihost_outw(lai_fadt->pm1a_control_block, data);
+    laihost_outw(instance->fadt->pm1a_control_block, data);
 
-    if(lai_fadt->pm1b_control_block) {
-        data = laihost_inw(lai_fadt->pm1b_control_block);
+    if(instance->fadt->pm1b_control_block) {
+        data = laihost_inw(instance->fadt->pm1b_control_block);
         data &= 0xE3FF;
         data |= (slp_typb.integer << 10) | ACPI_SLEEP;
-        laihost_outw(lai_fadt->pm1b_control_block, data);
+        laihost_outw(instance->fadt->pm1b_control_block, data);
     }
 
     /* poll the wake status */
