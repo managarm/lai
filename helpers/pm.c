@@ -73,6 +73,8 @@ int lai_enter_sleep(uint8_t sleep_state)
         lai_finalize_state(&state);
     }
 
+
+    // _GTS has actually become obsolete with ACPI 5.0A but we still execute it for compatibility with older ACPI versions
     handle = lai_resolve_path(NULL, "\\_GTS");
 
     if(handle) {
