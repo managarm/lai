@@ -2253,11 +2253,10 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         op_item->kind = LAI_OP_STACKITEM;
         op_item->op_opcode = opcode;
         op_item->opstack_frame = state->opstack_ptr;
-        op_item->op_arg_modes[0] = LAI_UNRESOLVED_MODE;
-        op_item->op_arg_modes[1] = LAI_IMMEDIATE_BYTE_MODE;
-        op_item->op_arg_modes[2] = LAI_IMMEDIATE_DWORD_MODE;
-        op_item->op_arg_modes[3] = LAI_OBJECT_MODE;
-        op_item->op_arg_modes[4] = 0;
+        op_item->op_arg_modes[0] = LAI_IMMEDIATE_BYTE_MODE;
+        op_item->op_arg_modes[1] = LAI_IMMEDIATE_DWORD_MODE;
+        op_item->op_arg_modes[2] = LAI_OBJECT_MODE;
+        op_item->op_arg_modes[3] = 0;
         op_item->op_want_result = want_result;
     }
 
