@@ -7,7 +7,7 @@
 /* As of now, it's only for S5 (shutdown) sleep, because other sleeping states
  * need NVS and other things I still need to research */
 
-#include <lai/helpers/sleep.h>
+#include <lai/helpers/pm.h>
 #include "../core/libc.h"
 #include "../core/eval.h"
 
@@ -104,10 +104,6 @@ int lai_enter_sleep(uint8_t sleep_state)
         data |= (slp_typb.integer << 10) | ACPI_SLEEP;
         laihost_outw(instance->fadt->pm1b_control_block, data);
     }
-
-    /* poll the wake status */
-    while(!(lai_last_event & ACPI_WAKE))
-        ;
 
     return 0;
 }
