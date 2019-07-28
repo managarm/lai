@@ -443,14 +443,13 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
             // TODO: DeRefOf() can take strings!
             //       It resolves them to objects and returns the contents.
             case LAI_ARG_REF:
-                lai_obj_clone(&result, &ref.iref_invocation->arg[ref.iref_index]);
-                break;
             case LAI_LOCAL_REF:
-                lai_obj_clone(&result, &ref.iref_invocation->local[ref.iref_index]);
+            case LAI_NODE_REF: {
+                LAI_CLEANUP_VAR lai_variable_t temp = LAI_VAR_INITIALIZER;
+                lai_exec_ref_load(&temp, &ref);
+                lai_obj_clone(&result, &temp);
                 break;
-            case LAI_NODE_REF:
-                lai_exec_access(&result, ref.handle);
-                break;
+            }
             case LAI_STRING_INDEX: {
                 char *window = ref.string_ptr->content;
                 result.type = LAI_INTEGER;

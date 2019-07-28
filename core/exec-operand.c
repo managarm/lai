@@ -27,6 +27,44 @@ void lai_exec_pkg_var_store(lai_variable_t *in, struct lai_pkg_head *head, size_
 static void lai_write_buffer(lai_nsnode_t *handle, lai_variable_t *source);
 
 // --------------------------------------------------------------------------------------
+// Helpers for load/store operations.
+// --------------------------------------------------------------------------------------
+
+void lai_exec_ref_load(lai_variable_t *object, lai_variable_t *ref) {
+    // Note: This function intentionally *does not* handle indices.
+    switch (ref->type) {
+        case LAI_ARG_REF:
+            lai_var_assign(object, &ref->iref_invocation->arg[ref->iref_index]);
+            break;
+        case LAI_LOCAL_REF:
+            lai_var_assign(object, &ref->iref_invocation->local[ref->iref_index]);
+            break;
+        case LAI_NODE_REF:
+            lai_exec_access(object, ref->handle);
+            break;
+        default:
+            lai_panic("unknown reference type %d for lai_exec_ref_load()", ref->type);
+    }
+}
+
+void lai_exec_ref_store(lai_variable_t *ref, lai_variable_t *object) {
+    // Note: This function intentionally *does not* handle indices.
+    switch (ref->type) {
+        case LAI_ARG_REF:
+            lai_var_assign(&ref->iref_invocation->arg[ref->iref_index], object);
+            break;
+        case LAI_LOCAL_REF:
+            lai_var_assign(&ref->iref_invocation->local[ref->iref_index], object);
+            break;
+        case LAI_NODE_REF:
+            lai_store_ns(ref->handle, object);
+            break;
+        default:
+            lai_panic("unknown reference type %d for lai_exec_ref_store()", ref->type);
+    }
+}
+
+// --------------------------------------------------------------------------------------
 // lai_exec_access().
 // --------------------------------------------------------------------------------------
 
@@ -82,7 +120,7 @@ void lai_operand_load(lai_state_t *state, struct lai_operand *src, lai_variable_
     }
 }
 
-static void lai_store_ns(lai_nsnode_t *target, lai_variable_t *object) {
+void lai_store_ns(lai_nsnode_t *target, lai_variable_t *object) {
     switch (target->type) {
         case LAI_NAMESPACE_NAME:
             lai_var_assign(&target->object, object);
@@ -157,7 +195,19 @@ void lai_operand_store_overwrite(lai_state_t *state,
         case LAI_ARG_NAME: {
             struct lai_ctxitem *ctxitem = lai_exec_peek_ctxstack_back(state);
             LAI_ENSURE(ctxitem->invocation);
-            lai_var_assign(&ctxitem->invocation->arg[dest->index], object);
+
+            // Stores to ARGx that contain references automatically dereference ARGx
+            // and store to the target of the reference instead.
+            lai_variable_t *arg_var = &ctxitem->invocation->arg[dest->index];
+            switch (arg_var->type) {
+                case LAI_ARG_REF:
+                case LAI_LOCAL_REF:
+                case LAI_NODE_REF:
+                    lai_exec_ref_store(arg_var, object);
+                    break;
+                default:
+                    lai_var_assign(arg_var, object);
+            };
             break;
         }
         case LAI_LOCAL_NAME: {
