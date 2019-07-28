@@ -569,6 +569,28 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
         laihost_sleep(time.integer);
         break;
     }
+    case (EXTOP_PREFIX << 8) | FATAL_OP: {
+        LAI_CLEANUP_VAR lai_variable_t fatal_type = LAI_VAR_INITIALIZER;
+        lai_exec_get_integer(state, &operands[1], &fatal_type);
+
+        LAI_CLEANUP_VAR lai_variable_t fatal_data = LAI_VAR_INITIALIZER;
+        lai_exec_get_integer(state, &operands[2], &fatal_data);
+
+        LAI_CLEANUP_VAR lai_variable_t fatal_arg = LAI_VAR_INITIALIZER;
+        lai_exec_get_integer(state, &operands[3], &fatal_arg);
+
+        if(!fatal_type.integer)
+            fatal_type.integer = 0;
+        
+        if(!fatal_data.integer)
+            fatal_data.integer = 0;
+
+        if(!fatal_arg.integer)
+            fatal_arg.integer = 0;
+
+        lai_panic("FatalOp in AML, Type: %02x, Data %08X, Arg: %x\n", fatal_type, fatal_data, fatal_arg);
+        break;
+    }
     case (EXTOP_PREFIX << 8) | ACQUIRE_OP:
     {
         lai_debug("Acquire() is a stub");
@@ -1204,6 +1226,20 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
     } else if (parse_mode == LAI_IMMEDIATE_WORD_MODE) {
         uint16_t value;
         if (lai_parse_u16(&value, method, &pc, limit))
+            return 1;
+
+        if (lai_exec_reserve_opstack(state))
+            return 1;
+        lai_exec_commit_pc(state, pc);
+
+        struct lai_operand *result = lai_exec_push_opstack(state);
+        result->tag = LAI_OPERAND_OBJECT;
+        result->object.type = LAI_INTEGER;
+        result->object.integer = value;
+        return 0;
+    } else if(parse_mode == LAI_IMMEDIATE_DWORD_MODE){
+        uint32_t value;
+        if (lai_parse_u32(&value, method, &pc, limit))
             return 1;
 
         if (lai_exec_reserve_opstack(state))
@@ -2205,6 +2241,24 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         lai_exec_commit_pc(state, pc);
         lai_debug("Encountered BreakPointOp");
         break;
+    }
+
+    case (EXTOP_PREFIX << 8) | FATAL_OP: {
+        if(lai_exec_reserve_opstack(state))
+            return 1;
+
+        lai_exec_commit_pc(state, pc);
+
+        lai_stackitem_t *op_item = lai_exec_push_stack(state);
+        op_item->kind = LAI_OP_STACKITEM;
+        op_item->op_opcode = opcode;
+        op_item->opstack_frame = state->opstack_ptr;
+        op_item->op_arg_modes[0] = LAI_UNRESOLVED_MODE;
+        op_item->op_arg_modes[1] = LAI_IMMEDIATE_BYTE_MODE;
+        op_item->op_arg_modes[2] = LAI_IMMEDIATE_DWORD_MODE;
+        op_item->op_arg_modes[3] = LAI_OBJECT_MODE;
+        op_item->op_arg_modes[4] = 0;
+        op_item->op_want_result = want_result;
     }
 
     case (EXTOP_PREFIX << 8) | DEBUG_OP: {
