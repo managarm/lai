@@ -137,16 +137,16 @@ void lai_store_ns(lai_nsnode_t *target, lai_variable_t *object) {
     }
 }
 
-// lai_operand_store_implicit(): Stores a copy of the object to an operand.
+// lai_operand_mutate(): Modifies the operand in-place to store the object.
 //                       This is the type of store used by Store() and arithmetic operators.
-void lai_operand_store_implicit(lai_state_t *state,
+void lai_operand_mutate(lai_state_t *state,
                                 struct lai_operand *dest, lai_variable_t *object) {
-    lai_operand_store_overwrite(state, dest, object);
+    lai_operand_emplace(state, dest, object);
 }
 
-// lai_operand_store_overwrite(): Stores a copy of the object to a reference.
+// lai_operand_emplace(): Stores the object to the operand, replacing the current contents.
 //                        This is used by CopyObject() and type conversion operators.
-void lai_operand_store_overwrite(lai_state_t *state,
+void lai_operand_emplace(lai_state_t *state,
                                  struct lai_operand *dest, lai_variable_t *object) {
     // First, handle stores to AML references (returned by Index() and friends).
     if (dest->tag == LAI_OPERAND_OBJECT) {
