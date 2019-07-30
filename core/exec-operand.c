@@ -137,17 +137,66 @@ void lai_store_ns(lai_nsnode_t *target, lai_variable_t *object) {
     }
 }
 
+void lai_exec_mutate_ns(lai_nsnode_t *target, lai_variable_t *object) {
+    switch (target->type) {
+        case LAI_NAMESPACE_NAME:
+            switch (target->object.type) {
+                case LAI_STRING: {
+                    // Strings are resized during mutation.
+                    LAI_ENSURE(object->type == LAI_STRING); // TODO: Implement conversion.
+                    size_t length = lai_strlen(lai_exec_string_access(object));
+                    if (lai_obj_resize_string(&target->object, length))
+                        lai_panic("could not resize string in lai_exec_mutate_ns()");
+                    lai_strcpy(lai_exec_string_access(&target->object),
+                           lai_exec_string_access(object));
+                    break;
+                }
+                case LAI_BUFFER: {
+                    // Buffers are *not* resized during mutation.
+                    // The target buffer determines the size of the result.
+                    LAI_ENSURE(object->type == LAI_BUFFER); // TODO: Implement conversion.
+                    size_t copy_size = lai_exec_buffer_size(object);
+                    size_t buffer_size = lai_exec_buffer_size(&target->object);
+                    if (copy_size > buffer_size)
+                        copy_size = buffer_size;
+                    memset(lai_exec_buffer_access(&target->object), 0, buffer_size);
+                    memcpy(lai_exec_buffer_access(&target->object),
+                           lai_exec_buffer_access(object), copy_size);
+                    break;
+                }
+                case LAI_PACKAGE: {
+                    // Packages are resized during mutation.
+                    LAI_ENSURE(object->type == LAI_PACKAGE); // TODO: Implement conversion.
+                    size_t n = lai_exec_pkg_size(object);
+                    if (lai_obj_resize_pkg(&target->object, n))
+                        lai_panic("could not resize package in lai_exec_mutate_ns()");
+                    for (size_t i = 0; i < n; i++) {
+                        lai_variable_t temp = LAI_VAR_INITIALIZER;
+                        lai_exec_pkg_load(&temp, object, i);
+                        lai_exec_pkg_store(&temp, &target->object, i);
+                    }
+                    break;
+                }
+                default:
+                    lai_var_assign(&target->object, object);
+            }
+            break;
+        case LAI_NAMESPACE_FIELD:
+        case LAI_NAMESPACE_INDEXFIELD:
+            lai_write_opregion(target, object);
+            break;
+        case LAI_NAMESPACE_BUFFER_FIELD:
+            lai_write_buffer(target, object);
+            break;
+        default:
+            lai_panic("unexpected type %d of named object in lai_exec_mutate_ns()");
+    }
+}
+
 // lai_operand_mutate(): Modifies the operand in-place to store the object.
 //                       This is the type of store used by Store() and arithmetic operators.
 void lai_operand_mutate(lai_state_t *state,
-                                struct lai_operand *dest, lai_variable_t *object) {
-    lai_operand_emplace(state, dest, object);
-}
-
-// lai_operand_emplace(): Stores the object to the operand, replacing the current contents.
-//                        This is used by CopyObject() and type conversion operators.
-void lai_operand_emplace(lai_state_t *state,
-                                 struct lai_operand *dest, lai_variable_t *object) {
+                        struct lai_operand *dest, lai_variable_t *object) {
     // First, handle stores to AML references (returned by Index() and friends).
     if (dest->tag == LAI_OPERAND_OBJECT) {
         switch (dest->object.type) {
@@ -178,17 +227,91 @@ void lai_operand_emplace(lai_state_t *state,
         case LAI_NULL_NAME:
             // Stores to the null target are ignored.
             break;
-        case LAI_UNRESOLVED_NAME:
-        {
-            struct lai_amlname amln;
-            lai_amlname_parse(&amln, dest->unres_aml);
+        case LAI_RESOLVED_NAME:
+            lai_exec_mutate_ns(dest->handle, object);
+            break;
+        case LAI_ARG_NAME: {
+            struct lai_ctxitem *ctxitem = lai_exec_peek_ctxstack_back(state);
+            LAI_ENSURE(ctxitem->invocation);
 
-            lai_nsnode_t *handle = lai_do_resolve(dest->unres_ctx_handle, &amln);
-            if(!handle)
-                lai_panic("undefined reference %s", lai_stringify_amlname(&amln));
-            lai_store_ns(handle, object);
+            // Stores to ARGx that contain references automatically dereference ARGx
+            // and store to the target of the reference instead.
+            lai_variable_t *arg_var = &ctxitem->invocation->arg[dest->index];
+            switch (arg_var->type) {
+                case LAI_ARG_REF:
+                case LAI_LOCAL_REF:
+                case LAI_NODE_REF:
+                    lai_exec_ref_store(arg_var, object);
+                    break;
+                default:
+                    lai_var_assign(arg_var, object);
+            };
             break;
         }
+        case LAI_LOCAL_NAME: {
+            struct lai_ctxitem *ctxitem = lai_exec_peek_ctxstack_back(state);
+            LAI_ENSURE(ctxitem->invocation);
+            lai_var_assign(&ctxitem->invocation->local[dest->index], object);
+            break;
+        }
+        case LAI_DEBUG_NAME:
+            if(laihost_handle_amldebug)
+                laihost_handle_amldebug(object);
+            else {
+                switch (object->type) {
+                    case LAI_INTEGER:
+                        lai_debug("Debug(): integer(%ld)", object->integer);
+                        break;
+                    case LAI_STRING:
+                        lai_debug("Debug(): string(\"%s\")", lai_exec_string_access(object));
+                        break;
+                    case LAI_BUFFER:
+                        lai_debug("Debug(): buffer(%X)", (size_t)lai_exec_buffer_access(object));
+                        break;
+                    default:
+                        lai_debug("Debug(): type %d", object->type);
+                }
+            }
+            break;
+        default:
+            lai_panic("tag %d is not valid for lai_store_overwrite()", dest->tag);
+    }
+}
+
+// lai_operand_emplace(): Stores the object to the operand, replacing the current contents.
+//                        This is used by CopyObject() and type conversion operators.
+void lai_operand_emplace(lai_state_t *state,
+                         struct lai_operand *dest, lai_variable_t *object) {
+    // First, handle stores to AML references (returned by Index() and friends).
+    if (dest->tag == LAI_OPERAND_OBJECT) {
+        switch (dest->object.type) {
+            case LAI_STRING_INDEX: {
+                char *window = dest->object.string_ptr->content;
+                window[dest->object.integer] = object->integer;
+                break;
+            }
+            case LAI_BUFFER_INDEX: {
+                uint8_t *window = dest->object.buffer_ptr->content;
+                window[dest->object.integer] = object->integer;
+                break;
+            }
+            case LAI_PACKAGE_INDEX: {
+                lai_variable_t copy = {0};
+                lai_var_assign(&copy, object);
+                lai_exec_pkg_var_store(&copy, dest->object.pkg_ptr, dest->object.integer);
+                lai_var_finalize(&copy);
+                break;
+            }
+            default:
+                lai_panic("unexpected object type %d for lai_store_overwrite()", dest->object.type);
+        }
+        return;
+    }
+
+    switch (dest->tag) {
+        case LAI_NULL_NAME:
+            // Stores to the null target are ignored.
+            break;
         case LAI_RESOLVED_NAME:
             lai_store_ns(dest->handle, object);
             break;

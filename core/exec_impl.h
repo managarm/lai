@@ -73,6 +73,7 @@ void lai_exec_ref_store(lai_variable_t *, lai_variable_t *);
 
 void lai_exec_access(lai_variable_t *, lai_nsnode_t *);
 void lai_store_ns(lai_nsnode_t *target, lai_variable_t *object);
+void lai_mutate_ns(lai_nsnode_t *target, lai_variable_t *object);
 
 void lai_operand_load(lai_state_t *, struct lai_operand *, lai_variable_t *);
 void lai_operand_mutate(lai_state_t *, struct lai_operand *, lai_variable_t *);

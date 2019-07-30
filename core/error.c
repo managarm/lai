@@ -9,6 +9,8 @@ const char *lai_api_error_to_string(lai_api_error_t error){
     switch (error) {
     case LAI_ERROR_NONE:
         return "No error";
+    case LAI_ERROR_OUT_OF_MEMORY:
+        return "Out of memory";
     case LAI_ERROR_TYPE_MISMATCH:
         return "Type mismatch";
     case LAI_ERROR_OUT_OF_BOUNDS:

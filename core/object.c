@@ -64,6 +64,56 @@ int lai_create_pkg(lai_variable_t *object, size_t n) {
     return 0;
 }
 
+lai_api_error_t lai_obj_resize_string(lai_variable_t *object, size_t length) {
+    if (object->type != LAI_STRING)
+        return LAI_ERROR_TYPE_MISMATCH;
+    if (length > lai_strlen(object->string_ptr->content)) {
+        char *new_content = laihost_malloc(length + 1);
+        if (!new_content)
+            return LAI_ERROR_OUT_OF_MEMORY;
+        lai_strcpy(new_content, object->string_ptr->content);
+        laihost_free(object->string_ptr->content);
+        object->string_ptr->content = new_content;
+    }
+    return LAI_ERROR_NONE;
+}
+
+lai_api_error_t lai_obj_resize_buffer(lai_variable_t *object, size_t size) {
+    if (object->type != LAI_BUFFER)
+        return LAI_ERROR_TYPE_MISMATCH;
+    if (size > object->buffer_ptr->size) {
+        uint8_t *new_content = laihost_malloc(size);
+        if (!new_content)
+            return LAI_ERROR_OUT_OF_MEMORY;
+        memset(new_content, 0, size);
+        memcpy(new_content, object->buffer_ptr->content, object->buffer_ptr->size);
+        laihost_free(object->buffer_ptr->content);
+        object->buffer_ptr->content = new_content;
+    }
+    object->buffer_ptr->size = size;
+    return LAI_ERROR_NONE;
+}
+
+lai_api_error_t lai_obj_resize_pkg(lai_variable_t *object, size_t n) {
+    if (object->type != LAI_PACKAGE)
+        return LAI_ERROR_TYPE_MISMATCH;
+    if (n <= object->pkg_ptr->size) {
+        for (unsigned int i = n; i < object->pkg_ptr->size; i++)
+            lai_var_finalize(&object->pkg_ptr->elems[i]);
+    } else {
+        struct lai_variable_t *new_elems = laihost_malloc(n * sizeof(lai_variable_t));
+        if (!new_elems)
+            return LAI_ERROR_OUT_OF_MEMORY;
+        memset(new_elems, 0, n * sizeof(lai_variable_t));
+        for (unsigned int i = 0; i < object->pkg_ptr->size; i++)
+            lai_var_move(&new_elems[i], &object->pkg_ptr->elems[i]);
+        laihost_free(object->pkg_ptr->elems);
+        object->pkg_ptr->elems = new_elems;
+    }
+    object->pkg_ptr->size = n;
+    return LAI_ERROR_NONE;
+}
+
 static enum lai_object_type lai_object_type_of_objref(lai_variable_t *object) {
     switch (object->type) {
         case LAI_INTEGER:
