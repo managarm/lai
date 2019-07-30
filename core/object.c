@@ -9,10 +9,15 @@
 
 int lai_create_string(lai_variable_t *object, size_t length) {
     object->type = LAI_STRING;
-    object->string_ptr = laihost_malloc(sizeof(struct lai_string_head) + length + 1);
+    object->string_ptr = laihost_malloc(sizeof(struct lai_string_head));
     if (!object->string_ptr)
         return 1;
     object->string_ptr->rc = 1;
+    object->string_ptr->content = laihost_malloc(length + 1);
+    if (!object->string_ptr->content) {
+        laihost_free(object->string_ptr);
+        return 1;
+    }
     memset(object->string_ptr->content, 0, length + 1);
     return 0;
 }
@@ -29,23 +34,32 @@ int lai_create_c_string(lai_variable_t *object, const char *s) {
 
 int lai_create_buffer(lai_variable_t *object, size_t size) {
     object->type = LAI_BUFFER;
-    object->buffer_ptr = laihost_malloc(sizeof(struct lai_buffer_head) + size);
+    object->buffer_ptr = laihost_malloc(sizeof(struct lai_buffer_head));
     if (!object->buffer_ptr)
         return 1;
     object->buffer_ptr->rc = 1;
     object->buffer_ptr->size = size;
+    object->buffer_ptr->content = laihost_malloc(size);
+    if (!object->buffer_ptr->content) {
+        laihost_free(object->buffer_ptr);
+        return 1;
+    }
     memset(object->buffer_ptr->content, 0, size);
     return 0;
 }
 
 int lai_create_pkg(lai_variable_t *object, size_t n) {
     object->type = LAI_PACKAGE;
-    object->pkg_ptr = laihost_malloc(sizeof(struct lai_pkg_head)
-            + n * sizeof(lai_variable_t));
+    object->pkg_ptr = laihost_malloc(sizeof(struct lai_pkg_head));
     if (!object->pkg_ptr)
         return 1;
     object->pkg_ptr->rc = 1;
     object->pkg_ptr->size = n;
+    object->pkg_ptr->elems = laihost_malloc(n * sizeof(lai_variable_t));
+    if (!object->pkg_ptr->elems) {
+        laihost_free(object->pkg_ptr);
+        return 1;
+    }
     memset(object->pkg_ptr->elems, 0, n * sizeof(lai_variable_t));
     return 0;
 }

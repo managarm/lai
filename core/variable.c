@@ -11,6 +11,7 @@
 static void laihost_free_package(lai_variable_t *object) {
     for(int i = 0; i < object->pkg_ptr->size; i++)
         lai_var_finalize(&object->pkg_ptr->elems[i]);
+    laihost_free(object->pkg_ptr->elems);
     laihost_free(object->pkg_ptr);
 }
 
@@ -18,13 +19,17 @@ void lai_var_finalize(lai_variable_t *object) {
     switch (object->type) {
         case LAI_STRING:
         case LAI_STRING_INDEX:
-            if (lai_rc_unref(&object->string_ptr->rc))
+            if (lai_rc_unref(&object->string_ptr->rc)) {
+                laihost_free(object->string_ptr->content);
                 laihost_free(object->string_ptr);
+            }
             break;
         case LAI_BUFFER:
         case LAI_BUFFER_INDEX:
-            if (lai_rc_unref(&object->buffer_ptr->rc))
+            if (lai_rc_unref(&object->buffer_ptr->rc)) {
+                laihost_free(object->buffer_ptr->content);
                 laihost_free(object->buffer_ptr);
+            }
             break;
         case LAI_PACKAGE:
         case LAI_PACKAGE_INDEX:

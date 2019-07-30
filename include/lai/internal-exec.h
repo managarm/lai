@@ -64,19 +64,19 @@ typedef struct lai_variable_t
 
 struct lai_string_head {
     lai_rc_t rc;
-    char content[];
+    char *content;
 };
 
 struct lai_buffer_head {
     lai_rc_t rc;
     size_t size;
-    uint8_t content[];
+    uint8_t *content;
 };
 
 struct lai_pkg_head {
     lai_rc_t rc;
     unsigned int size;
-    struct lai_variable_t elems[];
+    struct lai_variable_t *elems;
 };
 
 // Allows access to the contents of a string.
