@@ -1253,7 +1253,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
 
     // Whether we use the result of an expression or not.
     // If yes, it will be pushed onto the opstack after the expression is computed.
-    int want_result = (parse_mode != LAI_EXEC_MODE);
+    int want_result = lai_mode_flags[parse_mode] & LAI_MF_RESULT;
 
     if (parse_mode == LAI_IMMEDIATE_BYTE_MODE) {
         uint8_t value;
@@ -1352,7 +1352,8 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
                 lai_panic("undefined reference %s in object mode",
                         lai_stringify_amlname(&amln));
 
-            if(handle->type == LAI_NAMESPACE_METHOD) {
+            if((lai_mode_flags[parse_mode] & LAI_MF_INVOKE)
+                    && handle->type == LAI_NAMESPACE_METHOD) {
                 if (debug_opcodes)
                     lai_debug("parsing invocation %s [@ 0x%x]", path, table_pc);
 

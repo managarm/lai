@@ -62,6 +62,23 @@ void lai_do_resolve_new_node(lai_nsnode_t *node,
 #define LAI_IMMEDIATE_WORD_MODE 8
 #define LAI_IMMEDIATE_DWORD_MODE 9
 
+// Operation is expected to return a result (on the opstack).
+#define LAI_MF_RESULT 1
+// Parse method invocations.
+#define LAI_MF_INVOKE 2
+
+static const uint32_t lai_mode_flags[] = {
+    [LAI_IMMEDIATE_BYTE_MODE]     = LAI_MF_RESULT,
+    [LAI_IMMEDIATE_WORD_MODE]     = LAI_MF_RESULT,
+    [LAI_IMMEDIATE_DWORD_MODE]    = LAI_MF_RESULT,
+    [LAI_EXEC_MODE]               = LAI_MF_INVOKE,
+    [LAI_UNRESOLVED_MODE]         = LAI_MF_RESULT,
+    [LAI_DATA_MODE]               = LAI_MF_RESULT,
+    [LAI_OBJECT_MODE]             = LAI_MF_RESULT | LAI_MF_INVOKE,
+    [LAI_REFERENCE_MODE]          = LAI_MF_RESULT,
+    [LAI_OPTIONAL_REFERENCE_MODE] = LAI_MF_RESULT,
+};
+
 // Allocate a new package.
 int lai_create_string(lai_variable_t *, size_t);
 int lai_create_c_string(lai_variable_t *, const char *);
