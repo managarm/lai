@@ -529,6 +529,17 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
         lai_var_move(&result, &ref);
         break;
     }
+    case TOBUFFER_OP: {
+        LAI_CLEANUP_VAR lai_variable_t operand = LAI_VAR_INITIALIZER;
+        lai_exec_get_objectref(state, &operands[0], &operand);
+
+        lai_api_error_t error = lai_obj_to_buffer(&result, &operand);
+        if(error != LAI_ERROR_NONE)
+            lai_panic("Failed ToBuffer: %s", lai_api_error_to_string(error));
+
+        lai_operand_emplace(state, &operands[1], &result);
+        break;
+    }
     case (EXTOP_PREFIX << 8) | CONDREF_OP: {
         struct lai_operand *operand = &operands[0];
         struct lai_operand *target = &operands[1];
@@ -2243,6 +2254,23 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         break;
     }
 
+    case TOBUFFER_OP: {
+        if(lai_exec_reserve_opstack(state))
+            return 1;
+
+        lai_exec_commit_pc(state, pc);
+
+        lai_stackitem_t *op_item = lai_exec_push_stack(state);
+        op_item->kind = LAI_OP_STACKITEM;
+        op_item->op_opcode = opcode;
+        op_item->opstack_frame = state->opstack_ptr;
+        op_item->op_arg_modes[0] = LAI_OBJECT_MODE;
+        op_item->op_arg_modes[1] = LAI_REFERENCE_MODE;
+        op_item->op_arg_modes[2] = 0;
+        op_item->op_want_result = want_result;
+        break;
+    }
+
     case (EXTOP_PREFIX << 8) | FATAL_OP: {
         if(lai_exec_reserve_opstack(state))
             return 1;
@@ -2258,6 +2286,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         op_item->op_arg_modes[2] = LAI_OBJECT_MODE;
         op_item->op_arg_modes[3] = 0;
         op_item->op_want_result = want_result;
+        break;
     }
 
     case (EXTOP_PREFIX << 8) | DEBUG_OP: {

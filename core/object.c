@@ -211,6 +211,42 @@ lai_api_error_t lai_obj_get_handle(lai_variable_t *object, lai_nsnode_t **out) {
     }
 }
 
+lai_api_error_t lai_obj_to_buffer(lai_variable_t *out, lai_variable_t *object){
+    switch (object->type)
+    {
+    case LAI_TYPE_INTEGER:
+        if(lai_create_buffer(out, sizeof(uint64_t)))
+            return LAI_ERROR_OUT_OF_MEMORY;
+        lai_warn("OI: %lx", object->integer);
+        memcpy(out->buffer_ptr->content, &object->integer, sizeof(uint64_t));
+        break;
+
+    case LAI_TYPE_BUFFER:
+        lai_obj_clone(out, object);
+        break;
+    
+    case LAI_TYPE_STRING: {
+        size_t len = lai_exec_string_length(object);
+        if(len == 0){
+            if(lai_create_buffer(out, 0))
+                return LAI_ERROR_OUT_OF_MEMORY;
+        } else {
+            if(lai_create_buffer(out, len + 1))
+                return LAI_ERROR_OUT_OF_MEMORY;
+            memcpy(out->buffer_ptr->content, object->string_ptr->content, len);
+        }
+        break;
+    }
+    
+    default:
+        lai_warn("lai_obj_to_buffer() unsupported object type %d",
+                   object->type);
+        return LAI_ERROR_ILLEGAL_ARGUMENTS;
+    }
+
+    return LAI_ERROR_NONE;
+}
+
 // lai_clone_buffer(): Clones a buffer object
 static void lai_clone_buffer(lai_variable_t *dest, lai_variable_t *source) {
     size_t size = lai_exec_buffer_size(source);
