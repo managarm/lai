@@ -571,13 +571,13 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
     }
     case (EXTOP_PREFIX << 8) | FATAL_OP: {
         LAI_CLEANUP_VAR lai_variable_t fatal_type = LAI_VAR_INITIALIZER;
-        lai_exec_get_integer(state, &operands[1], &fatal_type);
+        lai_exec_get_integer(state, &operands[0], &fatal_type);
 
         LAI_CLEANUP_VAR lai_variable_t fatal_data = LAI_VAR_INITIALIZER;
-        lai_exec_get_integer(state, &operands[2], &fatal_data);
+        lai_exec_get_integer(state, &operands[1], &fatal_data);
 
         LAI_CLEANUP_VAR lai_variable_t fatal_arg = LAI_VAR_INITIALIZER;
-        lai_exec_get_integer(state, &operands[3], &fatal_arg);
+        lai_exec_get_integer(state, &operands[2], &fatal_arg);
 
         if(!fatal_type.integer)
             fatal_type.integer = 0;
@@ -1156,8 +1156,8 @@ static inline int lai_parse_u64(uint64_t *out, uint8_t *code, int *pc, int limit
         return 1;
     *out = ((uint64_t)code[*pc]) | (((uint64_t)code[*pc + 1]) << 8)
            | (((uint64_t)code[*pc + 2]) << 16) | (((uint64_t)code[*pc + 3]) << 24)
-           | (((uint64_t)code[*pc + 4]) << 32) | (((uint64_t)code[*pc + 1]) << 40)
-           | (((uint64_t)code[*pc + 2]) << 48) | (((uint64_t)code[*pc + 3]) << 56);
+           | (((uint64_t)code[*pc + 4]) << 32) | (((uint64_t)code[*pc + 5]) << 40)
+           | (((uint64_t)code[*pc + 6]) << 48) | (((uint64_t)code[*pc + 7]) << 56);
     *pc += 8;
     return 0;
 }
