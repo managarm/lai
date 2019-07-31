@@ -86,3 +86,9 @@ int lai_strcmp(const char *a, const char *b) {
     }
 }
 
+void lai_snprintf(char * buf, size_t bufsize, const char * fmt, ...){
+    va_list list;
+    va_start(list, fmt);
+    lai_vsnprintf(buf, bufsize, fmt, list);
+    va_end(list);
+}

@@ -14,3 +14,4 @@ char *lai_strcpy(char *, const char *);
 int lai_strcmp(const char *, const char *);
 
 void lai_vsnprintf(char *, size_t, const char *, va_list);
+void lai_snprintf(char *, size_t, const char *, ...);
