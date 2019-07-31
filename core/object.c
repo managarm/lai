@@ -289,6 +289,44 @@ lai_api_error_t lai_obj_to_string(lai_variable_t *out, lai_variable_t *object, s
     return LAI_ERROR_NONE;
 }
 
+lai_api_error_t lai_obj_to_decimal_string(lai_variable_t *out, lai_variable_t *object){
+    switch (object->type)
+    {
+    case LAI_BUFFER: {
+        size_t buffer_len = lai_exec_buffer_size(object);
+        uint8_t *buffer = lai_exec_buffer_access(object);
+        lai_create_string(out, (buffer_len * 3)); // For every buffer byte we need 2 chars of number and a comma
+
+        char *string = lai_exec_string_access(out);
+        uint64_t string_index = 0;
+
+        for(uint64_t i = 0; i < buffer_len; i++){
+            char buf[5] = "";
+            lai_snprintf(buf, 5, "%02d", buffer[i]);
+
+            string[string_index] = buf[0];
+            string[string_index + 1] = buf[1];
+            string[string_index + 2] = ',';
+            string_index += 3;
+        }
+        // String with values should be constructed now, remove the last comma
+        string[string_index - 1] = '\0';
+        break;
+    }
+
+    case LAI_STRING:
+        lai_obj_clone(out, object);
+        break;
+    
+    default:
+        lai_warn("lai_obj_to_decimal_string() unsupported object type %d",
+                   object->type);
+        return LAI_ERROR_ILLEGAL_ARGUMENTS;
+    }
+
+    return LAI_ERROR_NONE;
+}
+
 // lai_clone_buffer(): Clones a buffer object
 static void lai_clone_buffer(lai_variable_t *dest, lai_variable_t *source) {
     size_t size = lai_exec_buffer_size(source);

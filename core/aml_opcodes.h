@@ -69,6 +69,7 @@
 #define LGREATER_OP			0x94
 #define LLESS_OP			0x95
 #define TOBUFFER_OP         0x96
+#define TODECIMALSTRING_OP  0x97
 #define TOSTRING_OP         0x9C
 #define COPYOBJECT_OP		0x9D
 #define CONTINUE_OP			0x9F
