@@ -327,6 +327,48 @@ lai_api_error_t lai_obj_to_decimal_string(lai_variable_t *out, lai_variable_t *o
     return LAI_ERROR_NONE;
 }
 
+// The spec doesn't mention this but the numbers should be prefixed with 0x
+lai_api_error_t lai_obj_to_hex_string(lai_variable_t *out, lai_variable_t *object){
+    switch (object->type)
+    {
+    case LAI_BUFFER: {
+        size_t buffer_len = lai_exec_buffer_size(object);
+        uint8_t *buffer = lai_exec_buffer_access(object);
+        lai_create_string(out, (buffer_len * 5)); // For every buffer byte we need 2 chars of prefix, 2 chars of number and a comma
+                                                  // I'll take the 1 byte loss of the last comma for code simplicity
+
+        char *string = lai_exec_string_access(out);
+        uint64_t string_index = 0;
+
+        for(uint64_t i = 0; i < buffer_len; i++){
+            char buf[5] = "";
+            lai_snprintf(buf, 5, "%02X", buffer[i]);
+
+            string[string_index] = '0';
+            string[string_index + 1] = 'x';
+            string[string_index + 2] = buf[0];
+            string[string_index + 3] = buf[1];
+            string[string_index + 4] = ',';
+            string_index += 5;
+        }
+        // String with values should be constructed now, remove the last comma
+        string[string_index - 1] = '\0';
+        break;
+    }
+
+    case LAI_STRING:
+        lai_obj_clone(out, object);
+        break;
+    
+    default:
+        lai_warn("lai_obj_to_decimal_string() unsupported object type %d",
+                   object->type);
+        return LAI_ERROR_ILLEGAL_ARGUMENTS;
+    }
+
+    return LAI_ERROR_NONE;
+}
+
 // lai_clone_buffer(): Clones a buffer object
 static void lai_clone_buffer(lai_variable_t *dest, lai_variable_t *source) {
     size_t size = lai_exec_buffer_size(source);

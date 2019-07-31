@@ -551,6 +551,17 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
         lai_operand_emplace(state, &operands[1], &result);
         break;
     }
+    case TOHEXSTRING_OP: {
+        LAI_CLEANUP_VAR lai_variable_t operand = LAI_VAR_INITIALIZER;
+        lai_exec_get_objectref(state, &operands[0], &operand);
+
+        lai_api_error_t error = lai_obj_to_hex_string(&result, &operand);
+        if(error != LAI_ERROR_NONE)
+            lai_panic("Failed ToHexString: %s", lai_api_error_to_string(error));
+
+        lai_operand_emplace(state, &operands[1], &result);
+        break;
+    }
     case TOSTRING_OP: {
         LAI_CLEANUP_VAR lai_variable_t operand = LAI_VAR_INITIALIZER;
         lai_exec_get_objectref(state, &operands[0], &operand);
@@ -2296,6 +2307,23 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
     }
 
     case TODECIMALSTRING_OP: {
+        if(lai_exec_reserve_stack(state))
+            return 1;
+
+        lai_exec_commit_pc(state, pc);
+
+        lai_stackitem_t *op_item = lai_exec_push_stack(state);
+        op_item->kind = LAI_OP_STACKITEM;
+        op_item->op_opcode = opcode;
+        op_item->opstack_frame = state->opstack_ptr;
+        op_item->op_arg_modes[0] = LAI_OBJECT_MODE;
+        op_item->op_arg_modes[1] = LAI_REFERENCE_MODE;
+        op_item->op_arg_modes[2] = 0;
+        op_item->op_want_result = want_result;
+        break;
+    }
+
+    case TOHEXSTRING_OP: {
         if(lai_exec_reserve_stack(state))
             return 1;
 
