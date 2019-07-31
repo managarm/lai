@@ -540,6 +540,19 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
         lai_operand_emplace(state, &operands[1], &result);
         break;
     }
+    case TOSTRING_OP: {
+        LAI_CLEANUP_VAR lai_variable_t operand = LAI_VAR_INITIALIZER;
+        lai_exec_get_objectref(state, &operands[0], &operand);
+        LAI_CLEANUP_VAR lai_variable_t size_var = LAI_VAR_INITIALIZER;
+        lai_exec_get_integer(state, &operands[1], &size_var);
+        
+        lai_api_error_t error = lai_obj_to_string(&result, &operand, size_var.integer);
+        if(error != LAI_ERROR_NONE)
+            lai_panic("Failed ToString: %s", lai_api_error_to_string(error));
+
+        lai_operand_emplace(state, &operands[2], &result);
+        break; 
+    }
     case (EXTOP_PREFIX << 8) | CONDREF_OP: {
         struct lai_operand *operand = &operands[0];
         struct lai_operand *target = &operands[1];
@@ -599,7 +612,7 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
         if(!fatal_arg.integer)
             fatal_arg.integer = 0;
 
-        lai_panic("FatalOp in AML, Type: %02x, Data %08X, Arg: %x\n", fatal_type, fatal_data, fatal_arg);
+        lai_panic("FatalOp in AML, Type: %02x, Data %08X, Arg: %x\n", fatal_type.integer, fatal_data.integer, fatal_arg.integer);
         break;
     }
     case (EXTOP_PREFIX << 8) | ACQUIRE_OP:
@@ -2255,7 +2268,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
     }
 
     case TOBUFFER_OP: {
-        if(lai_exec_reserve_opstack(state))
+        if(lai_exec_reserve_stack(state))
             return 1;
 
         lai_exec_commit_pc(state, pc);
@@ -2271,8 +2284,26 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         break;
     }
 
+    case TOSTRING_OP: {
+        if(lai_exec_reserve_stack(state))
+            return 1;
+
+        lai_exec_commit_pc(state, pc);
+
+        lai_stackitem_t *op_item = lai_exec_push_stack(state);
+        op_item->kind = LAI_OP_STACKITEM;
+        op_item->op_opcode = opcode;
+        op_item->opstack_frame = state->opstack_ptr;
+        op_item->op_arg_modes[0] = LAI_OBJECT_MODE;
+        op_item->op_arg_modes[1] = LAI_OBJECT_MODE;
+        op_item->op_arg_modes[2] = LAI_REFERENCE_MODE;
+        op_item->op_arg_modes[3] = 0;
+        op_item->op_want_result = want_result;
+        break;
+    }
+
     case (EXTOP_PREFIX << 8) | FATAL_OP: {
-        if(lai_exec_reserve_opstack(state))
+        if(lai_exec_reserve_stack(state))
             return 1;
 
         lai_exec_commit_pc(state, pc);

@@ -217,7 +217,6 @@ lai_api_error_t lai_obj_to_buffer(lai_variable_t *out, lai_variable_t *object){
     case LAI_TYPE_INTEGER:
         if(lai_create_buffer(out, sizeof(uint64_t)))
             return LAI_ERROR_OUT_OF_MEMORY;
-        lai_warn("OI: %lx", object->integer);
         memcpy(out->buffer_ptr->content, &object->integer, sizeof(uint64_t));
         break;
 
@@ -240,6 +239,49 @@ lai_api_error_t lai_obj_to_buffer(lai_variable_t *out, lai_variable_t *object){
     
     default:
         lai_warn("lai_obj_to_buffer() unsupported object type %d",
+                   object->type);
+        return LAI_ERROR_ILLEGAL_ARGUMENTS;
+    }
+
+    return LAI_ERROR_NONE;
+}
+
+lai_api_error_t lai_obj_to_string(lai_variable_t *out, lai_variable_t *object, size_t size){
+    switch (object->type)
+    {
+    case LAI_TYPE_BUFFER: {
+        size_t buffer_length = 0;
+        uint8_t *buffer = lai_exec_buffer_access(object);
+        for(uint64_t i = 0; i < lai_exec_buffer_size(object); i++){
+            if(buffer[i] == '\0') 
+                break;
+            buffer_length++;
+        }
+        
+        if(buffer_length == 0){
+            lai_create_string(out, 0);
+        } else if(size == ~(uint64_t)(0)){
+            // Copy until the '\0'
+            lai_create_string(out, buffer_length + 1);
+            char *string = lai_exec_string_access(out);
+            memcpy(string, buffer, buffer_length);
+        } else {
+            if(size < buffer_length){
+                lai_create_string(out, size);
+                char *string = lai_exec_string_access(out);
+                memcpy(string, buffer, size);
+            } else {
+                lai_create_string(out, buffer_length);
+                char *string = lai_exec_string_access(out);
+                memcpy(string, buffer, buffer_length);
+            }
+            
+        }
+        break;
+    }
+    
+    default:
+        lai_warn("lai_obj_to_string() unsupported object type %d",
                    object->type);
         return LAI_ERROR_ILLEGAL_ARGUMENTS;
     }
