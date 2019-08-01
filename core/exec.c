@@ -16,8 +16,8 @@
 static int debug_opcodes = 0;
 static int debug_stack = 0;
 
-static int lai_exec_process(lai_state_t *state);
-static int lai_exec_parse(int parse_mode, lai_state_t *state);
+static lai_api_error_t lai_exec_process(lai_state_t *state);
+static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state);
 
 // Prepare the interpreter state for a control method call.
 // Param: lai_state_t *state - will store method name and arguments
@@ -675,7 +675,7 @@ static int lai_exec_run(lai_state_t *state) {
                 }
             }
 
-        int e;
+        lai_api_error_t e;
         if((e = lai_exec_process(state)))
             return e;
     }
@@ -721,7 +721,7 @@ static int lai_parse_name(struct lai_amlname *out, uint8_t *code, int *pc, int l
 }
 
 // Process the top-most item of the execution stack.
-static int lai_exec_process(lai_state_t *state) {
+static lai_api_error_t lai_exec_process(lai_state_t *state) {
     lai_stackitem_t *item = lai_exec_peek_stack_back(state);
     struct lai_ctxitem *ctxitem = lai_exec_peek_ctxstack_back(state);
     struct lai_blkitem *block = lai_exec_peek_blkstack_back(state);
@@ -758,7 +758,7 @@ static int lai_exec_process(lai_state_t *state) {
             lai_exec_pop_blkstack_back(state);
             lai_exec_pop_ctxstack_back(state);
             lai_exec_pop_stack_back(state);
-            return 0;
+            return LAI_ERROR_NONE;
         } else {
             return lai_exec_parse(LAI_EXEC_MODE, state);
         }
@@ -766,7 +766,7 @@ static int lai_exec_process(lai_state_t *state) {
         // ACPI does an implicit Return(0) at the end of a control method.
         if (block->pc == block->limit) {
             if (lai_exec_reserve_opstack(state))
-                return 1;
+                return LAI_ERROR_OUT_OF_MEMORY;
 
             if (state->opstack_ptr) // This is an internal error.
                 lai_panic("opstack is not empty before return");
@@ -788,7 +788,7 @@ static int lai_exec_process(lai_state_t *state) {
             lai_exec_pop_blkstack_back(state);
             lai_exec_pop_ctxstack_back(state);
             lai_exec_pop_stack_back(state);
-            return 0;
+            return LAI_ERROR_NONE;
         } else {
             return lai_exec_parse(LAI_EXEC_MODE, state);
         }
@@ -822,7 +822,7 @@ static int lai_exec_process(lai_state_t *state) {
 
             lai_exec_pop_blkstack_back(state);
             lai_exec_pop_stack_back(state);
-            return 0;
+            return LAI_ERROR_NONE;
         } else {
             return lai_exec_parse(LAI_OBJECT_MODE, state);
         }
@@ -851,7 +851,7 @@ static int lai_exec_process(lai_state_t *state) {
 
             lai_exec_pop_blkstack_back(state);
             lai_exec_pop_stack_back(state);
-            return 0;
+            return LAI_ERROR_NONE;
         } else {
             return lai_exec_parse(LAI_DATA_MODE, state);
         }
@@ -863,7 +863,7 @@ static int lai_exec_process(lai_state_t *state) {
             lai_exec_pop_opstack(state, k);
 
             lai_exec_pop_stack_back(state);
-            return 0;
+            return LAI_ERROR_NONE;
         } else {
             return lai_exec_parse(item->node_arg_modes[k], state);
         }
@@ -872,7 +872,7 @@ static int lai_exec_process(lai_state_t *state) {
 //            lai_debug("got %d parameters", k);
         if (!item->op_arg_modes[k]) {
             if (lai_exec_reserve_opstack(state))
-                return 1;
+                return LAI_ERROR_OUT_OF_MEMORY;
 
             lai_variable_t result = {0};
             struct lai_operand *operands = lai_exec_get_opstack(state, item->opstack_frame);
@@ -888,7 +888,7 @@ static int lai_exec_process(lai_state_t *state) {
             }
 
             lai_exec_pop_stack_back(state);
-            return 0;
+            return LAI_ERROR_NONE;
         } else {
             return lai_exec_parse(item->op_arg_modes[k], state);
         }
@@ -900,7 +900,7 @@ static int lai_exec_process(lai_state_t *state) {
         if (k == argc + 1) { // First operand is the method name.
             if (lai_exec_reserve_ctxstack(state)
                     || lai_exec_reserve_blkstack(state))
-                return 1;
+                return LAI_ERROR_OUT_OF_MEMORY;
 
             struct lai_operand *opstack_method
                     = lai_exec_get_opstack(state, item->opstack_frame);
@@ -928,8 +928,10 @@ static int lai_exec_process(lai_state_t *state) {
                 LAI_CLEANUP_VAR lai_variable_t method_result = LAI_VAR_INITIALIZER;
                 int e = handle->method_override(args, &method_result);
 
-                if (e)
-                    return e;
+                if (e) {
+                    lai_warn("overriden control method failed");
+                    return LAI_ERROR_EXECUTION_FAILURE;
+                }
                 if (want_result) {
                     // Note: there is no need to reserve() as we pop an operand above.
                     struct lai_operand *opstack_res = lai_exec_push_opstack(state);
@@ -962,7 +964,7 @@ static int lai_exec_process(lai_state_t *state) {
                 item->kind = LAI_METHOD_STACKITEM;
                 item->mth_want_result = want_result;
             }
-            return 0;
+            return LAI_ERROR_NONE;
         } else {
             return lai_exec_parse(LAI_OBJECT_MODE, state);
         }
@@ -1023,7 +1025,7 @@ static int lai_exec_process(lai_state_t *state) {
             lai_exec_pop_ctxstack_back(state);
             lai_exec_pop_blkstack_back(state);
             lai_exec_pop_stack_back(state);
-            return 0;
+            return LAI_ERROR_NONE;
         } else {
             return lai_exec_parse(LAI_OBJECT_MODE, state);
         }
@@ -1044,7 +1046,7 @@ static int lai_exec_process(lai_state_t *state) {
                     lai_exec_pop_blkstack_back(state);
                     lai_exec_pop_stack_back(state);
                 }
-                return 0;
+                return LAI_ERROR_NONE;
             } else {
                 return lai_exec_parse(LAI_OBJECT_MODE, state);
             }
@@ -1054,7 +1056,7 @@ static int lai_exec_process(lai_state_t *state) {
             if (block->pc == block->limit) {
                 item->loop_state = 0;
                 block->pc = item->loop_pred;
-                return 0;
+                return LAI_ERROR_NONE;
             } else {
                 return lai_exec_parse(LAI_EXEC_MODE, state);
             }
@@ -1082,7 +1084,7 @@ static int lai_exec_process(lai_state_t *state) {
                         lai_exec_pop_stack_back(state);
                     }
                 }
-                return 0;
+                return LAI_ERROR_NONE;
             } else {
                 return lai_exec_parse(LAI_OBJECT_MODE, state);
             }
@@ -1091,7 +1093,7 @@ static int lai_exec_process(lai_state_t *state) {
             if (block->pc == block->limit) {
                 lai_exec_pop_blkstack_back(state);
                 lai_exec_pop_stack_back(state);
-                return 0;
+                return LAI_ERROR_NONE;
             } else {
                 return lai_exec_parse(LAI_EXEC_MODE, state);
             }
@@ -1128,8 +1130,9 @@ static int lai_exec_process(lai_state_t *state) {
                 switch (*(method + pc)) {
                     case 0: // ReservedField
                         pc++;
+                        // TODO: Partially failing to parse a Field() is a bad idea.
                         if (lai_parse_varint(&skip_bits, method, &pc, limit))
-                            return 1;
+                            return LAI_ERROR_EXECUTION_FAILURE;
                         curr_off += skip_bits;
                         break;
                     case 1: // AccessField
@@ -1141,9 +1144,10 @@ static int lai_exec_process(lai_state_t *state) {
                         lai_panic("ConnectField parsing isn't implemented");
                         break;
                     default: // NamedField
+                        // TODO: Partially failing to parse a Field() is a bad idea.
                         if (lai_parse_name(&field_amln, method, &pc, limit)
                                 || lai_parse_varint(&skip_bits, method, &pc, limit))
-                            return 1;
+                            return LAI_ERROR_EXECUTION_FAILURE;
 
                         lai_nsnode_t *node = lai_create_nsnode_or_die();
                         node->type = LAI_NAMESPACE_BANK_FIELD;
@@ -1165,7 +1169,7 @@ static int lai_exec_process(lai_state_t *state) {
 
             lai_exec_pop_blkstack_back(state);
             lai_exec_pop_stack_back(state);
-            return 0;
+            return LAI_ERROR_NONE;
         } else {
             return lai_exec_parse(LAI_OBJECT_MODE, state);
         }
@@ -1219,7 +1223,7 @@ static inline void lai_exec_commit_pc(lai_state_t *state, int pc) {
     block->pc = pc;
 }
 
-static int lai_exec_parse(int parse_mode, lai_state_t *state) {
+static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
     struct lai_ctxitem *ctxitem = lai_exec_peek_ctxstack_back(state);
     struct lai_blkitem *block = lai_exec_peek_blkstack_back(state);
     LAI_ENSURE(ctxitem);
@@ -1258,56 +1262,56 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
     if (parse_mode == LAI_IMMEDIATE_BYTE_MODE) {
         uint8_t value;
         if (lai_parse_u8(&value, method, &pc, limit))
-            return 1;
+            return LAI_ERROR_EXECUTION_FAILURE;
 
         if (lai_exec_reserve_opstack(state))
-            return 1;
+            return LAI_ERROR_OUT_OF_MEMORY;
         lai_exec_commit_pc(state, pc);
 
         struct lai_operand *result = lai_exec_push_opstack(state);
         result->tag = LAI_OPERAND_OBJECT;
         result->object.type = LAI_INTEGER;
         result->object.integer = value;
-        return 0;
+        return LAI_ERROR_NONE;
     } else if (parse_mode == LAI_IMMEDIATE_WORD_MODE) {
         uint16_t value;
         if (lai_parse_u16(&value, method, &pc, limit))
-            return 1;
+            return LAI_ERROR_EXECUTION_FAILURE;
 
         if (lai_exec_reserve_opstack(state))
-            return 1;
+            return LAI_ERROR_OUT_OF_MEMORY;
         lai_exec_commit_pc(state, pc);
 
         struct lai_operand *result = lai_exec_push_opstack(state);
         result->tag = LAI_OPERAND_OBJECT;
         result->object.type = LAI_INTEGER;
         result->object.integer = value;
-        return 0;
+        return LAI_ERROR_NONE;
     } else if(parse_mode == LAI_IMMEDIATE_DWORD_MODE){
         uint32_t value;
         if (lai_parse_u32(&value, method, &pc, limit))
-            return 1;
+            return LAI_ERROR_EXECUTION_FAILURE;
 
         if (lai_exec_reserve_opstack(state))
-            return 1;
+            return LAI_ERROR_OUT_OF_MEMORY;
         lai_exec_commit_pc(state, pc);
 
         struct lai_operand *result = lai_exec_push_opstack(state);
         result->tag = LAI_OPERAND_OBJECT;
         result->object.type = LAI_INTEGER;
         result->object.integer = value;
-        return 0;
+        return LAI_ERROR_NONE;
     }
 
     // Process names.
     if (lai_is_name(method[pc])) {
         struct lai_amlname amln;
         if (lai_parse_name(&amln, method, &pc, limit))
-            return 1;
+            return LAI_ERROR_EXECUTION_FAILURE;
 
         if (lai_exec_reserve_opstack(state)
                 || lai_exec_reserve_stack(state))
-            return 1;
+            return LAI_ERROR_OUT_OF_MEMORY;
         lai_exec_commit_pc(state, pc);
 
         LAI_CLEANUP_FREE_STRING char *path = NULL;
@@ -1389,7 +1393,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
                 }
             }
         }
-        return 0;
+        return LAI_ERROR_NONE;
     }
 
     /* General opcodes */
@@ -1420,7 +1424,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
 
     case ZERO_OP:
         if (lai_exec_reserve_opstack(state))
-            return 1;
+            return LAI_ERROR_OUT_OF_MEMORY;
         lai_exec_commit_pc(state, pc);
 
         if (parse_mode == LAI_DATA_MODE || parse_mode == LAI_OBJECT_MODE) {
@@ -1440,7 +1444,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         break;
     case ONE_OP:
         if (lai_exec_reserve_opstack(state))
-            return 1;
+            return LAI_ERROR_OUT_OF_MEMORY;
         lai_exec_commit_pc(state, pc);
 
         if (parse_mode == LAI_DATA_MODE || parse_mode == LAI_OBJECT_MODE) {
@@ -1455,7 +1459,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         break;
     case ONES_OP:
         if (lai_exec_reserve_opstack(state))
-            return 1;
+            return LAI_ERROR_OUT_OF_MEMORY;
         lai_exec_commit_pc(state, pc);
 
         if (parse_mode == LAI_DATA_MODE || parse_mode == LAI_OBJECT_MODE) {
@@ -1478,33 +1482,33 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
             case BYTEPREFIX: {
                 uint8_t temp;
                 if (lai_parse_u8(&temp, method, &pc, limit))
-                    return 1;
+                    return LAI_ERROR_EXECUTION_FAILURE;
                 value = temp;
                 break;
             }
             case WORDPREFIX: {
                 uint16_t temp;
                 if (lai_parse_u16(&temp, method, &pc, limit))
-                    return 1;
+                    return LAI_ERROR_EXECUTION_FAILURE;
                 value = temp;
                 break;
             }
             case DWORDPREFIX: {
                 uint32_t temp;
                 if (lai_parse_u32(&temp, method, &pc, limit))
-                    return 1;
+                    return LAI_ERROR_EXECUTION_FAILURE;
                 value = temp;
                 break;
             }
             case QWORDPREFIX: {
                 if (lai_parse_u64(&value, method, &pc, limit))
-                    return 1;
+                    return LAI_ERROR_EXECUTION_FAILURE;
                 break;
             }
         }
 
         if (lai_exec_reserve_opstack(state))
-            return 1;
+            return LAI_ERROR_OUT_OF_MEMORY;
         lai_exec_commit_pc(state, pc);
 
         if (parse_mode == LAI_DATA_MODE || parse_mode == LAI_OBJECT_MODE) {
@@ -1528,7 +1532,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         pc += n + 1;
 
         if (lai_exec_reserve_opstack(state))
-            return 1;
+            return LAI_ERROR_OUT_OF_MEMORY;
         lai_exec_commit_pc(state, pc);
 
         if (parse_mode == LAI_DATA_MODE || parse_mode == LAI_OBJECT_MODE) {
@@ -1546,13 +1550,13 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         int data_pc;
         size_t encoded_size; // Size of the buffer initializer.
         if (lai_parse_varint(&encoded_size, method, &pc, limit))
-            return 1;
+            return LAI_ERROR_EXECUTION_FAILURE;
         data_pc = pc;
         pc = opcode_pc + 1 + encoded_size;
 
         if (lai_exec_reserve_blkstack(state)
                 || lai_exec_reserve_stack(state))
-            return 1;
+            return LAI_ERROR_OUT_OF_MEMORY;
         lai_exec_commit_pc(state, pc);
 
         struct lai_blkitem *blkitem = lai_exec_push_blkstack(state);
@@ -1572,14 +1576,14 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         uint8_t num_ents; // The number of elements of the package.
         if (lai_parse_varint(&encoded_size, method, &pc, limit)
                 || lai_parse_u8(&num_ents, method, &pc, limit))
-            return 1;
+            return LAI_ERROR_EXECUTION_FAILURE;
         data_pc = pc;
         pc = opcode_pc + 1 + encoded_size;
 
         if (lai_exec_reserve_opstack(state)
                 || lai_exec_reserve_blkstack(state)
                 || lai_exec_reserve_stack(state))
-            return 1;
+            return LAI_ERROR_OUT_OF_MEMORY;
         lai_exec_commit_pc(state, pc);
 
         // Note that not all elements of the package need to be initialized.
@@ -1606,7 +1610,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
     case RETURN_OP:
     {
         if (lai_exec_reserve_stack(state))
-            return 1;
+            return LAI_ERROR_OUT_OF_MEMORY;
         lai_exec_commit_pc(state, pc);
 
         lai_stackitem_t *node_item = lai_exec_push_stack(state);
@@ -1620,13 +1624,13 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         int body_pc;
         size_t loop_size;
         if (lai_parse_varint(&loop_size, method, &pc, limit))
-            return 1;
+            return LAI_ERROR_EXECUTION_FAILURE;
         body_pc = pc;
         pc = opcode_pc + 1 + loop_size;
 
         if (lai_exec_reserve_blkstack(state)
                 || lai_exec_reserve_stack(state))
-            return 1;
+            return LAI_ERROR_OUT_OF_MEMORY;
         lai_exec_commit_pc(state, pc);
 
         struct lai_blkitem *blkitem = lai_exec_push_blkstack(state);
@@ -1712,21 +1716,21 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         size_t if_size;
         size_t else_size;
         if (lai_parse_varint(&if_size, method, &pc, limit))
-            return 1;
+            return LAI_ERROR_EXECUTION_FAILURE;
         if_pc = pc;
         pc = opcode_pc + 1 + if_size;
         if (pc < block->limit && method[pc] == ELSE_OP) {
             has_else = 1;
             pc++;
             if (lai_parse_varint(&else_size, method, &pc, limit))
-                return 1;
+                return LAI_ERROR_EXECUTION_FAILURE;
             else_pc = pc;
             pc = opcode_pc + 1 + if_size + 1 + else_size;
         }
 
         if (lai_exec_reserve_blkstack(state)
                 || lai_exec_reserve_stack(state))
-            return 1;
+            return LAI_ERROR_OUT_OF_MEMORY;
         lai_exec_commit_pc(state, pc);
 
         struct lai_blkitem *blkitem = lai_exec_push_blkstack(state);
@@ -1754,14 +1758,14 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         struct lai_amlname amln;
         if (lai_parse_varint(&encoded_size, method, &pc, limit)
                 || lai_parse_name(&amln, method, &pc, limit))
-            return 1;
+            return LAI_ERROR_EXECUTION_FAILURE;
         nested_pc = pc;
         pc = opcode_pc + 1 + encoded_size;
 
         if (lai_exec_reserve_ctxstack(state)
                 || lai_exec_reserve_blkstack(state)
                 || lai_exec_reserve_stack(state))
-            return 1;
+            return LAI_ERROR_OUT_OF_MEMORY;
         lai_exec_commit_pc(state, pc);
 
         lai_nsnode_t *scoped_ctx_handle = lai_do_resolve(ctx_handle, &amln);
@@ -1788,14 +1792,14 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         struct lai_amlname amln;
         if (lai_parse_varint(&encoded_size, method, &pc, limit)
                 || lai_parse_name(&amln, method, &pc, limit))
-            return 1;
+            return LAI_ERROR_EXECUTION_FAILURE;
         nested_pc = pc;
         pc = opcode_pc + 2 + encoded_size;
 
         if (lai_exec_reserve_ctxstack(state)
                 || lai_exec_reserve_blkstack(state)
                 || lai_exec_reserve_stack(state))
-            return 1;
+            return LAI_ERROR_OUT_OF_MEMORY;
         lai_exec_commit_pc(state, pc);
 
         lai_nsnode_t *node = lai_create_nsnode_or_die();
@@ -1829,14 +1833,14 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
                 || lai_parse_u8(&cpu_id, method, &pc, limit)
                 || lai_parse_u32(&pblk_addr, method, &pc, limit)
                 || lai_parse_u8(&pblk_len, method, &pc, limit))
-            return 1;
+            return LAI_ERROR_EXECUTION_FAILURE;
         int nested_pc = pc;
         pc = opcode_pc + 2 + pkgsize;
 
         if (lai_exec_reserve_ctxstack(state)
                 || lai_exec_reserve_blkstack(state)
                 || lai_exec_reserve_stack(state))
-            return 1;
+            return LAI_ERROR_OUT_OF_MEMORY;
         lai_exec_commit_pc(state, pc);
 
         lai_nsnode_t *node = lai_create_nsnode_or_die();
@@ -1870,7 +1874,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         struct lai_amlname amln;
         if (lai_parse_varint(&encoded_size, method, &pc, limit)
                 || lai_parse_name(&amln, method, &pc, limit))
-            return 1;
+            return LAI_ERROR_EXECUTION_FAILURE;
 //            uint8_t system_level = method[pc];
         pc++;
 //            uint16_t resource_order = *(uint16_t*)&method[pc];
@@ -1881,7 +1885,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         if (lai_exec_reserve_ctxstack(state)
                 || lai_exec_reserve_blkstack(state)
                 || lai_exec_reserve_stack(state))
-            return 1;
+            return LAI_ERROR_OUT_OF_MEMORY;
         lai_exec_commit_pc(state, pc);
 
         lai_nsnode_t *node = lai_create_nsnode_or_die();
@@ -1911,14 +1915,14 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         struct lai_amlname amln;
         if (lai_parse_varint(&encoded_size, method, &pc, limit)
                 || lai_parse_name(&amln, method, &pc, limit))
-            return 1;
+            return LAI_ERROR_EXECUTION_FAILURE;
         nested_pc = pc;
         pc = opcode_pc + 2 + encoded_size;
 
         if (lai_exec_reserve_ctxstack(state)
                 || lai_exec_reserve_blkstack(state)
                 || lai_exec_reserve_stack(state))
-            return 1;
+            return LAI_ERROR_OUT_OF_MEMORY;
         lai_exec_commit_pc(state, pc);
 
         lai_nsnode_t *node = lai_create_nsnode_or_die();
@@ -1948,10 +1952,9 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         struct lai_amlname amln;
         uint8_t flags;
         if (lai_parse_varint(&encoded_size, method, &pc, limit)
-                || lai_parse_name(&amln, method, &pc, limit))
-            return 1;
-        if (lai_parse_u8(&flags, method, &pc, limit))
-            return 1;
+                || lai_parse_name(&amln, method, &pc, limit)
+                || lai_parse_u8(&flags, method, &pc, limit))
+            return LAI_ERROR_EXECUTION_FAILURE;
         int nested_pc = pc;
         pc = opcode_pc + 1 + encoded_size;
 
@@ -1971,7 +1974,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
     }
     case NAME_OP: {
         if (lai_exec_reserve_stack(state))
-            return 1;
+            return LAI_ERROR_OUT_OF_MEMORY;
         lai_exec_commit_pc(state, pc);
 
         lai_stackitem_t *node_item = lai_exec_push_stack(state);
@@ -1988,7 +1991,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         struct lai_amlname dest_amln;
         if (lai_parse_name(&target_amln, method, &pc, limit)
                 || lai_parse_name(&dest_amln, method, &pc, limit))
-            return 1;
+            return LAI_ERROR_EXECUTION_FAILURE;
 
         lai_exec_commit_pc(state, pc);
 
@@ -2010,7 +2013,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
     case DWORDFIELD_OP:
     case QWORDFIELD_OP: {
         if (lai_exec_reserve_stack(state))
-            return 1;
+            return LAI_ERROR_OUT_OF_MEMORY;
         lai_exec_commit_pc(state, pc);
 
         lai_stackitem_t *node_item = lai_exec_push_stack(state);
@@ -2026,7 +2029,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
     case (EXTOP_PREFIX << 8) | MUTEX: {
         struct lai_amlname amln;
         if (lai_parse_name(&amln, method, &pc, limit))
-            return 1;
+            return LAI_ERROR_EXECUTION_FAILURE;
         pc++; // skip over trailing 0x02
 
         lai_exec_commit_pc(state, pc);
@@ -2042,7 +2045,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
     case (EXTOP_PREFIX << 8) | EVENT: {
         struct lai_amlname amln;
         if (lai_parse_name(&amln, method, &pc, limit))
-            return 1;
+            return LAI_ERROR_EXECUTION_FAILURE;
 
         lai_exec_commit_pc(state, pc);
 
@@ -2056,7 +2059,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
     }
     case (EXTOP_PREFIX << 8) | OPREGION: {
         if (lai_exec_reserve_stack(state))
-            return 1;
+            return LAI_ERROR_OUT_OF_MEMORY;
         lai_exec_commit_pc(state, pc);
 
         lai_stackitem_t *node_item = lai_exec_push_stack(state);
@@ -2075,7 +2078,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         struct lai_amlname region_amln;
         if (lai_parse_varint(&pkgsize, method, &pc, limit)
                 || lai_parse_name(&region_amln, method, &pc, limit))
-            return 1;
+            return LAI_ERROR_EXECUTION_FAILURE;
 
         int end_pc = opcode_pc + 2 + pkgsize;
 
@@ -2097,8 +2100,9 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
             switch (*(method + pc)) {
                 case 0: // ReservedField
                     pc++;
+                    // TODO: Partially failing to parse a Field() is a bad idea.
                     if (lai_parse_varint(&skip_bits, method, &pc, limit))
-                        return 1;
+                        return LAI_ERROR_EXECUTION_FAILURE;
                     curr_off += skip_bits;
                     break;
                 case 1: // AccessField
@@ -2110,9 +2114,10 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
                     lai_panic("ConnectField parsing isn't implemented");
                     break;
                 default: // NamedField
+                        // TODO: Partially failing to parse a Field() is a bad idea.
                     if (lai_parse_name(&field_amln, method, &pc, limit)
                             || lai_parse_varint(&skip_bits, method, &pc, limit))
-                        return 1;
+                        return LAI_ERROR_EXECUTION_FAILURE;
 
                     lai_nsnode_t *node = lai_create_nsnode_or_die();
                     node->type = LAI_NAMESPACE_FIELD;
@@ -2140,7 +2145,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         if (lai_parse_varint(&pkgsize, method, &pc, limit)
                 || lai_parse_name(&index_amln, method, &pc, limit)
                 || lai_parse_name(&data_amln, method, &pc, limit))
-            return 1;
+            return LAI_ERROR_EXECUTION_FAILURE;
 
         int end_pc = opcode_pc + 2 + pkgsize;
 
@@ -2160,8 +2165,9 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
             switch (*(method + pc)) {
                 case 0: // ReservedField
                     pc++;
+                    // TODO: Partially failing to parse a Field() is a bad idea.
                     if (lai_parse_varint(&skip_bits, method, &pc, limit))
-                        return 1;
+                        return LAI_ERROR_EXECUTION_FAILURE;
                     curr_off += skip_bits;
                     break;
                 case 1: // AccessField
@@ -2173,9 +2179,10 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
                     lai_panic("ConnectField parsing isn't implemented");
                     break;
                 default: // NamedField
+                    // TODO: Partially failing to parse a Field() is a bad idea.
                     if (lai_parse_name(&field_amln, method, &pc, limit)
                             || lai_parse_varint(&skip_bits, method, &pc, limit))
-                        return 1;
+                        return LAI_ERROR_EXECUTION_FAILURE;
 
                     lai_nsnode_t *node = lai_create_nsnode_or_die();
                     node->type = LAI_NAMESPACE_INDEXFIELD;
@@ -2205,7 +2212,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         if (lai_parse_varint(&pkgsize, method, &pc, limit)
                 || lai_parse_name(&region_amln, method, &pc, limit)
                 || lai_parse_name(&bank_amln, method, &pc, limit))
-            return 1;
+            return LAI_ERROR_EXECUTION_FAILURE;
 
         int start_pc = pc;
         pc = opcode_pc + 2 + pkgsize;
@@ -2218,7 +2225,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         if (lai_exec_reserve_blkstack(state)
                 || lai_exec_reserve_stack(state)
                 || lai_exec_reserve_opstack_n(state, 2))
-            return 1;
+            return LAI_ERROR_OUT_OF_MEMORY;
         lai_exec_commit_pc(state, pc);
 
         struct lai_blkitem *blkitem = lai_exec_push_blkstack(state);
@@ -2248,7 +2255,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
     case ARG5_OP:
     case ARG6_OP: {
         if (lai_exec_reserve_opstack(state))
-            return 1;
+            return LAI_ERROR_OUT_OF_MEMORY;
         lai_exec_commit_pc(state, pc);
 
         if (parse_mode == LAI_REFERENCE_MODE
@@ -2275,7 +2282,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
     case LOCAL6_OP:
     case LOCAL7_OP: {
         if (lai_exec_reserve_opstack(state))
-            return 1;
+            return LAI_ERROR_OUT_OF_MEMORY;
         lai_exec_commit_pc(state, pc);
 
         if(parse_mode == LAI_REFERENCE_MODE
@@ -2301,7 +2308,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
 
     case TOBUFFER_OP: {
         if(lai_exec_reserve_stack(state))
-            return 1;
+            return LAI_ERROR_OUT_OF_MEMORY;
 
         lai_exec_commit_pc(state, pc);
 
@@ -2318,7 +2325,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
 
     case TODECIMALSTRING_OP: {
         if(lai_exec_reserve_stack(state))
-            return 1;
+            return LAI_ERROR_OUT_OF_MEMORY;
 
         lai_exec_commit_pc(state, pc);
 
@@ -2335,7 +2342,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
 
     case TOHEXSTRING_OP: {
         if(lai_exec_reserve_stack(state))
-            return 1;
+            return LAI_ERROR_OUT_OF_MEMORY;
 
         lai_exec_commit_pc(state, pc);
 
@@ -2352,7 +2359,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
 
     case TOSTRING_OP: {
         if(lai_exec_reserve_stack(state))
-            return 1;
+            return LAI_ERROR_OUT_OF_MEMORY;
 
         lai_exec_commit_pc(state, pc);
 
@@ -2370,7 +2377,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
 
     case (EXTOP_PREFIX << 8) | FATAL_OP: {
         if(lai_exec_reserve_stack(state))
-            return 1;
+            return LAI_ERROR_OUT_OF_MEMORY;
 
         lai_exec_commit_pc(state, pc);
 
@@ -2388,7 +2395,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
 
     case (EXTOP_PREFIX << 8) | DEBUG_OP: {
         if (lai_exec_reserve_opstack(state))
-            return 1;
+            return LAI_ERROR_OUT_OF_MEMORY;
         lai_exec_commit_pc(state, pc);
 
         // Accessing (i.e., loading from) the Debug object is not supported yet.
@@ -2403,7 +2410,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
     case COPYOBJECT_OP:
     case NOT_OP: {
         if (lai_exec_reserve_stack(state))
-            return 1;
+            return LAI_ERROR_OUT_OF_MEMORY;
         lai_exec_commit_pc(state, pc);
 
         lai_stackitem_t *op_item = lai_exec_push_stack(state);
@@ -2425,7 +2432,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
     case SHR_OP:
     case SHL_OP: {
         if (lai_exec_reserve_stack(state))
-            return 1;
+            return LAI_ERROR_OUT_OF_MEMORY;
         lai_exec_commit_pc(state, pc);
 
         lai_stackitem_t *op_item = lai_exec_push_stack(state);
@@ -2441,7 +2448,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
     }
     case DIVIDE_OP: {
         if (lai_exec_reserve_stack(state))
-            return 1;
+            return LAI_ERROR_OUT_OF_MEMORY;
         lai_exec_commit_pc(state, pc);
 
         lai_stackitem_t *op_item = lai_exec_push_stack(state);
@@ -2460,7 +2467,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
     case INCREMENT_OP:
     case DECREMENT_OP: {
         if (lai_exec_reserve_stack(state))
-            return 1;
+            return LAI_ERROR_OUT_OF_MEMORY;
         lai_exec_commit_pc(state, pc);
 
         lai_stackitem_t *op_item = lai_exec_push_stack(state);
@@ -2475,7 +2482,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
 
     case LNOT_OP: {
         if (lai_exec_reserve_stack(state))
-            return 1;
+            return LAI_ERROR_OUT_OF_MEMORY;
         lai_exec_commit_pc(state, pc);
 
         lai_stackitem_t *op_item = lai_exec_push_stack(state);
@@ -2493,7 +2500,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
     case LLESS_OP:
     case LGREATER_OP: {
         if (lai_exec_reserve_stack(state))
-            return 1;
+            return LAI_ERROR_OUT_OF_MEMORY;
         lai_exec_commit_pc(state, pc);
 
         lai_stackitem_t *op_item = lai_exec_push_stack(state);
@@ -2509,7 +2516,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
 
     case INDEX_OP: {
         if (lai_exec_reserve_stack(state))
-            return 1;
+            return LAI_ERROR_OUT_OF_MEMORY;
         lai_exec_commit_pc(state, pc);
 
         lai_stackitem_t *op_item = lai_exec_push_stack(state);
@@ -2526,7 +2533,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
     case DEREF_OP:
     case SIZEOF_OP: {
         if (lai_exec_reserve_stack(state))
-            return 1;
+            return LAI_ERROR_OUT_OF_MEMORY;
         lai_exec_commit_pc(state, pc);
 
         lai_stackitem_t *op_item = lai_exec_push_stack(state);
@@ -2540,7 +2547,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
     }
     case REFOF_OP: {
         if (lai_exec_reserve_stack(state))
-            return 1;
+            return LAI_ERROR_OUT_OF_MEMORY;
         lai_exec_commit_pc(state, pc);
 
         lai_stackitem_t *op_item = lai_exec_push_stack(state);
@@ -2554,7 +2561,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
     }
     case (EXTOP_PREFIX << 8) | CONDREF_OP: {
         if (lai_exec_reserve_stack(state))
-            return 1;
+            return LAI_ERROR_OUT_OF_MEMORY;
         lai_exec_commit_pc(state, pc);
 
         lai_stackitem_t *op_item = lai_exec_push_stack(state);
@@ -2570,7 +2577,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
 
     case (EXTOP_PREFIX << 8) | SLEEP_OP: {
         if (lai_exec_reserve_stack(state))
-            return 1;
+            return LAI_ERROR_OUT_OF_MEMORY;
         lai_exec_commit_pc(state, pc);
 
         lai_stackitem_t *op_item = lai_exec_push_stack(state);
@@ -2585,7 +2592,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
 
     case (EXTOP_PREFIX << 8) | ACQUIRE_OP: {
         if (lai_exec_reserve_stack(state))
-            return 1;
+            return LAI_ERROR_OUT_OF_MEMORY;
         lai_exec_commit_pc(state, pc);
 
         lai_stackitem_t *op_item = lai_exec_push_stack(state);
@@ -2600,7 +2607,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
     }
     case (EXTOP_PREFIX << 8) | RELEASE_OP: {
         if (lai_exec_reserve_stack(state))
-            return 1;
+            return LAI_ERROR_OUT_OF_MEMORY;
         lai_exec_commit_pc(state, pc);
 
         lai_stackitem_t *op_item = lai_exec_push_stack(state);
@@ -2618,7 +2625,7 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
                 method[opcode_pc + 0], method[opcode_pc + 1],
                 method[opcode_pc + 2], method[opcode_pc + 3]);
     }
-    return 0;
+    return LAI_ERROR_NONE;
 }
 
 int lai_populate(lai_nsnode_t *parent, struct lai_aml_segment *amls, lai_state_t *state) {
