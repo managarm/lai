@@ -63,20 +63,25 @@ void lai_do_resolve_new_node(lai_nsnode_t *node,
 #define LAI_IMMEDIATE_DWORD_MODE 9
 
 // Operation is expected to return a result (on the opstack).
-#define LAI_MF_RESULT 1
+#define LAI_MF_RESULT   1
+// Resolve names to namespace nodes.
+#define LAI_MF_RESOLVE  2
+// Allow unresolvable names.
+#define LAI_MF_NULLABLE 4
 // Parse method invocations.
-#define LAI_MF_INVOKE 2
+// Requires LAI_MF_RESOLVE.
+#define LAI_MF_INVOKE   8
 
 static const uint32_t lai_mode_flags[] = {
     [LAI_IMMEDIATE_BYTE_MODE]     = LAI_MF_RESULT,
     [LAI_IMMEDIATE_WORD_MODE]     = LAI_MF_RESULT,
     [LAI_IMMEDIATE_DWORD_MODE]    = LAI_MF_RESULT,
-    [LAI_EXEC_MODE]               = LAI_MF_INVOKE,
+    [LAI_EXEC_MODE]               = LAI_MF_RESOLVE | LAI_MF_INVOKE,
     [LAI_UNRESOLVED_MODE]         = LAI_MF_RESULT,
     [LAI_DATA_MODE]               = LAI_MF_RESULT,
-    [LAI_OBJECT_MODE]             = LAI_MF_RESULT | LAI_MF_INVOKE,
-    [LAI_REFERENCE_MODE]          = LAI_MF_RESULT,
-    [LAI_OPTIONAL_REFERENCE_MODE] = LAI_MF_RESULT,
+    [LAI_OBJECT_MODE]             = LAI_MF_RESULT | LAI_MF_RESOLVE | LAI_MF_INVOKE,
+    [LAI_REFERENCE_MODE]          = LAI_MF_RESULT | LAI_MF_RESOLVE,
+    [LAI_OPTIONAL_REFERENCE_MODE] = LAI_MF_RESULT | LAI_MF_RESOLVE | LAI_MF_NULLABLE,
 };
 
 // Allocate a new package.

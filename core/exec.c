@@ -1314,46 +1314,45 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
         if (debug_opcodes)
             path = lai_stringify_amlname(&amln);
 
-        if (parse_mode == LAI_UNRESOLVED_MODE) {
+        if (parse_mode == LAI_DATA_MODE) {
             if (debug_opcodes)
                 lai_debug("parsing name %s [@ 0x%x]", path, table_pc);
 
-            struct lai_operand *opstack_res = lai_exec_push_opstack(state);
-            opstack_res->tag = LAI_UNRESOLVED_NAME;
-            opstack_res->unres_ctx_handle = ctx_handle;
-            opstack_res->unres_aml = method + opcode_pc;
-        } else if (parse_mode == LAI_REFERENCE_MODE
-                || parse_mode == LAI_OPTIONAL_REFERENCE_MODE) {
+            if (want_result) {
+                struct lai_operand *opstack_res = lai_exec_push_opstack(state);
+                opstack_res->tag = LAI_OPERAND_OBJECT;
+                opstack_res->object.type = LAI_LAZY_HANDLE;
+                opstack_res->object.unres_ctx_handle = ctx_handle;
+                opstack_res->object.unres_aml = method + opcode_pc;
+            }
+        }else if (!(lai_mode_flags[parse_mode] & LAI_MF_RESOLVE)) {
             if (debug_opcodes)
                 lai_debug("parsing name %s [@ 0x%x]", path, table_pc);
 
-            lai_nsnode_t *handle = lai_do_resolve(ctx_handle, &amln);
-            if (parse_mode == LAI_REFERENCE_MODE && !handle)
-                lai_panic("undefined reference %s in object mode",
-                        lai_stringify_amlname(&amln));
-
-            struct lai_operand *opstack_res = lai_exec_push_opstack(state);
-            opstack_res->tag = LAI_RESOLVED_NAME;
-            opstack_res->handle = handle;
-        }else if (parse_mode == LAI_DATA_MODE) {
-            if (debug_opcodes)
-                lai_debug("parsing name %s [@ 0x%x]", path, table_pc);
-
-            struct lai_operand *opstack_res = lai_exec_push_opstack(state);
-            opstack_res->tag = LAI_OPERAND_OBJECT;
-            opstack_res->object.type = LAI_LAZY_HANDLE;
-            opstack_res->object.unres_ctx_handle = ctx_handle;
-            opstack_res->object.unres_aml = method + opcode_pc;
+            if (want_result) {
+                struct lai_operand *opstack_res = lai_exec_push_opstack(state);
+                opstack_res->tag = LAI_UNRESOLVED_NAME;
+                opstack_res->unres_ctx_handle = ctx_handle;
+                opstack_res->unres_aml = method + opcode_pc;
+            }
         } else {
-            LAI_ENSURE(parse_mode == LAI_OBJECT_MODE
-                       || parse_mode == LAI_EXEC_MODE);
             lai_nsnode_t *handle = lai_do_resolve(ctx_handle, &amln);
-            if (!handle)
-                lai_panic("undefined reference %s in object mode",
-                        lai_stringify_amlname(&amln));
+            if (!handle) {
+                if (lai_mode_flags[parse_mode] & LAI_MF_NULLABLE) {
+                    if (debug_opcodes)
+                        lai_debug("parsing non-existant name %s [@ 0x%x]", path, table_pc);
 
-            if((lai_mode_flags[parse_mode] & LAI_MF_INVOKE)
-                    && handle->type == LAI_NAMESPACE_METHOD) {
+                    if (want_result) {
+                        struct lai_operand *opstack_res = lai_exec_push_opstack(state);
+                        opstack_res->tag = LAI_RESOLVED_NAME;
+                        opstack_res->handle = NULL;
+                    }
+                }else{
+                    lai_panic("undefined reference %s in object mode",
+                            lai_stringify_amlname(&amln));
+                }
+            } else if (handle->type == LAI_NAMESPACE_METHOD
+                    && (lai_mode_flags[parse_mode] & LAI_MF_INVOKE)) {
                 if (debug_opcodes)
                     lai_debug("parsing invocation %s [@ 0x%x]", path, table_pc);
 
@@ -1366,7 +1365,8 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
                 struct lai_operand *opstack_method = lai_exec_push_opstack(state);
                 opstack_method->tag = LAI_RESOLVED_NAME;
                 opstack_method->handle = handle;
-            } else {
+            } else if (lai_mode_flags[parse_mode] & LAI_MF_INVOKE) {
+                // TODO: Get rid of this case again!
                 if (debug_opcodes)
                     lai_debug("parsing name %s [@ 0x%x]", path, table_pc);
 
@@ -1377,6 +1377,15 @@ static int lai_exec_parse(int parse_mode, lai_state_t *state) {
                     struct lai_operand *opstack_res = lai_exec_push_opstack(state);
                     opstack_res->tag = LAI_OPERAND_OBJECT;
                     lai_var_move(&opstack_res->object, &result);
+                }
+            } else {
+                if (debug_opcodes)
+                    lai_debug("parsing name %s [@ 0x%x]", path, table_pc);
+
+                if (want_result) {
+                    struct lai_operand *opstack_method = lai_exec_push_opstack(state);
+                    opstack_method->tag = LAI_RESOLVED_NAME;
+                    opstack_method->handle = handle;
                 }
             }
         }
