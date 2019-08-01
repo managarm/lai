@@ -2628,11 +2628,12 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
     return LAI_ERROR_NONE;
 }
 
-int lai_populate(lai_nsnode_t *parent, struct lai_aml_segment *amls, lai_state_t *state) {
+lai_api_error_t lai_populate(lai_nsnode_t *parent, struct lai_aml_segment *amls,
+        lai_state_t *state) {
     if (lai_exec_reserve_ctxstack(state)
             || lai_exec_reserve_blkstack(state)
             || lai_exec_reserve_stack(state))
-        return 1;
+        return LAI_ERROR_OUT_OF_MEMORY;
 
     size_t size = amls->table->header.length - sizeof(acpi_header_t);
 
@@ -2654,11 +2655,11 @@ int lai_populate(lai_nsnode_t *parent, struct lai_aml_segment *amls, lai_state_t
     LAI_ENSURE(state->ctxstack_ptr == -1);
     LAI_ENSURE(state->stack_ptr == -1);
     LAI_ENSURE(!state->opstack_ptr);
-    return 0;
+    return LAI_ERROR_NONE;
 }
 
 // lai_eval_args(): Evaluates a node of the ACPI namespace (including control methods).
-int lai_eval_args(lai_variable_t *result, lai_nsnode_t *handle, lai_state_t *state,
+lai_api_error_t lai_eval_args(lai_variable_t *result, lai_nsnode_t *handle, lai_state_t *state,
         int n, lai_variable_t *args) {
     LAI_ENSURE(handle);
     LAI_ENSURE(handle->type != LAI_NAMESPACE_ALIAS);
@@ -2667,16 +2668,16 @@ int lai_eval_args(lai_variable_t *result, lai_nsnode_t *handle, lai_state_t *sta
         case LAI_NAMESPACE_NAME:
             if (n) {
                 lai_warn("non-empty argument list given when evaluating Name()");
-                return 1;
+                return LAI_ERROR_TYPE_MISMATCH;
             }
             if (result)
                 lai_obj_clone(result, &handle->object);
-            return 0;
+            return LAI_ERROR_NONE;
         case LAI_NAMESPACE_METHOD: {
             if (lai_exec_reserve_ctxstack(state)
                     || lai_exec_reserve_blkstack(state)
                     || lai_exec_reserve_stack(state))
-                return 1;
+                return LAI_ERROR_OUT_OF_MEMORY;
 
             LAI_CLEANUP_VAR lai_variable_t method_result = LAI_VAR_INITIALIZER;
             int e;
@@ -2730,11 +2731,12 @@ int lai_eval_args(lai_variable_t *result, lai_nsnode_t *handle, lai_state_t *sta
         }
 
         default:
-            return 1;
+            return LAI_ERROR_TYPE_MISMATCH;
     }
 }
 
-int lai_eval_vargs(lai_variable_t *result, lai_nsnode_t *handle, lai_state_t *state, va_list vl) {
+lai_api_error_t lai_eval_vargs(lai_variable_t *result, lai_nsnode_t *handle,
+        lai_state_t *state, va_list vl) {
     int n = 0;
     lai_variable_t args[7];
     memset(args, 0, sizeof(lai_variable_t) * 7);
@@ -2750,7 +2752,8 @@ int lai_eval_vargs(lai_variable_t *result, lai_nsnode_t *handle, lai_state_t *st
     return lai_eval_args(result, handle, state, n, args);
 }
 
-int lai_eval_largs(lai_variable_t *result, lai_nsnode_t *handle, lai_state_t *state, ...) {
+lai_api_error_t lai_eval_largs(lai_variable_t *result, lai_nsnode_t *handle,
+        lai_state_t *state, ...) {
     va_list vl;
     va_start(vl, state);
     int e = lai_eval_vargs(result, handle, state, vl);
@@ -2758,7 +2761,7 @@ int lai_eval_largs(lai_variable_t *result, lai_nsnode_t *handle, lai_state_t *st
     return e;
 }
 
-int lai_eval(lai_variable_t *result, lai_nsnode_t *handle, lai_state_t *state) {
+lai_api_error_t lai_eval(lai_variable_t *result, lai_nsnode_t *handle, lai_state_t *state) {
     return lai_eval_args(result, handle, state, 0, NULL);
 }
 

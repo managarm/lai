@@ -129,13 +129,14 @@ void lai_var_assign(lai_variable_t *, lai_variable_t *);
 
 // Evaluation of namespace nodes (including control methods).
 
-int lai_eval_args(lai_variable_t *, lai_nsnode_t *, lai_state_t *, int, lai_variable_t *);
-int lai_eval_largs(lai_variable_t *, lai_nsnode_t *, lai_state_t *, ...);
-int lai_eval_vargs(lai_variable_t *, lai_nsnode_t *, lai_state_t *, va_list);
-int lai_eval(lai_variable_t *, lai_nsnode_t *, lai_state_t *);
+lai_api_error_t lai_eval_args(lai_variable_t *, lai_nsnode_t *, lai_state_t *,
+                              int, lai_variable_t *);
+lai_api_error_t lai_eval_largs(lai_variable_t *, lai_nsnode_t *, lai_state_t *, ...);
+lai_api_error_t lai_eval_vargs(lai_variable_t *, lai_nsnode_t *, lai_state_t *, va_list);
+lai_api_error_t lai_eval(lai_variable_t *, lai_nsnode_t *, lai_state_t *);
 
 // ACPI Control Methods
-int lai_populate(lai_nsnode_t *, struct lai_aml_segment *, lai_state_t *);
+lai_api_error_t lai_populate(lai_nsnode_t *, struct lai_aml_segment *, lai_state_t *);
 
 // LAI debugging functions.
 
