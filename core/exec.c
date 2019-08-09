@@ -650,6 +650,29 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
         break;
     }
 
+    case (EXTOP_PREFIX << 8) | FROM_BCD_OP: {
+        LAI_CLEANUP_VAR lai_variable_t operand = LAI_VAR_INITIALIZER;
+        lai_exec_get_objectref(state, &operands[0], &operand);
+        
+        result.type = LAI_INTEGER;
+
+        uint64_t power_of_ten = 1;
+        uint64_t value = operand.integer;
+        lai_debug("%016X", value);
+        for(int i = 0; i < 16; i++, power_of_ten *= 10){ // 16 is the amount of nibbles in 64bit
+            uint8_t temp = (value >> (i * 4)) & 0xF;
+            if(temp > 9){
+                lai_warn("FromBCDOp Nibble is larger than 9 and thus an invalid BCD nibble");
+                return LAI_ERROR_UNEXPECTED_RESULT;
+            }
+
+            result.integer += (temp * power_of_ten);
+        }
+
+        lai_operand_emplace(state, &operands[1], &result);
+        break; 
+    }
+
     default:
         lai_panic("undefined opcode in lai_exec_reduce_op: %02X", opcode);
     }
@@ -2616,6 +2639,22 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
         op_item->opstack_frame = state->opstack_ptr;
         op_item->op_arg_modes[0] = LAI_REFERENCE_MODE;
         op_item->op_arg_modes[1] = 0;
+        op_item->op_want_result = want_result;
+        break;
+    }
+
+    case (EXTOP_PREFIX << 8) | FROM_BCD_OP: {
+        if(lai_exec_reserve_stack(state))
+            return LAI_ERROR_OUT_OF_MEMORY;
+        lai_exec_commit_pc(state, pc);
+
+        lai_stackitem_t *op_item = lai_exec_push_stack(state);
+        op_item->kind = LAI_OP_STACKITEM;
+        op_item->op_opcode = opcode;
+        op_item->opstack_frame = state->opstack_ptr;
+        op_item->op_arg_modes[0] = LAI_OBJECT_MODE;
+        op_item->op_arg_modes[1] = LAI_REFERENCE_MODE;
+        op_item->op_arg_modes[2] = 0;
         op_item->op_want_result = want_result;
         break;
     }

@@ -91,6 +91,8 @@
 #define SLEEP_OP			0x22
 #define ACQUIRE_OP			0x23
 #define RELEASE_OP			0x27
+#define FROM_BCD_OP         0x28
+#define TO_BCD_OP           0x29
 #define DEBUG_OP			0x31
 #define FATAL_OP            0x32
 #define OPREGION			0x80
