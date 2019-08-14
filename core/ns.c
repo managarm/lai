@@ -748,3 +748,7 @@ enum lai_node_type lai_ns_get_node_type(lai_nsnode_t *node){
         break;
     }
 }
+
+void lai_set_acpi_revision(int revision){
+    lai_current_instance()->acpi_revision = (revision == 0) ? (1) : (revision); // For some reason ACPI 1 is encoded as 0 and the rest just normally
+}

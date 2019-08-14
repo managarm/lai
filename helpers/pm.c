@@ -110,4 +110,42 @@ int lai_enter_sleep(uint8_t sleep_state)
     return 0;
 }
 
+int lai_acpi_reset(){
+    struct lai_instance *instance = lai_current_instance();
+    if(instance->acpi_revision == 0)
+        lai_panic("Knowing the ACPI revision is needed for lai_acpi_reset");
 
+    if(instance->acpi_revision == 1) 
+        return 1; // ACPI 1 didn't have support for the reset functionalty
+
+    acpi_fadt_t *fadt = instance->fadt;
+
+    uint32_t fixed_flags = fadt->flags;
+    if(!(fixed_flags & (1 << 10))) // System doesn't indicate support for ACPI reset via flags
+        return 1;
+
+    switch(fadt->reset_register.address_space){
+    case ACPI_GAS_MMIO: {
+        if(!laihost_map)
+            lai_panic("laihost_map is required for lai_acpi_reset");
+        laihost_map(fadt->reset_register.base, 1); // We only need 1 byte mapped
+        uint8_t *reg = (uint8_t *)(fadt->reset_register.base);
+        *reg = fadt->reset_command;
+        break;
+    }
+    case ACPI_GAS_IO:
+        if(!laihost_outb)
+            lai_panic("laihost_outb is required for lai_acpi_reset");
+
+        laihost_outb(fadt->reset_register.base, fadt->reset_command);
+        break;
+    case ACPI_GAS_PCI:
+        // Spec states that it is at Seg 0, bus 0
+        laihost_pci_writeb(0, 0, fadt->reset_register.base >> 24, fadt->reset_register.base >> 16, fadt->reset_register.base >> 8, fadt->reset_command);
+        break;
+    default:
+        lai_panic("Unknown FADT reset reg address space type: 0x%02X", fadt->reset_register.address_space);
+    }
+
+    return 0;
+}

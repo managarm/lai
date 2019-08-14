@@ -8,3 +8,4 @@
 #include <lai/core.h>
 
 int lai_enter_sleep(uint8_t);
+int lai_acpi_reset();

@@ -107,13 +107,14 @@ typedef struct acpi_fadt_t
     uint8_t century;
 
     // ACPI 2.0 fields
-    uint16_t boot_flags;
+    uint16_t iapc_boot_flags;
     uint8_t reserved2;
     uint32_t flags;
 
     acpi_gas_t reset_register;
     uint8_t reset_command;
-    uint8_t reserved3[3];
+    uint16_t arm_boot_flags;
+    uint8_t minor_version;
 
     uint64_t x_firmware_control;
     uint64_t x_dsdt;
