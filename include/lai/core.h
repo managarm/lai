@@ -36,6 +36,7 @@ typedef enum lai_api_error {
     LAI_ERROR_UNEXPECTED_RESULT,
     // Error given when end of iterator is reached, nothing to worry about
     LAI_ERROR_END_REACHED,
+    LAI_ERROR_UNSUPPORTED,
 } lai_api_error_t;
 
 // Convert a lai_api_error_t to a human readable string

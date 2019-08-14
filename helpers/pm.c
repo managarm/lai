@@ -15,7 +15,7 @@
 // Param:    uint8_t state - 0-5 to correspond with states S0-S5
 // Return:    int - 0 on success
 
-int lai_enter_sleep(uint8_t sleep_state)
+lai_api_error_t lai_enter_sleep(uint8_t sleep_state)
 {
     if(!laihost_inw || !laihost_outw)
         lai_panic("lai_enter_sleep() requires port I/O");
@@ -41,7 +41,7 @@ int lai_enter_sleep(uint8_t sleep_state)
     lai_nsnode_t *handle = lai_resolve_path(NULL, sleep_object);
     if(!handle) {
         lai_debug("sleep state S%d is not supported.", sleep_state);
-        return 1;
+        return LAI_ERROR_UNSUPPORTED;
     }
 
     LAI_CLEANUP_VAR lai_variable_t package = LAI_VAR_INITIALIZER;
@@ -51,7 +51,7 @@ int lai_enter_sleep(uint8_t sleep_state)
     eval_status = lai_eval(&package, handle, &state);
     if(eval_status) {
         lai_debug("sleep state S%d is not supported.", sleep_state);
-        return 1;
+        return LAI_ERROR_UNSUPPORTED;
     }
 
     lai_debug("entering sleep state S%d...", sleep_state);
@@ -107,22 +107,22 @@ int lai_enter_sleep(uint8_t sleep_state)
         laihost_outw(instance->fadt->pm1b_control_block, data);
     }
 
-    return 0;
+    return LAI_ERROR_NONE;
 }
 
-int lai_acpi_reset(){
+lai_api_error_t lai_acpi_reset(){
     struct lai_instance *instance = lai_current_instance();
     if(instance->acpi_revision == 0)
         lai_panic("Knowing the ACPI revision is needed for lai_acpi_reset");
 
     if(instance->acpi_revision == 1) 
-        return 1; // ACPI 1 didn't have support for the reset functionalty
+        return LAI_ERROR_UNSUPPORTED; // ACPI 1 didn't have support for the reset functionalty
 
     acpi_fadt_t *fadt = instance->fadt;
 
     uint32_t fixed_flags = fadt->flags;
     if(!(fixed_flags & (1 << 10))) // System doesn't indicate support for ACPI reset via flags
-        return 1;
+        return LAI_ERROR_UNSUPPORTED;
 
     switch(fadt->reset_register.address_space){
     case ACPI_GAS_MMIO: {
@@ -147,5 +147,5 @@ int lai_acpi_reset(){
         lai_panic("Unknown FADT reset reg address space type: 0x%02X", fadt->reset_register.address_space);
     }
 
-    return 0;
+    return LAI_ERROR_NONE;
 }

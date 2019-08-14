@@ -7,5 +7,5 @@
 
 #include <lai/core.h>
 
-int lai_enter_sleep(uint8_t);
-int lai_acpi_reset();
+lai_api_error_t lai_enter_sleep(uint8_t);
+lai_api_error_t lai_acpi_reset();
