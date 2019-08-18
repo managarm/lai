@@ -663,7 +663,7 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
             uint8_t temp = (value >> (i * 4)) & 0xF;
             if(temp > 9){
                 lai_warn("FromBCDOp Nibble is larger than 9 and thus an invalid BCD nibble");
-                return LAI_ERROR_UNEXPECTED_RESULT;
+                //return LAI_ERROR_UNEXPECTED_RESULT;
             }
 
             result.integer += (temp * power_of_ten);
