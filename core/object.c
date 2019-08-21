@@ -369,6 +369,76 @@ lai_api_error_t lai_obj_to_hex_string(lai_variable_t *out, lai_variable_t *objec
     return LAI_ERROR_NONE;
 }
 
+lai_api_error_t lai_obj_to_integer(lai_variable_t *out, lai_variable_t *object){
+    switch (object->type)
+    {
+
+    case LAI_BUFFER: {
+        size_t buffer_len = lai_exec_buffer_size(object);
+        uint64_t *buffer = lai_exec_buffer_access(object);
+
+        if (buffer_len < 8) {
+            lai_warn("lai_obj_to_integer() buffer shorter than 8 bytes");
+            return LAI_ERROR_ILLEGAL_ARGUMENTS;
+        }
+
+        out->integer = *buffer;
+
+        break;
+    }
+
+    case LAI_STRING: {
+        size_t string_len = lai_exec_string_length(object);
+        const char *string = lai_exec_string_access(object);
+
+        uint64_t integer = 0;
+
+        // Check if hexadecimal
+        if (string_len >= 2 && (string[1] == 'x' || string[1] == 'X')) {
+            for (size_t i = 0; i < string_len; i++) {
+                unsigned v;
+                if      (string[i] >= '0' && string[i] <= '9')
+                    v = string[i] - '0';
+                else if (string[i] >= 'a' && string[i] <= 'f')
+                    v = string[i] - 'a' + 10;
+                else if (string[i] >= 'A' && string[i] <= 'F')
+                    v = string[i] - 'A' + 10;
+                else {
+                    lai_warn("lai_obj_to_integer() hexadecimal string contains non valid character %c",
+                              string[i]);
+                    return LAI_ERROR_ILLEGAL_ARGUMENTS;
+                }
+                integer = integer * 16 + v;
+            }
+        } else {
+            for (size_t i = 0; i < string_len; i++) {
+                if (string[i] < '0' || string[i] > '9') {
+                    lai_warn("lai_obj_to_integer() decimal string contains non valid character %c",
+                              string[i]);
+                    return LAI_ERROR_ILLEGAL_ARGUMENTS;
+                }
+                integer = integer * 10 + (string[i] - '0');
+            }
+        }
+
+        out->integer = integer;
+
+        break;
+    }
+
+    case LAI_INTEGER:
+        lai_obj_clone(out, object);
+        break;
+
+    default:
+        lai_warn("lai_obj_to_integer() unsupported object type %d",
+                   object->type);
+        return LAI_ERROR_ILLEGAL_ARGUMENTS;
+    }
+
+    return LAI_ERROR_NONE;
+}
+
 // lai_clone_buffer(): Clones a buffer object
 static void lai_clone_buffer(lai_variable_t *dest, lai_variable_t *source) {
     size_t size = lai_exec_buffer_size(source);

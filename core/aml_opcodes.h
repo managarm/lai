@@ -71,6 +71,7 @@
 #define TOBUFFER_OP         0x96
 #define TODECIMALSTRING_OP  0x97
 #define TOHEXSTRING_OP      0x98
+#define TOINTEGER_OP        0x99
 #define TOSTRING_OP         0x9C
 #define COPYOBJECT_OP		0x9D
 #define CONTINUE_OP			0x9F

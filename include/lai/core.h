@@ -121,6 +121,7 @@ lai_api_error_t lai_obj_to_buffer(lai_variable_t *, lai_variable_t *);
 lai_api_error_t lai_obj_to_string(lai_variable_t *, lai_variable_t *, size_t);
 lai_api_error_t lai_obj_to_decimal_string(lai_variable_t *, lai_variable_t *);
 lai_api_error_t lai_obj_to_hex_string(lai_variable_t *, lai_variable_t *);
+lai_api_error_t lai_obj_to_integer(lai_variable_t *, lai_variable_t *);
 void lai_obj_clone(lai_variable_t *, lai_variable_t *);
 
 #define LAI_CLEANUP_VAR __attribute__((cleanup(lai_var_finalize)))
