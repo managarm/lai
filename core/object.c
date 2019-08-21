@@ -385,6 +385,13 @@ lai_api_error_t lai_obj_to_integer(lai_variable_t *out, lai_variable_t *object){
         out->type = LAI_INTEGER;
         out->integer = *buffer;
 
+        #ifndef __BYTE_ORDER__
+            #error Required macro __BYTE_ORDER__ not defined
+        #endif
+        #if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+            out->integer = bswap64(out->integer);
+        #endif
+
         break;
     }
 
