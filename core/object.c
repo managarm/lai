@@ -382,6 +382,7 @@ lai_api_error_t lai_obj_to_integer(lai_variable_t *out, lai_variable_t *object){
             return LAI_ERROR_ILLEGAL_ARGUMENTS;
         }
 
+        out->type = LAI_INTEGER;
         out->integer = *buffer;
 
         break;
@@ -421,6 +422,7 @@ lai_api_error_t lai_obj_to_integer(lai_variable_t *out, lai_variable_t *object){
             }
         }
 
+        out->type = LAI_INTEGER;
         out->integer = integer;
 
         break;
