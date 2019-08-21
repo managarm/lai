@@ -394,8 +394,8 @@ lai_api_error_t lai_obj_to_integer(lai_variable_t *out, lai_variable_t *object){
         uint64_t integer = 0;
 
         // Check if hexadecimal
-        if (string_len >= 2 && (string[1] == 'x' || string[1] == 'X')) {
-            for (size_t i = 0; i < string_len; i++) {
+        if (string_len >= 2 && string[0] == '0' && (string[1] == 'x' || string[1] == 'X')) {
+            for (size_t i = 2; i < string_len; i++) {
                 unsigned v;
                 if      (string[i] >= '0' && string[i] <= '9')
                     v = string[i] - '0';
