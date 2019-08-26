@@ -97,6 +97,8 @@ lai_nsnode_t *lai_ns_get_child(lai_nsnode_t *parent, const char *name);
 lai_api_error_t lai_ns_override_opregion(lai_nsnode_t *node, const struct lai_opregion_override *override, void *userptr);
 enum lai_node_type lai_ns_get_node_type(lai_nsnode_t *node);
 
+uint8_t lai_ns_get_opregion_address_space(lai_nsnode_t *node);
+
 // Access and manipulation of lai_variable_t.
 
 enum lai_object_type {

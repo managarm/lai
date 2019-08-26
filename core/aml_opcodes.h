@@ -105,15 +105,6 @@
 #define INDEXFIELD			0x86	// ACPI spec v5.0 section 19.5.60
 #define BANKFIELD			0x87
 
-// OpRegion Address Spaces
-#define OPREGION_MEMORY			0x00
-#define OPREGION_IO			0x01
-#define OPREGION_PCI			0x02
-#define OPREGION_EC			0x03
-#define OPREGION_SMBUS			0x04
-#define OPREGION_CMOS			0x05
-#define OPREGION_OEM			0x80
-
 // Field Access Type
 #define FIELD_ANY_ACCESS		0x00
 #define FIELD_BYTE_ACCESS		0x01

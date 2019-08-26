@@ -752,3 +752,8 @@ enum lai_node_type lai_ns_get_node_type(lai_nsnode_t *node){
 void lai_set_acpi_revision(int revision){
     lai_current_instance()->acpi_revision = (revision == 0) ? (1) : (revision); // For some reason ACPI 1 is encoded as 0 and the rest just normally
 }
+
+uint8_t lai_ns_get_opregion_address_space(lai_nsnode_t *node){
+    LAI_ENSURE(node->type == LAI_NAMESPACE_OPREGION);
+    return node->op_address_space;
+}
