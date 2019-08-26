@@ -58,7 +58,7 @@ void lai_read_field(lai_variable_t *destination, lai_nsnode_t *field) {
     uint64_t adr_result = 0; // When _ADR is not present, again, default to zero.
     size_t pci_byte_offset;
 
-    if (opregion->op_address_space != OPREGION_PCI) {
+    if (opregion->op_address_space != ACPI_OPREGION_PCI) {
         switch (field->fld_flags & 0x0F) {
             case FIELD_BYTE_ACCESS:
                 bit_offset = field->fld_offset % 8;
@@ -121,7 +121,7 @@ void lai_read_field(lai_variable_t *destination, lai_nsnode_t *field) {
                           lai_stringify_node_path(field));
             break;
         }
-    } else if (opregion->op_address_space == OPREGION_IO) {
+    } else if (opregion->op_address_space == ACPI_OPREGION_IO) {
         // I/O port
         switch (field->fld_flags & 0x0F) {
             case FIELD_BYTE_ACCESS:
@@ -144,7 +144,7 @@ void lai_read_field(lai_variable_t *destination, lai_nsnode_t *field) {
                 lai_panic("undefined field flags 0x%02X: %s", field->fld_flags,
                           lai_stringify_node_path(field));
         }
-    } else if (opregion->op_address_space == OPREGION_MEMORY) {
+    } else if (opregion->op_address_space == ACPI_OPREGION_MEMORY) {
         // Memory-mapped I/O
         if (!laihost_map)
             lai_panic("host does not provide memory mapping functions");
@@ -176,7 +176,7 @@ void lai_read_field(lai_variable_t *destination, lai_nsnode_t *field) {
                 lai_panic("undefined field flags 0x%02X: %s", field->fld_flags,
                           lai_stringify_node_path(field));
         }
-    } else if (opregion->op_address_space == OPREGION_PCI) {
+    } else if (opregion->op_address_space == ACPI_OPREGION_PCI) {
         LAI_CLEANUP_STATE lai_state_t state;
         lai_init_state(&state);
 
@@ -263,7 +263,7 @@ void lai_write_field(lai_nsnode_t *field, lai_variable_t *source) {
     uint64_t adr_result = 0; // When _ADR is not present, again, default to zero.
     size_t pci_byte_offset;
 
-    if (opregion->op_address_space != OPREGION_PCI) {
+    if (opregion->op_address_space != ACPI_OPREGION_PCI) {
         switch (field->fld_flags & 0x0F) {
             case FIELD_BYTE_ACCESS:
                 bit_offset = field->fld_offset % 8;
@@ -326,7 +326,7 @@ void lai_write_field(lai_nsnode_t *field, lai_variable_t *source) {
                           lai_stringify_node_path(field));
             break;
         }
-    } else if (opregion->op_address_space == OPREGION_IO) {
+    } else if (opregion->op_address_space == ACPI_OPREGION_IO) {
         // I/O port
         switch (field->fld_flags & 0x0F) {
             case FIELD_BYTE_ACCESS:
@@ -349,7 +349,7 @@ void lai_write_field(lai_nsnode_t *field, lai_variable_t *source) {
                 lai_panic("undefined field flags 0x%02X: %s", field->fld_flags,
                           lai_stringify_node_path(field));
         }
-    } else if (opregion->op_address_space == OPREGION_MEMORY) {
+    } else if (opregion->op_address_space == ACPI_OPREGION_MEMORY) {
         // Memory-mapped I/O
         if (!laihost_map)
             lai_panic("host does not provide memory mapping functions");
@@ -381,7 +381,7 @@ void lai_write_field(lai_nsnode_t *field, lai_variable_t *source) {
                 lai_panic("undefined field flags 0x%02X: %s", field->fld_flags,
                           lai_stringify_node_path(field));
         }
-    } else if (opregion->op_address_space == OPREGION_PCI) {
+    } else if (opregion->op_address_space == ACPI_OPREGION_PCI) {
         LAI_CLEANUP_STATE lai_state_t state;
         lai_init_state(&state);
 
@@ -488,7 +488,7 @@ void lai_write_field(lai_nsnode_t *field, lai_variable_t *source) {
                           lai_stringify_node_path(field));
             break;
         }
-    } else if (opregion->op_address_space == OPREGION_IO) {
+    } else if (opregion->op_address_space == ACPI_OPREGION_IO) {
         // I/O port
         switch (field->fld_flags & 0x0F) {
             case FIELD_BYTE_ACCESS:
@@ -510,7 +510,7 @@ void lai_write_field(lai_nsnode_t *field, lai_variable_t *source) {
         // iowait() equivalent
         laihost_outb(0x80, 0x00);
         laihost_outb(0x80, 0x00);
-    } else if (opregion->op_address_space == OPREGION_MEMORY) {
+    } else if (opregion->op_address_space == ACPI_OPREGION_MEMORY) {
         // Memory-mapped I/O
         if (!laihost_map)
             lai_panic("host does not provide memory mapping functions");
@@ -542,7 +542,7 @@ void lai_write_field(lai_nsnode_t *field, lai_variable_t *source) {
             default:
                 lai_panic("undefined field flags 0x%02X", field->fld_flags);
         }
-    } else if (opregion->op_address_space == OPREGION_PCI) {
+    } else if (opregion->op_address_space == ACPI_OPREGION_PCI) {
         switch (field->fld_flags & 0x0F) {
             case FIELD_BYTE_ACCESS:
                 if (!laihost_pci_writeb) lai_panic("host does not provide PCI access functions");

@@ -24,13 +24,13 @@
 #define ACPI_GAS_PCI            2
 
 // OpRegion Address Spaces
-#define OPREGION_MEMORY			0x00
-#define OPREGION_IO			0x01
-#define OPREGION_PCI			0x02
-#define OPREGION_EC			0x03
-#define OPREGION_SMBUS			0x04
-#define OPREGION_CMOS			0x05
-#define OPREGION_OEM			0x80
+#define ACPI_OPREGION_MEMORY			0x00
+#define ACPI_OPREGION_IO			0x01
+#define ACPI_OPREGION_PCI			0x02
+#define ACPI_OPREGION_EC			0x03
+#define ACPI_OPREGION_SMBUS			0x04
+#define ACPI_OPREGION_CMOS			0x05
+#define ACPI_OPREGION_OEM			0x80
 
 typedef struct acpi_rsdp_t
 {
