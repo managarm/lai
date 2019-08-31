@@ -110,6 +110,35 @@ int lai_enable_acpi(uint32_t mode) {
     return 0;
 }
 
+int lai_disable_acpi(void){
+    if (!laihost_inw || !laihost_outw)
+        lai_panic("lai_read_event() requires port I/O");
+
+    struct lai_instance *instance = lai_current_instance();
+
+    lai_debug("attempt to disable ACPI...");
+
+    // Disable all SCI events
+    lai_set_sci_event(0);
+    lai_get_sci_event();
+
+    // Clear SCI_EN (APCI_ENABLED in lai) so to stop SCIs from arriving
+    uint16_t pm1a_cnt_block = laihost_inw(instance->fadt->pm1a_control_block);
+    pm1a_cnt_block &= ~ACPI_ENABLED;
+    laihost_outw(instance->fadt->pm1a_control_block, pm1a_cnt_block);
+
+    if(instance->fadt->pm1b_control_block){
+        uint16_t pm1b_cnt_block = laihost_inw(instance->fadt->pm1b_control_block);
+        pm1b_cnt_block &= ~ACPI_ENABLED;
+        laihost_outw(instance->fadt->pm1b_control_block, pm1b_cnt_block);
+    }
+
+    // Send the definitive ACPI_DISABLE command
+    laihost_outb(instance->fadt->smi_command_port, instance->fadt->acpi_disable);
+
+    lai_debug("Success");
+}
+
 int lai_evaluate_sta(lai_nsnode_t *node) {
     // If _STA not present, assume 0x0F as ACPI spec says.
     uint64_t sta = 0x0F;
