@@ -151,5 +151,6 @@ void lai_set_acpi_revision(int);
 // LAI debugging functions.
 
 #define LAI_TRACE_OP 1
+#define LAI_TRACE_IO 2
 
 void lai_enable_tracing(int trace);

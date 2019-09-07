@@ -39,6 +39,7 @@ void lai_write_opregion(lai_nsnode_t *field, lai_variable_t *source) {
 }
 
 void lai_read_field(lai_variable_t *destination, lai_nsnode_t *field) {
+    struct lai_instance *instance = lai_current_instance();
     lai_nsnode_t *opregion = field->fld_region_node;
 
     uint64_t offset, value, mask;
@@ -90,6 +91,8 @@ void lai_read_field(lai_variable_t *destination, lai_nsnode_t *field) {
     }
 
     if(opregion->op_override){
+        if(instance->trace & LAI_TRACE_IO)
+            lai_debug("lai_read_field: Reading from overrided field with address space %02X, address: %X", opregion->op_address_space, opregion->op_base + offset);
         switch (field->fld_flags & 0x0F) {
         case FIELD_BYTE_ACCESS:
             if(!opregion->op_override->readb)
@@ -123,6 +126,8 @@ void lai_read_field(lai_variable_t *destination, lai_nsnode_t *field) {
         }
     } else if (opregion->op_address_space == ACPI_OPREGION_IO) {
         // I/O port
+        if(instance->trace & LAI_TRACE_IO)
+            lai_debug("lai_read_field: Reading from I/O field, address: %X", opregion->op_base + offset);
         switch (field->fld_flags & 0x0F) {
             case FIELD_BYTE_ACCESS:
                 if (!laihost_inb)
@@ -146,6 +151,8 @@ void lai_read_field(lai_variable_t *destination, lai_nsnode_t *field) {
         }
     } else if (opregion->op_address_space == ACPI_OPREGION_MEMORY) {
         // Memory-mapped I/O
+        if(instance->trace & LAI_TRACE_IO)
+            lai_debug("lai_read_field: Reading from MMIO field, address: %X", opregion->op_base + offset);
         if (!laihost_map)
             lai_panic("host does not provide memory mapping functions");
         mmio = laihost_map(opregion->op_base + offset, 8);
@@ -203,6 +210,9 @@ void lai_read_field(lai_variable_t *destination, lai_nsnode_t *field) {
                 lai_panic("could not evaluate _ADR of OperationRegion()");
             adr_result = address_number.integer;
         }
+        
+        if(instance->trace & LAI_TRACE_IO)
+            lai_debug("lai_write_field: Reading from PCI field, %d:%d:%d:%d address: %X", seg_result, bbn_result, (uint8_t)(adr_result >> 16) & 0xFF, (uint8_t)(adr_result & 0xFF), opregion->op_base + (offset & 0xFFFF));
 
        switch (field->fld_flags & 0x0F) {
             case FIELD_BYTE_ACCESS:
@@ -243,6 +253,7 @@ void lai_read_field(lai_variable_t *destination, lai_nsnode_t *field) {
 }
 
 void lai_write_field(lai_nsnode_t *field, lai_variable_t *source) {
+    struct lai_instance *instance = lai_current_instance();
     // determine the flags we need in order to write
     lai_nsnode_t *opregion = field->fld_region_node;
 
@@ -457,6 +468,8 @@ void lai_write_field(lai_nsnode_t *field, lai_variable_t *source) {
     }
 
     if(opregion->op_override) {
+        if(instance->trace & LAI_TRACE_IO)
+            lai_debug("lai_write_field: Writing to overrided field, address space %02X, address: %X, value %X", opregion->op_address_space, opregion->op_base + offset, value);
         switch (field->fld_flags & 0x0F) {
         case FIELD_BYTE_ACCESS:
             if(!opregion->op_override->writeb)
@@ -490,6 +503,8 @@ void lai_write_field(lai_nsnode_t *field, lai_variable_t *source) {
         }
     } else if (opregion->op_address_space == ACPI_OPREGION_IO) {
         // I/O port
+        if(instance->trace & LAI_TRACE_IO)
+            lai_debug("lai_write_field: Writing to I/O field, address: %X, value: %X", opregion->op_base + offset, value);
         switch (field->fld_flags & 0x0F) {
             case FIELD_BYTE_ACCESS:
                 laihost_outb(opregion->op_base + offset, (uint8_t)value);
@@ -512,6 +527,8 @@ void lai_write_field(lai_nsnode_t *field, lai_variable_t *source) {
         laihost_outb(0x80, 0x00);
     } else if (opregion->op_address_space == ACPI_OPREGION_MEMORY) {
         // Memory-mapped I/O
+        if(instance->trace & LAI_TRACE_IO)
+            lai_debug("lai_write_field: Writing to MMIO field, address: %X, value: %X", opregion->op_base + offset, value);
         if (!laihost_map)
             lai_panic("host does not provide memory mapping functions");
         mmio = laihost_map(opregion->op_base + offset, 8);
@@ -543,6 +560,8 @@ void lai_write_field(lai_nsnode_t *field, lai_variable_t *source) {
                 lai_panic("undefined field flags 0x%02X", field->fld_flags);
         }
     } else if (opregion->op_address_space == ACPI_OPREGION_PCI) {
+        if(instance->trace & LAI_TRACE_IO)
+            lai_debug("lai_write_field: Writing to PCI field, %d:%d:%d:%d address: %X", seg_result, bbn_result, (uint8_t)(adr_result >> 16) & 0xFF, (uint8_t)(adr_result & 0xFF), opregion->op_base + (offset & 0xFFFF));
         switch (field->fld_flags & 0x0F) {
             case FIELD_BYTE_ACCESS:
                 if (!laihost_pci_writeb) lai_panic("host does not provide PCI access functions");
