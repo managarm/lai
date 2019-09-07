@@ -14,7 +14,6 @@
 #include "eval.h"
 #include "util-hash.h"
 
-static int debug_namespace = 0;
 static int debug_resolution = 0;
 
 int lai_do_osi_method(lai_variable_t *args, lai_variable_t *result);
@@ -57,9 +56,9 @@ lai_nsnode_t *lai_create_nsnode_or_die(void) {
 void lai_install_nsnode(lai_nsnode_t *node) {
     struct lai_instance *instance = lai_current_instance();
 
-    if (debug_namespace) {
+    if (instance->trace & LAI_TRACE_NS) {
         LAI_CLEANUP_FREE_STRING char *fullpath = lai_stringify_node_path(node);
-        lai_debug("created %s", fullpath);
+        lai_debug("lai_install_nsnode: adding node with type %d at %s", node->type, fullpath);
     }
 
     if (instance->ns_size == instance->ns_capacity) {
