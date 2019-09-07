@@ -13,7 +13,6 @@
 #include "util-list.h"
 #include "util-macros.h"
 
-static int debug_opcodes = 0;
 static int debug_stack = 0;
 
 static lai_api_error_t lai_exec_process(lai_state_t *state);
@@ -68,7 +67,7 @@ static int lai_compare(lai_variable_t *lhs, lai_variable_t *rhs) {
 
 static void lai_exec_reduce_node(int opcode, lai_state_t *state, struct lai_operand *operands,
         lai_nsnode_t *ctx_handle) {
-    if (debug_opcodes)
+    if (lai_current_instance()->trace & LAI_TRACE_OP)
         lai_debug("lai_exec_reduce_node: opcode 0x%02X", opcode);
     switch (opcode) {
         case NAME_OP: {
@@ -155,7 +154,7 @@ static void lai_exec_reduce_node(int opcode, lai_state_t *state, struct lai_oper
 
 static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operand *operands,
         lai_variable_t *reduction_res) {
-    if (debug_opcodes)
+    if (lai_current_instance()->trace & LAI_TRACE_OP)
         lai_debug("lai_exec_reduce_op: opcode 0x%02X", opcode);
     lai_variable_t result = {0};
     switch (opcode) {
@@ -682,26 +681,6 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
 
         lai_operand_emplace(state, &operands[1], &result);
         break; 
-    }
-
-    case (EXTOP_PREFIX << 8) | TO_BCD_OP: {
-        LAI_CLEANUP_VAR lai_variable_t operand = LAI_VAR_INITIALIZER;
-        lai_exec_get_objectref(state, &operands[0], &operand);
-
-        result.type = LAI_INTEGER;
-        result.integer = 0;
-
-        // a uint64_t value can be expressed with 20 or less decimal digits
-        uint64_t o = operand.integer;
-        for (int i = 0; i < 20; i++) {
-            result.integer = (result.integer << 4) | (o % 10);
-            o /= 10;
-            if (!o)
-                break;
-        }
-
-        lai_operand_emplace(state, &operands[1], &result);
-        break;
     }
 
     default:
@@ -1286,6 +1265,7 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
     uint8_t *method = ctxitem->code;
     lai_nsnode_t *ctx_handle = ctxitem->handle;
     struct lai_invocation *invocation = ctxitem->invocation;
+    struct lai_instance *instance = lai_current_instance();
 
     int pc = block->pc;
     int limit = block->limit;
@@ -1369,11 +1349,11 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
         lai_exec_commit_pc(state, pc);
 
         LAI_CLEANUP_FREE_STRING char *path = NULL;
-        if (debug_opcodes)
+        if (instance->trace & LAI_TRACE_OP)
             path = lai_stringify_amlname(&amln);
 
         if (parse_mode == LAI_DATA_MODE) {
-            if (debug_opcodes)
+            if (instance->trace & LAI_TRACE_OP)
                 lai_debug("parsing name %s [@ 0x%x]", path, table_pc);
 
             if (want_result) {
@@ -1384,7 +1364,7 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
                 opstack_res->object.unres_aml = method + opcode_pc;
             }
         }else if (!(lai_mode_flags[parse_mode] & LAI_MF_RESOLVE)) {
-            if (debug_opcodes)
+            if (instance->trace & LAI_TRACE_OP)
                 lai_debug("parsing name %s [@ 0x%x]", path, table_pc);
 
             if (want_result) {
@@ -1397,7 +1377,7 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
             lai_nsnode_t *handle = lai_do_resolve(ctx_handle, &amln);
             if (!handle) {
                 if (lai_mode_flags[parse_mode] & LAI_MF_NULLABLE) {
-                    if (debug_opcodes)
+                    if (instance->trace & LAI_TRACE_OP)
                         lai_debug("parsing non-existant name %s [@ 0x%x]", path, table_pc);
 
                     if (want_result) {
@@ -1411,7 +1391,7 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
                 }
             } else if (handle->type == LAI_NAMESPACE_METHOD
                     && (lai_mode_flags[parse_mode] & LAI_MF_INVOKE)) {
-                if (debug_opcodes)
+                if (instance->trace & LAI_TRACE_OP)
                     lai_debug("parsing invocation %s [@ 0x%x]", path, table_pc);
 
                 lai_stackitem_t *node_item = lai_exec_push_stack(state);
@@ -1425,7 +1405,7 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
                 opstack_method->handle = handle;
             } else if (lai_mode_flags[parse_mode] & LAI_MF_INVOKE) {
                 // TODO: Get rid of this case again!
-                if (debug_opcodes)
+                if (instance->trace & LAI_TRACE_OP)
                     lai_debug("parsing name %s [@ 0x%x]", path, table_pc);
 
                 LAI_CLEANUP_VAR lai_variable_t result = LAI_VAR_INITIALIZER;
@@ -1437,7 +1417,7 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
                     lai_var_move(&opstack_res->object, &result);
                 }
             } else {
-                if (debug_opcodes)
+                if (instance->trace & LAI_TRACE_OP)
                     lai_debug("parsing name %s [@ 0x%x]", path, table_pc);
 
                 if (want_result) {
@@ -1461,7 +1441,7 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
         opcode = method[pc];
         pc++;
     }
-    if (debug_opcodes) {
+    if (instance->trace & LAI_TRACE_OP) {
         lai_debug("parsing opcode 0x%02x [0x%x @ %c%c%c%c %d]", opcode, table_pc,
                 amls->table->header.signature[0],
                 amls->table->header.signature[1],
@@ -2707,22 +2687,6 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
         break;
     }
 
-    case (EXTOP_PREFIX << 8) | TO_BCD_OP: {
-        if(lai_exec_reserve_stack(state))
-            return LAI_ERROR_OUT_OF_MEMORY;
-        lai_exec_commit_pc(state, pc);
-
-        lai_stackitem_t *op_item = lai_exec_push_stack(state);
-        op_item->kind = LAI_OP_STACKITEM;
-        op_item->op_opcode = opcode;
-        op_item->opstack_frame = state->opstack_ptr;
-        op_item->op_arg_modes[0] = LAI_OBJECT_MODE;
-        op_item->op_arg_modes[1] = LAI_REFERENCE_MODE;
-        op_item->op_arg_modes[2] = 0;
-        op_item->op_want_result = want_result;
-        break;
-    }
-
     default:
         lai_panic("unexpected opcode in lai_exec_run(), sequence %02X %02X %02X %02X",
                 method[opcode_pc + 0], method[opcode_pc + 1],
@@ -2868,6 +2832,6 @@ lai_api_error_t lai_eval(lai_variable_t *result, lai_nsnode_t *handle, lai_state
     return lai_eval_args(result, handle, state, 0, NULL);
 }
 
-void lai_enable_tracing(int enable) {
-    debug_opcodes = enable;
+void lai_enable_tracing(int trace) {
+    lai_current_instance()->trace = trace;
 }

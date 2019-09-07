@@ -50,6 +50,7 @@ struct lai_instance {
     size_t ns_capacity;
 
     int acpi_revision;
+    int trace;
 
     acpi_fadt_t *fadt;
 };
@@ -149,5 +150,6 @@ void lai_set_acpi_revision(int);
 
 // LAI debugging functions.
 
-// Trace all opcodes. This will produce *very* verbose output.
-void lai_enable_tracing(int enable);
+#define LAI_TRACE_OP 1
+
+void lai_enable_tracing(int trace);
