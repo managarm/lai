@@ -124,6 +124,7 @@ lai_api_error_t lai_obj_to_buffer(lai_variable_t *, lai_variable_t *);
 lai_api_error_t lai_obj_to_string(lai_variable_t *, lai_variable_t *, size_t);
 lai_api_error_t lai_obj_to_decimal_string(lai_variable_t *, lai_variable_t *);
 lai_api_error_t lai_obj_to_hex_string(lai_variable_t *, lai_variable_t *);
+lai_api_error_t lai_mutate_string(lai_variable_t *, lai_variable_t *);
 lai_api_error_t lai_obj_to_integer(lai_variable_t *, lai_variable_t *);
 void lai_obj_clone(lai_variable_t *, lai_variable_t *);
 

@@ -141,16 +141,10 @@ void lai_exec_mutate_ns(lai_nsnode_t *target, lai_variable_t *object) {
     switch (target->type) {
         case LAI_NAMESPACE_NAME:
             switch (target->object.type) {
-                case LAI_STRING: {
-                    // Strings are resized during mutation.
-                    LAI_ENSURE(object->type == LAI_STRING); // TODO: Implement conversion.
-                    size_t length = lai_strlen(lai_exec_string_access(object));
-                    if (lai_obj_resize_string(&target->object, length))
-                        lai_panic("could not resize string in lai_exec_mutate_ns()");
-                    lai_strcpy(lai_exec_string_access(&target->object),
-                           lai_exec_string_access(object));
+                case LAI_STRING:
+                    if(lai_mutate_string(&target->object, object))
+                        lai_panic("lai_mutate_string() failed");
                     break;
-                }
                 case LAI_BUFFER: {
                     // Buffers are *not* resized during mutation.
                     // The target buffer determines the size of the result.

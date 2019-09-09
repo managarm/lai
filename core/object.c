@@ -369,6 +369,61 @@ lai_api_error_t lai_obj_to_hex_string(lai_variable_t *out, lai_variable_t *objec
     return LAI_ERROR_NONE;
 }
 
+lai_api_error_t lai_mutate_string(lai_variable_t *target, lai_variable_t *object) {
+    // Strings are resized during mutation.
+
+    switch (object->type) {
+        // No conversion necessary.
+        case LAI_TYPE_STRING: {
+            size_t length = lai_strlen(lai_exec_string_access(object));
+            if (lai_obj_resize_string(target, length))
+                lai_panic("could not resize string in lai_exec_mutate_ns()");
+            lai_strcpy(lai_exec_string_access(target),
+                   lai_exec_string_access(object));
+            break;
+        }
+
+        case LAI_TYPE_INTEGER: {
+            // Need space for 16 hex digits + one null-terminator.
+            // TODO: This depends on the integer width.
+            if (lai_obj_resize_string(target, 17))
+                lai_panic("could not resize string in lai_exec_mutate_ns()");
+            char *s = lai_exec_string_access(target);
+
+            lai_snprintf(s, 17, "%016lX", object->integer);
+            break;
+        }
+        case LAI_TYPE_BUFFER: {
+            size_t length = lai_exec_buffer_size(object);
+            uint8_t *p = lai_exec_buffer_access(object);
+
+            // Need space for '0x12 ' + one null-terminator.
+            if (lai_obj_resize_string(target, 5 * length + 1))
+                lai_panic("could not resize string in lai_exec_mutate_ns()");
+            char *s = lai_exec_string_access(target);
+
+            for(size_t i = 0; i < length; i++) {
+                if(!i) {
+                    lai_snprintf(s, 5, "0x%02X", p[i]);
+                    s += 4;
+                }else{
+                    lai_snprintf(s, 6, " 0x%02X", p[i]);
+                    s += 5;
+                }
+            }
+            *s = '\0';
+            break;
+        }
+
+        default:
+            lai_warn("lai_mutate_string() unsupported object type %d",
+                       object->type);
+            return LAI_ERROR_ILLEGAL_ARGUMENTS;
+    }
+
+    return LAI_ERROR_NONE;
+}
+
 lai_api_error_t lai_obj_to_integer(lai_variable_t *out, lai_variable_t *object){
     switch (object->type)
     {
