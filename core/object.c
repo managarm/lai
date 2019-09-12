@@ -246,6 +246,55 @@ lai_api_error_t lai_obj_to_buffer(lai_variable_t *out, lai_variable_t *object){
     return LAI_ERROR_NONE;
 }
 
+lai_api_error_t lai_mutate_buffer(lai_variable_t *target, lai_variable_t *object) {
+    // Buffers are *not* resized during mutation.
+    // The target buffer determines the size of the result.
+
+    switch (object->type) {
+        // No conversion necessary.
+        case LAI_BUFFER: {
+            size_t copy_size = lai_exec_buffer_size(object);
+            size_t buffer_size = lai_exec_buffer_size(target);
+            if (copy_size > buffer_size)
+                copy_size = buffer_size;
+            memset(lai_exec_buffer_access(target), 0, buffer_size);
+            memcpy(lai_exec_buffer_access(target),
+                   lai_exec_buffer_access(object), copy_size);
+            break;
+        }
+
+        case LAI_INTEGER: {
+            // TODO: This assumes that 64-bit integers are used.
+            size_t copy_size = 8;
+            size_t buffer_size = lai_exec_buffer_size(target);
+            if (copy_size > buffer_size)
+                copy_size = buffer_size;
+            // TODO: bswap() if necessary.
+            uint64_t data = object->integer;
+            memset(lai_exec_buffer_access(target), 0, buffer_size);
+            memcpy(lai_exec_buffer_access(target), &data, copy_size);
+            break;
+        }
+        case LAI_STRING: {
+            size_t copy_size = lai_strlen(lai_exec_string_access(object)) + 1;
+            size_t buffer_size = lai_exec_buffer_size(target);
+            if (copy_size > buffer_size)
+                copy_size = buffer_size;
+            memset(lai_exec_buffer_access(target), 0, buffer_size);
+            memcpy(lai_exec_buffer_access(target),
+                   lai_exec_string_access(object), copy_size);
+            break;
+        }
+
+        default:
+            lai_warn("lai_mutate_buffer() unsupported object type %d",
+                       object->type);
+            return LAI_ERROR_ILLEGAL_ARGUMENTS;
+    }
+
+    return LAI_ERROR_NONE;
+}
+
 lai_api_error_t lai_obj_to_string(lai_variable_t *out, lai_variable_t *object, size_t size){
     switch (object->type)
     {

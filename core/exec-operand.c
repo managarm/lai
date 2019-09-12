@@ -145,19 +145,10 @@ void lai_exec_mutate_ns(lai_nsnode_t *target, lai_variable_t *object) {
                     if(lai_mutate_string(&target->object, object))
                         lai_panic("lai_mutate_string() failed");
                     break;
-                case LAI_BUFFER: {
-                    // Buffers are *not* resized during mutation.
-                    // The target buffer determines the size of the result.
-                    LAI_ENSURE(object->type == LAI_BUFFER); // TODO: Implement conversion.
-                    size_t copy_size = lai_exec_buffer_size(object);
-                    size_t buffer_size = lai_exec_buffer_size(&target->object);
-                    if (copy_size > buffer_size)
-                        copy_size = buffer_size;
-                    memset(lai_exec_buffer_access(&target->object), 0, buffer_size);
-                    memcpy(lai_exec_buffer_access(&target->object),
-                           lai_exec_buffer_access(object), copy_size);
+                case LAI_BUFFER:
+                    if(lai_mutate_buffer(&target->object, object))
+                        lai_panic("lai_mutate_buffer() failed");
                     break;
-                }
                 case LAI_PACKAGE: {
                     // Packages are resized during mutation.
                     LAI_ENSURE(object->type == LAI_PACKAGE); // TODO: Implement conversion.
