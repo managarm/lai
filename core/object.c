@@ -552,6 +552,55 @@ lai_api_error_t lai_obj_to_integer(lai_variable_t *out, lai_variable_t *object){
     return LAI_ERROR_NONE;
 }
 
+lai_api_error_t lai_mutate_integer(lai_variable_t *target, lai_variable_t *object) {
+    switch (object->type) {
+        // No conversion necessary.
+        case LAI_INTEGER:
+            lai_var_assign(target, object);
+            break;
+
+        case LAI_STRING: {
+            const char *s = lai_exec_string_access(object);
+            LAI_ENSURE(target->type == LAI_INTEGER);
+            target->integer = 0;
+
+            for(int i = 0; i < 16; i++) {
+                if(s[i] >= '0' && s[i] <= '9') {
+                    target->integer <<= 4;
+                    target->integer |= s[i] - '0';
+                }else if(s[i] >= 'a' && s[i] <= 'f') {
+                    target->integer <<= 4;
+                    target->integer |= (s[i] - 'a') + 10;
+                }else if(s[i] >= 'A' && s[i] <= 'F') {
+                    target->integer <<= 4;
+                    target->integer |= (s[i] - 'A') + 10;
+                }else
+                    break;
+            }
+            break;
+        }
+        case LAI_BUFFER: {
+            LAI_ENSURE(target->type == LAI_INTEGER);
+            target->integer = 0;
+
+            // TODO: This assumes that 64-bit integers are used.
+            size_t copy_size = lai_exec_buffer_size(object);
+            if (copy_size > 8)
+                copy_size = 8;
+            memcpy(&target->integer, lai_exec_buffer_access(object), copy_size);
+            // TODO: bswap() if necessary.
+            break;
+        }
+
+        default:
+            lai_warn("lai_mutate_integer() unsupported object type %d",
+                       object->type);
+            return LAI_ERROR_ILLEGAL_ARGUMENTS;
+    }
+
+    return LAI_ERROR_NONE;
+}
+
 // lai_clone_buffer(): Clones a buffer object
 static void lai_clone_buffer(lai_variable_t *dest, lai_variable_t *source) {
     size_t size = lai_exec_buffer_size(source);

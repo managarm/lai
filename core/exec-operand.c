@@ -141,6 +141,10 @@ void lai_exec_mutate_ns(lai_nsnode_t *target, lai_variable_t *object) {
     switch (target->type) {
         case LAI_NAMESPACE_NAME:
             switch (target->object.type) {
+                case LAI_INTEGER:
+                    if(lai_mutate_integer(&target->object, object))
+                        lai_panic("lai_mutate_integer() failed");
+                    break;
                 case LAI_STRING:
                     if(lai_mutate_string(&target->object, object))
                         lai_panic("lai_mutate_string() failed");
