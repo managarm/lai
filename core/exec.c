@@ -199,6 +199,36 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
         lai_operand_mutate(state, &operands[1], &result);
         break;
     }
+	case FINDSETLEFTBIT_OP:
+	{
+		LAI_CLEANUP_VAR lai_variable_t operand = LAI_VAR_INITIALIZER;
+		lai_exec_get_integer(state, operands, &operand);
+		result.type = LAI_INTEGER;
+		int msb = 0;
+		while(operand.integer != 0) {
+			operand.integer >>= 1;
+			msb++;
+		}
+		result.type = LAI_INTEGER;
+		result.integer = msb;
+		lai_operand_mutate(state, &operands[1], &result);
+		break;
+	}
+	case FINDSETRIGHTBIT_OP:
+	{
+		LAI_CLEANUP_VAR lai_variable_t operand = LAI_VAR_INITIALIZER;
+		lai_exec_get_integer(state, operands, &operand);
+		result.type = LAI_INTEGER;
+		int lsb = 0;
+		while(operand.integer != 0) {
+			++lsb;
+			operand.integer <<= 1;
+		}
+		result.type = LAI_INTEGER;
+		result.integer = lsb == 0 ? 0 : (65 - lsb);
+		lai_operand_mutate(state, &operands[1], &result);
+		break;
+	}
     case ADD_OP:
     {
         lai_variable_t lhs = {0};
@@ -2493,6 +2523,36 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
         op_item->op_want_result = want_result;
         break;
     }
+	case FINDSETLEFTBIT_OP: {
+		if (lai_exec_reserve_stack(state))
+			return LAI_ERROR_OUT_OF_MEMORY;
+		lai_exec_commit_pc(state, pc);
+
+		lai_stackitem_t *op_item = lai_exec_push_stack(state);
+		op_item->kind = LAI_OP_STACKITEM;
+		op_item->op_opcode = opcode;
+		op_item->opstack_frame = state->opstack_ptr;
+		op_item->op_arg_modes[0] = LAI_OBJECT_MODE;
+		op_item->op_arg_modes[1] = LAI_REFERENCE_MODE;
+		op_item->op_arg_modes[2] = 0;
+		op_item->op_want_result = want_result;
+		break;
+	}
+	case FINDSETRIGHTBIT_OP: {
+		if (lai_exec_reserve_stack(state))
+			return LAI_ERROR_OUT_OF_MEMORY;
+		lai_exec_commit_pc(state, pc);
+
+		lai_stackitem_t *op_item = lai_exec_push_stack(state);
+		op_item->kind = LAI_OP_STACKITEM;
+		op_item->op_opcode = opcode;
+		op_item->opstack_frame = state->opstack_ptr;
+		op_item->op_arg_modes[0] = LAI_OBJECT_MODE;
+		op_item->op_arg_modes[1] = LAI_REFERENCE_MODE;
+		op_item->op_arg_modes[2] = 0;
+		op_item->op_want_result = want_result;
+		break;
+	}
     case ADD_OP:
     case SUBTRACT_OP:
     case MULTIPLY_OP:

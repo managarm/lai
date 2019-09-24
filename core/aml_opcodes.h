@@ -54,6 +54,8 @@
 #define OR_OP				0x7D
 #define XOR_OP				0x7F
 #define NOT_OP				0x80
+#define FINDSETLEFTBIT_OP   0x81
+#define FINDSETRIGHTBIT_OP  0x82
 #define DEREF_OP			0x83
 #define SIZEOF_OP			0x87
 #define INDEX_OP			0x88
