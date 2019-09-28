@@ -79,9 +79,15 @@ void lai_exec_access(lai_variable_t *object, lai_nsnode_t *src) {
         case LAI_NAMESPACE_INDEXFIELD:
             lai_read_opregion(object, src);
             break;
-		case LAI_NAMESPACE_BUFFER_FIELD:
-			lai_read_buffer(object, src);
-			break;
+        case LAI_NAMESPACE_BUFFER_FIELD:
+            lai_read_buffer(object, src);
+            break;
+        case LAI_NAMESPACE_EVENT: /* fall through */
+        case LAI_NAMESPACE_MUTEX: /* fall through */
+        case LAI_NAMESPACE_OPREGION: /* fall through */
+        case LAI_NAMESPACE_THERMALZONE: /* fall through */
+        case LAI_NAMESPACE_PROCESSOR: /* fall through */
+        case LAI_NAMESPACE_POWERRESOURCE: /* fall through */
         case LAI_NAMESPACE_DEVICE:
             object->type = LAI_HANDLE;
             object->handle = src;
@@ -408,28 +414,26 @@ static void lai_write_buffer(lai_nsnode_t *handle, lai_variable_t *source) {
 
 // lai_read_buffer(): Reads from a BufferField.
 static void lai_read_buffer(lai_variable_t *dest, lai_nsnode_t *handle) {
-    lai_nsnode_t *buffer_handle = handle->bf_node;
+	lai_nsnode_t *buffer_handle = handle->bf_node;
 
-    size_t offset = handle->bf_offset;
+	size_t offset = handle->bf_offset;
 	size_t size = handle->bf_size;
-    uint8_t *data = lai_exec_buffer_access(&buffer_handle->object);
+	uint8_t *data = lai_exec_buffer_access(&buffer_handle->object);
 	dest->type = LAI_INTEGER;
 	dest->integer = 0;
 
 	int n = 0;
 	while(n < size) {
-    	int bit = (offset + n) & 7;
-    	int m = size - n;
+		int bit = (offset + n) & 7;
+		int m = size - n;
 		if (m > (8 - bit))
-    		m = 8 - bit;
-    	LAI_ENSURE(m); // read at least one bit.
-    	uint8_t mask = (1 << m) - 1;
+			m = 8 - bit;
+		LAI_ENSURE(m); // read at least one bit.
+		uint8_t mask = (1 << m) - 1;
 		uint8_t cur_byte = data[(offset + n) >> 3];
-		uint8_t to_write = 0;
-		to_write |= ((cur_byte & mask));
+		uint8_t to_write = ((cur_byte & mask));
 
-		uint64_t mask_2 = (uint64_t)to_write << n;
-		dest->integer |= mask_2;
+		dest->integer |= (uint64_t)to_write << n;
 		n += m;
 	}
 }
