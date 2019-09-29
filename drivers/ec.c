@@ -139,8 +139,6 @@ uint8_t lai_read_ec(uint8_t offset, struct lai_ec_driver *driver){
     if(!laihost_outb || !laihost_inb)
         lai_panic("host does not provide io functions required by lai_read_ec()");
 
-    enable_burst(driver);
-
     poll_ibf(driver);
     laihost_outb(driver->cmd_port, ACPI_EC_READ);
 
@@ -150,7 +148,6 @@ uint8_t lai_read_ec(uint8_t offset, struct lai_ec_driver *driver){
     poll_obf(driver);
     uint8_t ret = laihost_inb(driver->data_port);
 
-    disable_burst(driver);
     return ret;
 }
 
@@ -163,8 +160,6 @@ void lai_write_ec(uint8_t offset, uint8_t value, struct lai_ec_driver *driver){
     if(!laihost_outb || !laihost_inb)
         lai_panic("host does not provide io functions required by lai_read_ec()");
 
-    enable_burst(driver);
-
     poll_ibf(driver);
     laihost_outb(driver->cmd_port, ACPI_EC_WRITE);
 
@@ -173,8 +168,6 @@ void lai_write_ec(uint8_t offset, uint8_t value, struct lai_ec_driver *driver){
 
     poll_ibf(driver);
     laihost_outb(driver->data_port, value);
-
-    disable_burst(driver);
 }
 
 uint8_t lai_query_ec(struct lai_ec_driver *driver){
@@ -195,12 +188,79 @@ uint8_t lai_query_ec(struct lai_ec_driver *driver){
     return laihost_inb(driver->data_port);
 }
 
-static uint8_t read(uint64_t offset, void *userptr){
-    return lai_read_ec(offset, userptr);
+static uint8_t readb(uint64_t offset, void *userptr){
+    enable_burst(userptr);
+    uint8_t ret = lai_read_ec(offset, userptr);
+    disable_burst(userptr);
+    return ret;
 }
 
-static void write(uint64_t offset, uint8_t value, void *userptr){
+static uint16_t readw(uint64_t offset, void *userptr){
+    enable_burst(userptr);
+    uint16_t ret = (uint16_t)lai_read_ec(offset, userptr) | ((uint16_t)lai_read_ec(offset + 1, userptr) << 8);
+    disable_burst(userptr);
+    return ret;
+}
+
+static uint32_t readd(uint64_t offset, void *userptr){
+    enable_burst(userptr);
+    uint32_t ret = (uint32_t)lai_read_ec(offset, userptr) | ((uint32_t)lai_read_ec(offset + 1, userptr) << 8) \
+                   | ((uint32_t)lai_read_ec(offset + 2, userptr) << 16) | ((uint32_t)lai_read_ec(offset + 3, userptr) << 24);
+    disable_burst(userptr);
+    return ret;
+}
+
+static uint64_t readq(uint64_t offset, void *userptr){
+     enable_burst(userptr);
+    uint64_t ret = lai_read_ec(offset, userptr) | ((uint64_t)lai_read_ec(offset + 1, userptr) << 8) \
+                   | ((uint64_t)lai_read_ec(offset + 2, userptr) << 16) | ((uint64_t)lai_read_ec(offset + 3, userptr) << 24) \
+                   | ((uint64_t)lai_read_ec(offset + 4, userptr) << 32) | ((uint64_t)lai_read_ec(offset + 5, userptr) << 40) \
+                   | ((uint64_t)lai_read_ec(offset + 6, userptr) << 48) | ((uint64_t)lai_read_ec(offset + 7, userptr) << 56);
+    disable_burst(userptr);
+    return ret;
+}
+
+static void writeb(uint64_t offset, uint8_t value, void *userptr){
+    enable_burst(userptr);
     lai_write_ec(offset, value, userptr);
+    disable_burst(userptr);
 }
 
-const struct lai_opregion_override lai_ec_opregion_override = {.readb = read, .writeb = write};
+static void writew(uint64_t offset, uint16_t value, void *userptr){
+    enable_burst(userptr);
+    lai_write_ec(offset, value & 0xFF, userptr);
+    lai_write_ec(offset + 1, (value >> 8) & 0xFF, userptr);
+    disable_burst(userptr);
+}
+
+static void writed(uint64_t offset, uint32_t value, void *userptr){
+    enable_burst(userptr);
+    lai_write_ec(offset, value & 0xFF, userptr);
+    lai_write_ec(offset + 1, (value >> 8) & 0xFF, userptr);
+    lai_write_ec(offset + 2, (value >> 16) & 0xFF, userptr);
+    lai_write_ec(offset + 3, (value >> 24) & 0xFF, userptr);
+    disable_burst(userptr);
+}
+
+static void writeq(uint64_t offset, uint64_t value, void *userptr){
+    enable_burst(userptr);
+    lai_write_ec(offset, value & 0xFF, userptr);
+    lai_write_ec(offset + 1, (value >> 8) & 0xFF, userptr);
+    lai_write_ec(offset + 2, (value >> 16) & 0xFF, userptr);
+    lai_write_ec(offset + 3, (value >> 24) & 0xFF, userptr);
+    lai_write_ec(offset + 4, (value >> 32) & 0xFF, userptr);
+    lai_write_ec(offset + 5, (value >> 40) & 0xFF, userptr);
+    lai_write_ec(offset + 6, (value >> 48) & 0xFF, userptr);
+    lai_write_ec(offset + 7, (value >> 56) & 0xFF, userptr);
+    disable_burst(userptr);
+}
+
+const struct lai_opregion_override lai_ec_opregion_override = {.readb = readb,
+                                                               .readw = readw,
+                                                               .readd = readd,
+                                                               .readq = readq,
+                                                               .writeb = writeb,
+                                                               .writew = writew,
+                                                               .writed = writed,
+                                                               .writeq = writeq
+                                                               };
