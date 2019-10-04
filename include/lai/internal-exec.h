@@ -118,12 +118,12 @@ void lai_exec_pkg_var_store(lai_variable_t *in, struct lai_pkg_head *head, size_
 __attribute__((always_inline))
 inline void lai_exec_pkg_load(lai_variable_t *out, lai_variable_t *pkg, size_t i) {
     LAI_ENSURE(pkg->type == LAI_PACKAGE);
-    return lai_exec_pkg_var_load(out, pkg->pkg_ptr, i);
+    lai_exec_pkg_var_load(out, pkg->pkg_ptr, i);
 }
 __attribute__((always_inline))
 inline void lai_exec_pkg_store(lai_variable_t *in, lai_variable_t *pkg, size_t i) {
     LAI_ENSURE(pkg->type == LAI_PACKAGE);
-    return lai_exec_pkg_var_store(in, pkg->pkg_ptr, i);
+    lai_exec_pkg_var_store(in, pkg->pkg_ptr, i);
 }
 
 // ----------------------------------------------------------------------------
