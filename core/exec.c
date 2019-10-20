@@ -731,6 +731,35 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
         lai_operand_emplace(state, &operands[1], &result);
         break;
     }
+    case OBJECTTYPE_OP: {
+        // NOTE: The spec states that predefined names (such as \_SB_ and others) are undefined and return 0, however ACPICA doesn't do this so we don't either
+        result.type = LAI_INTEGER;
+        result.integer = 0;
+        if(operands[0].tag == LAI_RESOLVED_NAME){
+            if(operands[0].handle->type == LAI_NAMESPACE_ALIAS)
+                result.integer = lai_objecttype_ns(operands[0].handle->al_target);
+            else if(operands[0].handle->type == LAI_NAMESPACE_NAME && operands[0].handle->object.type == LAI_NODE_REF)
+                result.integer = lai_objecttype_ns(operands[0].handle->object.handle);
+            else
+                result.integer = lai_objecttype_ns(operands[0].handle);
+        } else if(operands[0].tag == LAI_OPERAND_OBJECT) {
+            lai_nsnode_t* node = operands[0].object.handle;
+            if(node->type == LAI_NAMESPACE_ALIAS)
+                result.integer = lai_objecttype_ns(node->al_target);
+            else if(node->type == LAI_NAMESPACE_NAME && node->object.type == LAI_NODE_REF)
+                result.integer = lai_objecttype_ns(node->object.handle);
+            else
+                result.integer = lai_objecttype_ns(node);
+        } else if(operands[0].tag == LAI_ARG_NAME || operands[0].tag == LAI_LOCAL_NAME){
+            LAI_CLEANUP_VAR lai_variable_t var = LAI_VAR_INITIALIZER;
+            lai_operand_load(state, &operands[0], &var);
+
+            result.integer = lai_objecttype_obj(&var);
+        } else if(operands[0].tag == LAI_DEBUG_NAME){
+            result.integer = 16;
+        }
+        break;
+    }
 
     default:
         lai_panic("undefined opcode in lai_exec_reduce_op: %02X", opcode);
@@ -2657,6 +2686,20 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
         op_item->op_arg_modes[1] = LAI_OBJECT_MODE;
         op_item->op_arg_modes[2] = LAI_REFERENCE_MODE;
         op_item->op_arg_modes[3] = 0;
+        op_item->op_want_result = want_result;
+        break;
+    }
+    case OBJECTTYPE_OP: {
+        if (lai_exec_reserve_stack(state))
+            return LAI_ERROR_OUT_OF_MEMORY;
+        lai_exec_commit_pc(state, pc);
+
+        lai_stackitem_t *op_item = lai_exec_push_stack(state);
+        op_item->kind = LAI_OP_STACKITEM;
+        op_item->op_opcode = opcode;
+        op_item->opstack_frame = state->opstack_ptr;
+        op_item->op_arg_modes[0] = LAI_REFERENCE_MODE;
+        op_item->op_arg_modes[1] = 0;
         op_item->op_want_result = want_result;
         break;
     }

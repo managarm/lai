@@ -63,6 +63,7 @@
 #define WORDFIELD_OP			0x8B
 #define BYTEFIELD_OP			0x8C
 #define BITFIELD_OP			0x8D
+#define OBJECTTYPE_OP       0x8E
 #define QWORDFIELD_OP			0x8F
 #define LAND_OP				0x90
 #define LOR_OP				0x91

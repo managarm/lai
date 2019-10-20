@@ -651,3 +651,54 @@ void lai_obj_clone(lai_variable_t *dest, lai_variable_t *source) {
         lai_var_assign(dest, source);
     }
 }
+
+int lai_objecttype_obj(lai_variable_t* var){
+    switch (var->type) {
+        case LAI_INTEGER:
+            return 1;
+        case LAI_STRING_INDEX:
+        case LAI_STRING:
+            return 2;
+        case LAI_BUFFER_INDEX:
+        case LAI_BUFFER:
+            return 3;
+        case LAI_PACKAGE_INDEX:
+        case LAI_PACKAGE:
+            return 4;
+        default:
+            return 0;
+    }
+}
+
+int lai_objecttype_ns(lai_nsnode_t* node){
+    switch (node->type)
+    {
+        case LAI_NAMESPACE_NAME:
+            return lai_objecttype_obj(&node->object);
+        case LAI_NAMESPACE_FIELD:
+        case LAI_NAMESPACE_BANK_FIELD:
+        case LAI_NAMESPACE_INDEXFIELD:
+            return 5;
+        case LAI_NAMESPACE_DEVICE:
+            return 6;
+        case LAI_NAMESPACE_EVENT:
+            return 7;
+        case LAI_NAMESPACE_METHOD:
+            return 8;
+        case LAI_NAMESPACE_MUTEX:
+            return 9;
+        case LAI_NAMESPACE_OPREGION:
+            return 10;
+        case LAI_NAMESPACE_POWERRESOURCE:
+            return 11;
+        case LAI_NAMESPACE_PROCESSOR:
+            return 12;
+        case LAI_NAMESPACE_THERMALZONE:
+            return 13;
+        case LAI_NAMESPACE_BUFFER_FIELD:
+            return 14;
+        default:
+            break;
+    }
+    return 0;
+}
