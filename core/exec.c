@@ -152,7 +152,7 @@ static void lai_exec_reduce_node(int opcode, lai_state_t *state, struct lai_oper
     }
 }
 
-static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operand *operands,
+static lai_api_error_t lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operand *operands,
         lai_variable_t *reduction_res) {
     if (lai_current_instance()->trace & LAI_TRACE_OP)
         lai_debug("lai_exec_reduce_op: opcode 0x%02X", opcode);
@@ -227,6 +227,195 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
 		result.type = LAI_INTEGER;
 		result.integer = lsb == 0 ? 0 : (65 - lsb);
 		lai_operand_mutate(state, &operands[1], &result);
+		break;
+	}
+	case CONCAT_OP:
+	{
+		LAI_CLEANUP_VAR lai_variable_t operand0 = LAI_VAR_INITIALIZER;
+		lai_exec_get_objectref(state, &operands[0], &operand0);
+		LAI_CLEANUP_VAR lai_variable_t operand1 = LAI_VAR_INITIALIZER;
+		lai_exec_get_objectref(state, &operands[1], &operand1);
+
+		LAI_CLEANUP_VAR lai_variable_t operand0_convert = LAI_VAR_INITIALIZER;
+		LAI_CLEANUP_VAR lai_variable_t operand1_convert_temp = LAI_VAR_INITIALIZER;
+		LAI_CLEANUP_VAR lai_variable_t operand1_convert = LAI_VAR_INITIALIZER;
+
+		/*
+		 * Convert object types other than integers, strings and buffers to a string.
+		 *
+		 * According to the ACPI specification buffer fields should be turned into
+		 * strings, but in ACPICA they are treated as either integers on strings
+		 * based on their size.
+		 */
+		if(operand0.type != LAI_INTEGER && operand0.type != LAI_BUFFER && operand0.type != LAI_STRING) {
+			if(operand0.type == LAI_HANDLE) {
+				lai_api_error_t error = lai_obj_to_type_string(&operand0_convert, operand0.handle);
+				if(error != LAI_ERROR_NONE) {
+					lai_warn("Failed lai_obj_to_type_string: %s", lai_api_error_to_string(error));
+					return error;
+				}
+			} else if (operand0.type == LAI_TYPE_NONE) {
+				lai_api_error_t error = lai_create_c_string(&operand0_convert, "[Uninitialized Object]");
+				if(error != LAI_ERROR_NONE) {
+					lai_warn("failed to allocate memory for AML string");
+					return error;
+				}
+			} else if (operand0.type == LAI_PACKAGE) {
+				lai_api_error_t error = lai_create_c_string(&operand0_convert, "[Package Object]");
+				if(error != LAI_ERROR_NONE) {
+					lai_warn("failed to allocate memory for AML string");
+					return error;
+				}
+			}
+		} else {
+			lai_obj_clone(&operand0_convert, &operand0);
+		}
+
+		if(operand1.type != LAI_INTEGER && operand1.type != LAI_BUFFER && operand1.type != LAI_STRING) {
+			if(operand1.type == LAI_HANDLE) {
+				lai_api_error_t error = lai_create_string(&operand1_convert_temp, 0);
+				if(error != LAI_ERROR_NONE) {
+					lai_warn("failed to allocate memory for AML string");
+					return error;
+				}
+				error = lai_obj_to_type_string(&operand1_convert_temp, operand1.handle);
+				if(error != LAI_ERROR_NONE) {
+					lai_warn("Failed lai_obj_to_type_string: %s", lai_api_error_to_string(error));
+					return error;
+				}
+			} else if (operand1.type == LAI_TYPE_NONE) {
+				lai_api_error_t error = lai_create_string(&operand1_convert_temp, 22);
+				if(error != LAI_ERROR_NONE) {
+					lai_warn("failed to allocate memory for AML string");
+					return error;
+				}
+				char* str = lai_exec_string_access(&operand1_convert_temp);
+				lai_strcpy(str, "[Uninitialized Object]");
+			} else if (operand1.type == LAI_PACKAGE) {
+				lai_api_error_t error = lai_create_string(&operand1_convert_temp, 16);
+				if(error != LAI_ERROR_NONE) {
+					lai_warn("failed to allocate memory for AML string");
+					return error;
+				}
+				char* str = lai_exec_string_access(&operand1_convert_temp);
+				lai_strcpy(str, "[Package Object]");
+			}
+		} else {
+			lai_obj_clone(&operand1_convert_temp, &operand1);
+		}
+
+		switch(operand0_convert.type) {
+			case LAI_INTEGER: {
+				operand1_convert.type = LAI_INTEGER;
+				lai_api_error_t error = lai_mutate_integer(&operand1_convert, &operand1_convert_temp);
+				if(error != LAI_ERROR_NONE) {
+					lai_warn("Failed lai_mutate_integer: %s", lai_api_error_to_string(error));
+					return error;
+				}
+				error = lai_create_buffer(&result, sizeof(uint64_t) * 2);
+				if(error != LAI_ERROR_NONE) {
+					lai_warn("failed to allocate memory for AML buffer");
+					return error;
+				}
+				uint64_t *buffer = lai_exec_buffer_access(&result);
+				buffer[0] = operand0_convert.integer;
+				buffer[1] = operand1_convert.integer;
+				result.type = LAI_BUFFER;
+				break;
+			}
+			case LAI_BUFFER: {
+				if(operand1_convert_temp.type == LAI_STRING) {
+					size_t strl = lai_exec_string_length(&operand1_convert_temp);
+					lai_api_error_t error = lai_create_buffer(&operand1_convert, strl + 1);
+					if(error != LAI_ERROR_NONE) {
+						lai_warn("failed to allocate memory for AML buffer");
+						return error;
+					}
+					error = lai_mutate_buffer(&operand1_convert, &operand1_convert_temp);
+					if(error != LAI_ERROR_NONE) {
+						lai_warn("Failed lai_mutate_buffer: %s", lai_api_error_to_string(error));
+						return error;
+					}
+				} else if(operand1_convert_temp.type == LAI_INTEGER) {
+					lai_api_error_t error = lai_create_buffer(&operand1_convert, sizeof(uint64_t));
+					if(error != LAI_ERROR_NONE) {
+						lai_warn("failed to allocate memory for AML buffer");
+						return error;
+					}
+					error = lai_mutate_buffer(&operand1_convert, &operand1_convert_temp);
+					if(error != LAI_ERROR_NONE) {
+						lai_warn("Failed lai_mutate_buffer: %s", lai_api_error_to_string(error));
+						return error;
+					}
+				} else if (operand1_convert_temp.type == LAI_BUFFER) {
+					lai_obj_clone(&operand1_convert, &operand1_convert_temp);
+				}
+				size_t b0size = lai_exec_buffer_size(&operand0_convert);
+				size_t b1size = lai_exec_buffer_size(&operand1_convert);
+				lai_api_error_t error = lai_create_buffer(&result, b0size + b1size);
+				if(error != LAI_ERROR_NONE) {
+					lai_warn("Failed to allocate memory for AML buffer");
+					return error;
+				}
+				char *buffer0 = lai_exec_buffer_access(&operand0_convert);
+				char *buffer1 = lai_exec_buffer_access(&operand1_convert);
+				char *result_buffer = lai_exec_buffer_access(&result);
+				memcpy(result_buffer, buffer0, b0size);
+				memcpy(result_buffer + b0size, buffer1, b0size);
+				result.type = LAI_BUFFER;
+				break;
+			}
+			case LAI_STRING: {
+				switch(operand1_convert_temp.type) {
+					case LAI_STRING: {
+						lai_obj_clone(&operand1_convert, &operand1_convert_temp);
+						break;
+					}
+					case LAI_INTEGER: {
+						lai_api_error_t error = lai_create_string(&operand1_convert, 0);
+						if(error != LAI_ERROR_NONE) {
+							lai_warn("failed to allocate memory for AML string");
+							return error;
+						}
+						error = lai_mutate_string(&operand1_convert, &operand1_convert_temp);
+						if(error != LAI_ERROR_NONE) {
+							lai_panic("Failed lai_mutate_string: %s", lai_api_error_to_string(error));
+							return error;
+						}
+						break;
+					}
+					case LAI_BUFFER:{
+						size_t length = lai_exec_buffer_size(&operand1_convert_temp);
+						lai_api_error_t error = lai_create_string(&operand1_convert, 0);
+						if(error != LAI_ERROR_NONE) {
+							lai_warn("failed to allocate memory for AML string");
+							return error;
+						}
+						error = lai_mutate_string(&operand1_convert, &operand1_convert_temp);
+						if(error != LAI_ERROR_NONE) {
+							lai_warn("Failed lai_mutate_string: %s", lai_api_error_to_string(error));
+							return error;
+						}
+						break;
+					}
+				}
+				size_t s0len = lai_exec_string_length(&operand0_convert);
+				size_t s1len = lai_exec_string_length(&operand1_convert);
+				lai_api_error_t error = lai_create_string(&result, s0len + s1len + 1);
+				if(error != LAI_ERROR_NONE) {
+					lai_warn("failed to allocate memory for AML string");
+					return error;
+				}
+				char *string0 = lai_exec_string_access(&operand0_convert);
+				char *string1 = lai_exec_string_access(&operand1_convert);
+				char *result_string = lai_exec_string_access(&result);
+				memcpy(result_string, string0, s0len);
+				memcpy(result_string + s0len, string1, s1len);
+				result_string[s0len + s1len + 1] = '\0';
+				result.type = LAI_STRING;
+			}
+		}
+		lai_operand_emplace(state, &operands[2], &result);
 		break;
 	}
     case ADD_OP:
@@ -762,10 +951,12 @@ static void lai_exec_reduce_op(int opcode, lai_state_t *state, struct lai_operan
     }
 
     default:
-        lai_panic("undefined opcode in lai_exec_reduce_op: %02X", opcode);
+        lai_warn("undefined opcode in lai_exec_reduce_op: %02X", opcode);
+		return LAI_ERROR_UNSUPPORTED;
     }
 
     lai_var_move(reduction_res, &result);
+	return LAI_ERROR_NONE;
 }
 
 // lai_exec_run(): This is the main AML interpreter function.
@@ -987,7 +1178,10 @@ static lai_api_error_t lai_exec_process(lai_state_t *state) {
 
             lai_variable_t result = {0};
             struct lai_operand *operands = lai_exec_get_opstack(state, item->opstack_frame);
-            lai_exec_reduce_op(item->op_opcode, state, operands, &result);
+            lai_api_error_t error = lai_exec_reduce_op(item->op_opcode, state, operands, &result);
+			if(error != LAI_ERROR_NONE) {
+				return error;
+			}
             lai_exec_pop_opstack(state, k);
 
             if (item->op_want_result) {
@@ -2579,6 +2773,22 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
 		op_item->op_arg_modes[0] = LAI_OBJECT_MODE;
 		op_item->op_arg_modes[1] = LAI_REFERENCE_MODE;
 		op_item->op_arg_modes[2] = 0;
+		op_item->op_want_result = want_result;
+		break;
+	}
+	case CONCAT_OP: {
+		if (lai_exec_reserve_stack(state))
+			return LAI_ERROR_OUT_OF_MEMORY;
+		lai_exec_commit_pc(state, pc);
+
+		lai_stackitem_t *op_item = lai_exec_push_stack(state);
+		op_item->kind = LAI_OP_STACKITEM;
+		op_item->op_opcode = opcode;
+		op_item->opstack_frame = state->opstack_ptr;
+		op_item->op_arg_modes[0] = LAI_OBJECT_MODE;
+		op_item->op_arg_modes[1] = LAI_OBJECT_MODE;
+		op_item->op_arg_modes[2] = LAI_REFERENCE_MODE;
+		op_item->op_arg_modes[3] = 0;
 		op_item->op_want_result = want_result;
 		break;
 	}

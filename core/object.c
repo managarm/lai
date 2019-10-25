@@ -552,6 +552,78 @@ lai_api_error_t lai_obj_to_integer(lai_variable_t *out, lai_variable_t *object){
     return LAI_ERROR_NONE;
 }
 
+
+/*
+ * Convert an other than a Buffer, a String or an Integer
+ * into a string.
+ *
+ * This function follows ACPICA's implementation instead
+ * of the ACPI standard one.
+ */
+lai_api_error_t lai_obj_to_type_string(lai_variable_t *target, lai_nsnode_t *object) {
+		lai_debug("%d", object->type);
+		lai_api_error_t error;
+		switch(object->type) {
+			case LAI_NAMESPACE_FIELD: {
+				error = lai_create_string(target, 14);
+				char *str = lai_exec_string_access(target);
+				lai_strcpy(str, "[Field Object]");
+				break;
+			}
+			case LAI_NAMESPACE_DEVICE: {
+				error = lai_create_string(target, 15);
+				char *str = lai_exec_string_access(target);
+				lai_strcpy(str, "[Device Object]");
+				break;
+			}
+			case LAI_NAMESPACE_EVENT: {
+				error = lai_create_string(target, 14);
+				char *str = lai_exec_string_access(target);
+				lai_strcpy(str, "[Event Object]");
+				break;
+			}
+			case LAI_NAMESPACE_MUTEX: {
+				error = lai_create_string(target, 14);
+				char *str = lai_exec_string_access(target);
+				lai_strcpy(str, "[Mutex Object]");
+				break;
+			}
+			case LAI_NAMESPACE_OPREGION: {
+				error = lai_create_string(target, 15);
+				char *str = lai_exec_string_access(target);
+				lai_strcpy(str, "[Region Object]");
+				break;
+			}
+			case LAI_NAMESPACE_POWERRESOURCE: {
+				error = lai_create_string(target, 14);
+				char *str = lai_exec_string_access(target);
+				lai_strcpy(str, "[Power Object]");
+				break;
+			}
+			case LAI_NAMESPACE_PROCESSOR: {
+				error = lai_create_string(target, 18);
+				char *str = lai_exec_string_access(target);
+				lai_strcpy(str, "[Processor Object]");
+				break;
+			}
+			case LAI_NAMESPACE_THERMALZONE: {
+				error = lai_create_string(target, 14);
+				char *str = lai_exec_string_access(target);
+				lai_strcpy(str, "[Thermal Zone]");
+				break;
+			}
+			default: {
+				lai_warn("lai_obj_to_type_string() unsupported object type %d",
+						object->type);
+				return LAI_ERROR_ILLEGAL_ARGUMENTS;
+			}
+		}
+		if(error != LAI_ERROR_NONE) {
+			return LAI_ERROR_OUT_OF_MEMORY;
+		}
+		return LAI_ERROR_NONE;
+}
+
 lai_api_error_t lai_mutate_integer(lai_variable_t *target, lai_variable_t *object) {
     switch (object->type) {
         // No conversion necessary.

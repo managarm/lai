@@ -128,6 +128,7 @@ lai_api_error_t lai_obj_to_hex_string(lai_variable_t *, lai_variable_t *);
 lai_api_error_t lai_mutate_string(lai_variable_t *, lai_variable_t *);
 lai_api_error_t lai_obj_to_integer(lai_variable_t *, lai_variable_t *);
 lai_api_error_t lai_mutate_integer(lai_variable_t *, lai_variable_t *);
+lai_api_error_t lai_obj_to_type_string(lai_variable_t *target, lai_nsnode_t *object);
 void lai_obj_clone(lai_variable_t *, lai_variable_t *);
 
 int lai_objecttype_ns(lai_nsnode_t*);
