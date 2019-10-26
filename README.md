@@ -11,3 +11,4 @@ LAI has been split up into 2 parts:
 
 - [Core API Documentation](https://github.com/qword-os/lai/wiki/Core-API-Documentation)
 - [Helper API Documentation](https://github.com/qword-os/lai/wiki/Helper-API-Documentation)
+- [Host API Documentation](https://github.com/qword-os/lai/wiki/Host-API-Documentation)
