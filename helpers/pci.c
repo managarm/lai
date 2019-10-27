@@ -123,7 +123,7 @@ lai_api_error_t lai_pci_parse_prt(struct lai_prt_iterator *iter) {
         // TODO: Look up the GSI in the _CRS of the host bridge.
         iter->link = NULL;
         iter->resource_idx = 0;
-        iter->flags = ACPI_IRQ_LEVEL | ACPI_IRQ_ACTIVE_LOW | ACPI_IRQ_SHARED;
+        iter->flags = ACPI_SMALL_IRQ_ACTIVE_LOW | ACPI_SMALL_IRQ_SHARED;
         iter->gsi = gsi;
         return LAI_ERROR_NONE;
     } else if (type == LAI_TYPE_DEVICE) { // GSI obtained via a link dev
