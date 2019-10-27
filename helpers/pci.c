@@ -117,14 +117,13 @@ lai_api_error_t lai_pci_parse_prt(struct lai_prt_iterator *iter) {
     enum lai_object_type type = lai_obj_get_type(&prt_entry_type);
     if (type == LAI_TYPE_INTEGER) { // direct routing to GSI
         uint64_t gsi;
-
         if (lai_obj_get_integer(&prt_entry_index, &gsi))
             return LAI_ERROR_UNEXPECTED_RESULT;
 
+        // TODO: Look up the GSI in the _CRS of the host bridge.
         iter->link = NULL;
         iter->resource_idx = 0;
-        iter->flags = ACPI_IRQ_LEVEL | ACPI_IRQ_ACTIVE_HIGH
-                        | ACPI_IRQ_SHARED;
+        iter->flags = ACPI_IRQ_LEVEL | ACPI_IRQ_ACTIVE_LOW | ACPI_IRQ_SHARED;
         iter->gsi = gsi;
         return LAI_ERROR_NONE;
     } else if (type == LAI_TYPE_DEVICE) { // GSI obtained via a link dev
