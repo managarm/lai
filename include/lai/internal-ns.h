@@ -7,6 +7,10 @@
 
 #include <lai/internal-util.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 __attribute__((always_inline))
 inline void lai_namecpy(char *dest, const char *src) {
     memcpy(dest, src, 4);
@@ -128,3 +132,6 @@ typedef struct lai_nsnode
     struct lai_hashtable children;
 } lai_nsnode_t;
 
+#ifdef __cplusplus
+}
+#endif

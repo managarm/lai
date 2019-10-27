@@ -7,6 +7,10 @@
 
 #include <lai/internal-util.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // ----------------------------------------------------------------------------
 // struct lai_variable.
 // ----------------------------------------------------------------------------
@@ -261,3 +265,7 @@ typedef struct lai_state_t {
     lai_stackitem_t small_stack[LAI_SMALL_STACK_SIZE];
     struct lai_operand small_opstack[LAI_SMALL_OPSTACK_SIZE];
 } lai_state_t;
+
+#ifdef __cplusplus
+}
+#endif

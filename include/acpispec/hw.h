@@ -5,6 +5,10 @@
 
 #pragma once
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // Embedded Controller Table ID
 #define ACPI_ECDT_ID "ECDT"
 
@@ -25,3 +29,7 @@
 #define ACPI_EC_STATUS_BURST   0x10 // Temporarily halts normal processing so multiple commands can be processed
 #define ACPI_EC_STATUS_SCI_EVT 0x20 // SCI event pending
 #define ACPI_EC_STATUS_SMI_EVT 0x40 // SMI event pending
+
+#ifdef __cplusplus
+}
+#endif

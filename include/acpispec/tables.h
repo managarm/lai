@@ -5,6 +5,10 @@
 
 #pragma once
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // FADT Event/Status Fields
 #define ACPI_TIMER            0x0001
 #define ACPI_BUSMASTER            0x0010
@@ -152,3 +156,7 @@ typedef struct acpi_aml_t        // AML tables, DSDT and SSDT
     acpi_header_t header;
     uint8_t data[];
 }__attribute__((packed)) acpi_aml_t;
+
+#ifdef __cplusplus
+}
+#endif

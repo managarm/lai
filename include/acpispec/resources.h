@@ -5,6 +5,10 @@
 
 #pragma once
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // Device _STA object
 #define ACPI_STA_PRESENT        0x01
 #define ACPI_STA_ENABLED        0x02
@@ -58,3 +62,6 @@ typedef struct acpi_large_irq_t
     uint32_t irq;
 }__attribute__((packed)) acpi_large_irq_t;
 
+#ifdef __cplusplus
+}
+#endif

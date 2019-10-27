@@ -5,6 +5,10 @@
 
 #pragma once
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 // Even in freestanding environments, GCC requires memcpy(), memmove(), memset()
 // and memcmp() to be present. Thus, we just use them directly.
 void *memcpy(void *, const void *, size_t);
@@ -85,3 +89,7 @@ struct lai_hashtable {
     int *elem_hash_tab;  // Stores the hash of each element.
     int *bucket_tab;     // Indexes into elem_{ptr,hash}_tab.
 };
+
+#ifdef __cplusplus
+}
+#endif

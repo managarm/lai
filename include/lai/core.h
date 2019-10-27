@@ -17,6 +17,10 @@
 #include <lai/internal-ns.h>
 #include <lai/internal-util.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define ACPI_MAX_RESOURCES          512
 
 typedef enum lai_api_error {
@@ -162,3 +166,7 @@ void lai_set_acpi_revision(int);
 #define LAI_TRACE_NS 4
 
 void lai_enable_tracing(int trace);
+
+#ifdef __cplusplus
+}
+#endif

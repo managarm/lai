@@ -7,6 +7,10 @@
 
 #include <lai/core.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 __attribute__((deprecated("use lai_resource_view instead")))
 size_t lai_read_resource(lai_nsnode_t *, acpi_resource_t *);
 
@@ -44,3 +48,7 @@ lai_api_error_t lai_resource_iterate(struct lai_resource_view *);
 
 enum lai_resource_type lai_resource_get_type(struct lai_resource_view *);
 lai_api_error_t lai_resource_next_irq(struct lai_resource_view *iterator);
+
+#ifdef __cplusplus
+}
+#endif

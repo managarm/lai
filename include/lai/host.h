@@ -1,4 +1,3 @@
-
 /*
  * Lightweight ACPI Implementation
  * Copyright (C) 2018-2019 the lai authors
@@ -9,6 +8,10 @@
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 struct lai_variable_t;
 typedef struct lai_variable_t lai_variable_t;
@@ -44,3 +47,6 @@ __attribute__((weak)) void laihost_sleep(uint64_t);
 
 __attribute__((weak)) void laihost_handle_amldebug(lai_variable_t *);
 
+#ifdef __cplusplus
+}
+#endif
