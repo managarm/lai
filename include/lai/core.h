@@ -90,7 +90,7 @@ lai_nsnode_t *lai_resolve_search(lai_nsnode_t *, const char *);
 lai_nsnode_t *lai_get_device(size_t);
 int lai_check_device_pnp_id(lai_nsnode_t *, lai_variable_t *, lai_state_t *);
 lai_nsnode_t *lai_enum(char *, size_t);
-void lai_eisaid(lai_variable_t *, char *);
+void lai_eisaid(lai_variable_t *, const char *);
 lai_nsnode_t *lai_ns_iterate(struct lai_ns_iterator *);
 lai_nsnode_t *lai_ns_child_iterate(struct lai_ns_child_iterator *);
 

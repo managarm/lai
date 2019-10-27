@@ -64,7 +64,7 @@ uint8_t char_to_hex(char character) {
     return 0;
 }
 
-void lai_eisaid(lai_variable_t *object, char *id) {
+void lai_eisaid(lai_variable_t *object, const char *id) {
     size_t n = lai_strlen(id);
     if (lai_strlen(id) != 7) {
         if(lai_create_string(object, n))
