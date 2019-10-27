@@ -28,6 +28,8 @@ struct lai_prt_iterator {
     size_t resource_idx;
     uint32_t gsi;
     uint32_t flags;
+    uint8_t level_triggered;
+    uint8_t active_low;
 };
 
 #define LAI_PRT_ITERATOR_INITIALIZER(prt) {0, prt, 0, 0, 0, NULL, 0, 0, 0}
