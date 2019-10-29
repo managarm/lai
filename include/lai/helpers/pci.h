@@ -27,7 +27,6 @@ struct lai_prt_iterator {
     lai_nsnode_t *link;
     size_t resource_idx;
     uint32_t gsi;
-    uint32_t flags;
     uint8_t level_triggered;
     uint8_t active_low;
 };

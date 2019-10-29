@@ -69,7 +69,8 @@ lai_api_error_t lai_pci_route_pin(acpi_resource_t *dest, uint16_t seg, uint8_t b
                 iter.pin == pin) {
             dest->type = ACPI_RESOURCE_IRQ;
             dest->base = iter.gsi;
-            dest->irq_flags = iter.flags;
+            dest->irq_flags = (iter.level_triggered ? 0 : ACPI_SMALL_IRQ_EDGE_TRIGGERED)
+                              | (iter.active_low ? ACPI_SMALL_IRQ_ACTIVE_LOW : 0);
             return LAI_ERROR_NONE;
         }
     }
@@ -123,7 +124,6 @@ lai_api_error_t lai_pci_parse_prt(struct lai_prt_iterator *iter) {
         // TODO: Look up the GSI in the _CRS of the host bridge.
         iter->link = NULL;
         iter->resource_idx = 0;
-        iter->flags = ACPI_SMALL_IRQ_ACTIVE_LOW | ACPI_SMALL_IRQ_SHARED;
         iter->level_triggered = 1;
         iter->active_low = 1;
         iter->gsi = gsi;
@@ -163,7 +163,6 @@ lai_api_error_t lai_pci_parse_prt(struct lai_prt_iterator *iter) {
                 iter->link = link_handle;
                 iter->resource_idx = res_index;
                 iter->gsi = view.gsi;
-                iter->flags = view.flags;
                 iter->level_triggered = lai_resource_irq_is_level_triggered(&view);
                 iter->active_low = lai_resource_irq_is_active_low(&view);
                 return LAI_ERROR_NONE;
