@@ -22,14 +22,14 @@ extern "C" {
 #define ACPI_RESOURCE_IRQ        3
 
 // IRQ Flags
-#define ACPI_IRQ_LEVEL            0x00
-#define ACPI_IRQ_EDGE            0x01
-#define ACPI_IRQ_ACTIVE_HIGH        0x00
-#define ACPI_IRQ_ACTIVE_LOW        0x08
-#define ACPI_IRQ_EXCLUSIVE        0x00
-#define ACPI_IRQ_SHARED            0x10
-#define ACPI_IRQ_NO_WAKE        0x00
-#define ACPI_IRQ_WAKE            0x20
+#define ACPI_SMALL_IRQ_EDGE_TRIGGERED    0x01
+#define ACPI_SMALL_IRQ_ACTIVE_LOW        0x08
+#define ACPI_SMALL_IRQ_SHARED            0x10
+#define ACPI_SMALL_IRQ_WAKE              0x20
+#define ACPI_EXTENDED_IRQ_EDGE_TRIGGERED 0x02
+#define ACPI_EXTENDED_IRQ_ACTIVE_LOW     0x04
+#define ACPI_EXTENDED_IRQ_SHARED         0x08
+#define ACPI_EXTENDED_IRQ_WAKE           0x10
 
 typedef struct acpi_resource_t
 {

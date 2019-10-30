@@ -76,9 +76,7 @@ size_t lai_read_resource(lai_nsnode_t *device, acpi_resource_t *dest) {
                             if (data_size >= 3)
                                 dest[count].irq_flags = small_irq->config;
                             else
-                                dest[count].irq_flags = ACPI_IRQ_ACTIVE_HIGH
-                                    | ACPI_IRQ_EDGE
-                                    | ACPI_IRQ_EXCLUSIVE;
+                                dest[count].irq_flags = ACPI_SMALL_IRQ_EDGE_TRIGGERED;
 
                             small_irq_mask &= ~(1 << i);
                             count++;
@@ -169,7 +167,7 @@ lai_api_error_t lai_resource_iterate(struct lai_resource_view *iterator){
             iterator->entry_idx = 0;
             if(info.size == 2){
                 // No IRQ flags, use defaults
-                iterator->flags = ACPI_IRQ_ACTIVE_HIGH | ACPI_IRQ_EDGE | ACPI_IRQ_EXCLUSIVE;
+                iterator->flags = ACPI_SMALL_IRQ_EDGE_TRIGGERED;
             } else if(info.size == 3){
                 iterator->flags = entry[3];
             } else {
@@ -236,6 +234,42 @@ enum lai_resource_type lai_resource_get_type(struct lai_resource_view *iterator)
             lai_debug("Unknown resource type %02X in lai_resource_get_type", info.type);
             return LAI_RESOURCE_NULL;
     }    
+}
+
+int lai_resource_irq_is_level_triggered(struct lai_resource_view *iterator){
+    LAI_ENSURE(iterator);
+    LAI_ENSURE(iterator->entry);
+    uint8_t *entry = iterator->entry;
+
+    struct lai_resource_header_info info = lai_get_header_info(entry);
+    switch (info.type){
+        case ACPI_SMALL_IRQ:
+            if (info.size < 3)
+                return 0;
+            return !(entry[3] & ACPI_SMALL_IRQ_EDGE_TRIGGERED);
+        case ACPI_LARGE_IRQ:
+            return !(entry[3] & ACPI_EXTENDED_IRQ_EDGE_TRIGGERED);
+        default:
+            lai_panic("Resource type %02X is not an IRQ", info.type);
+    }
+}
+
+int lai_resource_irq_is_active_low(struct lai_resource_view *iterator){
+    LAI_ENSURE(iterator);
+    LAI_ENSURE(iterator->entry);
+    uint8_t *entry = iterator->entry;
+
+    struct lai_resource_header_info info = lai_get_header_info(entry);
+    switch (info.type){
+        case ACPI_SMALL_IRQ:
+            if (info.size < 3)
+                return 0;
+            return !!(entry[3] & ACPI_SMALL_IRQ_ACTIVE_LOW);
+        case ACPI_LARGE_IRQ:
+            return !!(entry[3] & ACPI_EXTENDED_IRQ_ACTIVE_LOW);
+        default:
+            lai_panic("Resource type %02X is not an IRQ", info.type);
+    }
 }
 
 lai_api_error_t lai_resource_next_irq(struct lai_resource_view *iterator){

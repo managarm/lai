@@ -69,7 +69,8 @@ lai_api_error_t lai_pci_route_pin(acpi_resource_t *dest, uint16_t seg, uint8_t b
                 iter.pin == pin) {
             dest->type = ACPI_RESOURCE_IRQ;
             dest->base = iter.gsi;
-            dest->irq_flags = iter.flags;
+            dest->irq_flags = (iter.level_triggered ? 0 : ACPI_SMALL_IRQ_EDGE_TRIGGERED)
+                              | (iter.active_low ? ACPI_SMALL_IRQ_ACTIVE_LOW : 0);
             return LAI_ERROR_NONE;
         }
     }
@@ -117,46 +118,57 @@ lai_api_error_t lai_pci_parse_prt(struct lai_prt_iterator *iter) {
     enum lai_object_type type = lai_obj_get_type(&prt_entry_type);
     if (type == LAI_TYPE_INTEGER) { // direct routing to GSI
         uint64_t gsi;
-
         if (lai_obj_get_integer(&prt_entry_index, &gsi))
             return LAI_ERROR_UNEXPECTED_RESULT;
 
+        // TODO: Look up the GSI in the _CRS of the host bridge.
         iter->link = NULL;
         iter->resource_idx = 0;
-        iter->flags = ACPI_IRQ_LEVEL | ACPI_IRQ_ACTIVE_HIGH
-                        | ACPI_IRQ_SHARED;
+        iter->level_triggered = 1;
+        iter->active_low = 1;
         iter->gsi = gsi;
         return LAI_ERROR_NONE;
     } else if (type == LAI_TYPE_DEVICE) { // GSI obtained via a link dev
         lai_nsnode_t *link_handle;
-
+        uint64_t res_index;
         if (lai_obj_get_handle(&prt_entry_type, &link_handle))
             return LAI_ERROR_UNEXPECTED_RESULT;
-
-        acpi_resource_t *res = lai_calloc(sizeof(acpi_resource_t), 
-                                            ACPI_MAX_RESOURCES);
-        size_t res_count = lai_read_resource(link_handle, res);
-
-        if (!res_count) {
-            laihost_free(res);
+        if (lai_obj_get_integer(&prt_entry_index, &res_index))
             return LAI_ERROR_UNEXPECTED_RESULT;
-        }
 
-        for (size_t i = 0; i < res_count; i++) {
-            if (res[i].type == ACPI_RESOURCE_IRQ) {
+        // Get _CRS of the link device.
+        LAI_CLEANUP_STATE lai_state_t state;
+        lai_init_state(&state);
+
+        lai_nsnode_t *crs_handle = lai_resolve_path(link_handle, "_CRS");
+        if (!crs_handle)
+            return LAI_ERROR_UNEXPECTED_RESULT;
+
+        LAI_CLEANUP_VAR lai_variable_t crs_buffer = LAI_VAR_INITIALIZER;
+        int status = lai_eval(&crs_buffer, crs_handle, &state);
+        if (status)
+            return LAI_ERROR_EXECUTION_FAILURE;
+
+        // Find the _CRS entry based on its index.
+        struct lai_resource_view view = LAI_RESOURCE_VIEW_INITIALIZER(&crs_buffer);
+        lai_api_error_t e;
+        unsigned int current = 0;
+        while(!(e = lai_resource_iterate(&view))) {
+            if(current == res_index) {
+                enum lai_resource_type type = lai_resource_get_type(&view);
+                if (type != LAI_RESOURCE_IRQ)
+                    return LAI_ERROR_UNEXPECTED_RESULT;
+                if (lai_resource_next_irq(&view))
+                    return LAI_ERROR_UNEXPECTED_RESULT;
                 iter->link = link_handle;
-                iter->resource_idx = i;
-                iter->flags = res[i].irq_flags;
-                iter->gsi = res[i].base;
-
-                laihost_free(res);
+                iter->resource_idx = res_index;
+                iter->gsi = view.gsi;
+                iter->level_triggered = lai_resource_irq_is_level_triggered(&view);
+                iter->active_low = lai_resource_irq_is_active_low(&view);
                 return LAI_ERROR_NONE;
             }
-
-            i++;
+            current++;
         }
-
-        laihost_free(res);
         return LAI_ERROR_UNEXPECTED_RESULT;
     } else {
         lai_warn("PRT entry has unexpected type %d", prt_entry_type);
