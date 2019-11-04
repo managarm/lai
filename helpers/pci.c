@@ -185,19 +185,18 @@ lai_nsnode_t *lai_pci_find_device(lai_nsnode_t *bus, uint8_t slot, uint8_t funct
     struct lai_ns_child_iterator iter = LAI_NS_CHILD_ITERATOR_INITIALIZER(bus);
     lai_nsnode_t *node;
     while ((node = lai_ns_child_iterate(&iter))) {
-        uint64_t adr_result = 0;
         LAI_CLEANUP_VAR lai_variable_t adr = LAI_VAR_INITIALIZER;
         lai_nsnode_t *adr_handle = lai_resolve_path(node, "_ADR");
         if (adr_handle) {
+            uint64_t adr_result;
             if (lai_eval(&adr, adr_handle, state)) {
                 lai_warn("failed to evaluate _ADR");
                 continue;
             }
             lai_obj_get_integer(&adr, &adr_result);
-        }
 
-        if(adr_result == device_adr){
-            return node;
+            if(adr_result == device_adr)
+                return node;
         }
     }
 
