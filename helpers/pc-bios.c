@@ -35,17 +35,21 @@ lai_api_error_t lai_bios_detect_rsdp_within(uintptr_t base, size_t length,
     }
 
 done:
-    // TODO: Unmap the memory range.
+    laihost_unmap(base, length);
     return e;
 }
 
 lai_api_error_t lai_bios_detect_rsdp(struct lai_rsdp_info *info) {
     int e;
 
+    if(!laihost_map || !laihost_unmap)
+        lai_panic("lai_bios_detect_rsdp() needs laihost_map() and laihost_unmap()");
+
     // ACPI specifies that we can find the EBDA through 0x40E.
     uint16_t bda_data;
     void *bda_window = laihost_map(0x40E, sizeof(uint16_t));
     memcpy(&bda_data, bda_window, sizeof(uint16_t));
+    laihost_unmap(0x40E, sizeof(uint16_t));
 
     uintptr_t ebda_base = ((uintptr_t)bda_data) << 4;
 
