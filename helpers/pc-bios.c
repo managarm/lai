@@ -23,15 +23,30 @@ lai_api_error_t lai_bios_detect_rsdp_within(uintptr_t base, size_t length,
 
         if (memcmp(rsdp->signature, "RSD PTR ", 8))
             continue;
+        
         if (lai_bios_calc_checksum(rsdp, sizeof(acpi_rsdp_t)))
             continue;
 
-        // TODO: Handle XSDTs and support ACPI 2 detection.
-        info->acpi_version = 1;
         info->rsdp_address = base + off;
-        info->rsdt_address = rsdp->rsdt;
-        e = LAI_ERROR_NONE;
-        goto done;
+        if(!rsdp->revision){
+            info->acpi_version = 1;
+            
+            info->rsdt_address = rsdp->rsdt;
+            info->xsdt_address = 0;
+            e = LAI_ERROR_NONE;
+            goto done;
+        } else {
+            acpi_xsdp_t *xsdp = (acpi_xsdp_t *)rsdp;
+
+            if(lai_bios_calc_checksum(xsdp, sizeof(acpi_xsdp_t)))
+                continue;
+
+            info->acpi_version = 2;
+            info->rsdt_address = 0;
+            info->xsdt_address = xsdp->xsdt;
+            e = LAI_ERROR_NONE;
+            goto done;
+        }
     }
 
 done:

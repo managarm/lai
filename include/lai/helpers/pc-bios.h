@@ -17,7 +17,7 @@ struct lai_rsdp_info {
     // Physical addresses of RSDP and RSDT.
     uintptr_t rsdp_address;
     uintptr_t rsdt_address;
-    // TODO: Support xsdt_address;
+    uintptr_t xsdt_address;
 };
 
 lai_api_error_t lai_bios_detect_rsdp_within(uintptr_t base, size_t length,

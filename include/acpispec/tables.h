@@ -45,10 +45,19 @@ typedef struct acpi_rsdp_t
     char oem[6];
     uint8_t revision;
     uint32_t rsdt;
+}__attribute__((packed)) acpi_rsdp_t;
+
+typedef struct acpi_xsdp_t
+{
+    char signature[8];
+    uint8_t checksum;
+    char oem[6];
+    uint8_t revision;
+    uint32_t rsdt;
     uint32_t length;
     uint64_t xsdt;
     uint8_t extended_checksum;
-}__attribute__((packed)) acpi_rsdp_t;
+}__attribute__((packed)) acpi_xsdp_t;
 
 typedef struct acpi_header_t
 {
