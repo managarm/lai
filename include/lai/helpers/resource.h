@@ -42,9 +42,9 @@ struct lai_resource_view {
     uint32_t gsi; // Large IRQs
 };
 
-#define LAI_RESOURCE_VIEW_INITIALIZER(crs) {.entry = lai_exec_buffer_access(crs),\
+#define LAI_RESOURCE_VIEW_INITIALIZER(crs) {.entry = (uint8_t*)lai_exec_buffer_access(crs),\
     .skip_size = 0, .entry_idx = 0, .crs_var = crs,\
-    .base = 0, .length = 0, .flags = 0,\
+    .base = 0, .length = 0, .alignment = 0, .flags = 0, \
     .address_space = 0, .bit_width = 0, .bit_offset = 0,\
     .gsi = 0}
 
