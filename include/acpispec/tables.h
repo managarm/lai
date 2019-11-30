@@ -78,6 +78,12 @@ typedef struct acpi_rsdt_t
     uint32_t tables[];
 }__attribute__((packed)) acpi_rsdt_t;
 
+typedef struct acpi_xsdt_t
+{
+    acpi_header_t header;
+    uint64_t tables[];
+}__attribute__((packed)) acpi_xsdt_t;
+
 typedef struct acpi_gas_t
 {
     uint8_t address_space;
