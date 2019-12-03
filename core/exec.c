@@ -114,7 +114,17 @@ static void lai_exec_reduce_node(int opcode, lai_state_t *state, struct lai_oper
                 case DWORDFIELD_OP: node->bf_size = 32; break;
                 case QWORDFIELD_OP: node->bf_size = 64; break;
             }
-            node->bf_offset = offset.integer * 8;
+            switch (opcode) {
+                case BITFIELD_OP:
+                    node->bf_offset = offset.integer;
+                    break;
+                case BYTEFIELD_OP:
+                case WORDFIELD_OP:
+                case DWORDFIELD_OP:
+                case QWORDFIELD_OP:
+                    node->bf_offset = offset.integer * 8;
+                    break;
+            }
 
             lai_install_nsnode(node);
             struct lai_ctxitem *ctxitem = lai_exec_peek_ctxstack_back(state);
