@@ -93,7 +93,7 @@ static void lai_exec_reduce_node(int opcode, lai_state_t *state, struct lai_oper
         case WORDFIELD_OP:
         case DWORDFIELD_OP:
         case QWORDFIELD_OP: {
-            lai_variable_t offset = {0};
+            LAI_CLEANUP_VAR lai_variable_t offset = LAI_VAR_INITIALIZER;
             lai_exec_get_integer(state, &operands[1], &offset);
             LAI_ENSURE(operands[0].tag == LAI_RESOLVED_NAME);
             LAI_ENSURE(operands[2].tag == LAI_UNRESOLVED_NAME);
@@ -133,8 +133,8 @@ static void lai_exec_reduce_node(int opcode, lai_state_t *state, struct lai_oper
             break;
         }
         case (EXTOP_PREFIX << 8) | ARBFIELD_OP: {
-            lai_variable_t offset = {0};
-            lai_variable_t size = {0};
+            LAI_CLEANUP_VAR lai_variable_t offset = LAI_VAR_INITIALIZER;
+            LAI_CLEANUP_VAR lai_variable_t size = LAI_VAR_INITIALIZER;
             lai_exec_get_integer(state, &operands[1], &offset);
             lai_exec_get_integer(state, &operands[2], &size);
             LAI_ENSURE(operands[0].tag == LAI_RESOLVED_NAME);
