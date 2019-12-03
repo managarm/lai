@@ -132,6 +132,31 @@ static void lai_exec_reduce_node(int opcode, lai_state_t *state, struct lai_oper
                 lai_list_link(&ctxitem->invocation->per_method_list, &node->per_method_item);
             break;
         }
+        case (EXTOP_PREFIX << 8) | ARBFIELD_OP: {
+            lai_variable_t offset = {0};
+            lai_variable_t size = {0};
+            lai_exec_get_integer(state, &operands[1], &offset);
+            lai_exec_get_integer(state, &operands[2], &offset);
+            LAI_ENSURE(operands[0].tag == LAI_RESOLVED_NAME);
+            LAI_ENSURE(operands[3].tag == LAI_UNRESOLVED_NAME);
+
+            struct lai_amlname node_amln;
+            lai_amlname_parse(&node_amln, operands[3].unres_aml);
+
+            lai_nsnode_t *node = lai_create_nsnode_or_die();
+            node->type = LAI_NAMESPACE_BUFFER_FIELD;
+            lai_do_resolve_new_node(node, operands[3].unres_ctx_handle, &node_amln);
+
+            node->bf_node = operands[0].handle;
+            node->bf_size = size.integer;
+            node->bf_offset = offset.integer;
+
+            lai_install_nsnode(node);
+            struct lai_ctxitem *ctxitem = lai_exec_peek_ctxstack_back(state);
+            if (ctxitem->invocation)
+                lai_list_link(&ctxitem->invocation->per_method_list, &node->per_method_item);
+            break;
+        }
         case (EXTOP_PREFIX << 8) | OPREGION: {
             lai_variable_t base = {0};
             lai_variable_t size = {0};
@@ -2352,6 +2377,22 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
         node_item->node_arg_modes[1] = LAI_OBJECT_MODE;
         node_item->node_arg_modes[2] = LAI_UNRESOLVED_MODE;
         node_item->node_arg_modes[3] = 0;
+        break;
+    }
+    case (EXTOP_PREFIX << 8) | ARBFIELD_OP: {
+        if (lai_exec_reserve_stack(state))
+            return LAI_ERROR_OUT_OF_MEMORY;
+        lai_exec_commit_pc(state, pc);
+
+        lai_stackitem_t *node_item = lai_exec_push_stack(state);
+        node_item->kind = LAI_NODE_STACKITEM;
+        node_item->node_opcode = opcode;
+        node_item->opstack_frame = state->opstack_ptr;
+        node_item->node_arg_modes[0] = LAI_REFERENCE_MODE;
+        node_item->node_arg_modes[1] = LAI_OBJECT_MODE;
+        node_item->node_arg_modes[2] = LAI_OBJECT_MODE;
+        node_item->node_arg_modes[3] = LAI_UNRESOLVED_MODE;
+        node_item->node_arg_modes[4] = 0;
         break;
     }
     case (EXTOP_PREFIX << 8) | MUTEX: {
