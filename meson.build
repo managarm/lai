@@ -21,6 +21,7 @@ library = static_library('lai',
         'helpers/sci.c',
         'helpers/pm.c',
         'drivers/ec.c',
+        'drivers/timer.c',
     include_directories: include,
     pic: false)
 
