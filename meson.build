@@ -26,6 +26,8 @@ sources = files(
     'drivers/timer.c',
 )
 
+includes = include_directories('include')
+
 library = static_library('lai', sources,
     include_directories: includes,
     pic: false)
