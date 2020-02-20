@@ -229,7 +229,7 @@ char *lai_stringify_amlname(const struct lai_amlname *in_amln) {
         }
     }
     str[n++] = '\0';
-    LAI_ENSURE(n <= max_length);
+    LAI_ENSURE(n <= (int) max_length);
     return str;
 }
 
@@ -661,7 +661,7 @@ int lai_check_device_pnp_id(lai_nsnode_t *dev, lai_variable_t *pnp_id,
         }
     } else if (id.type == LAI_STRING && pnp_id->type == LAI_STRING) {
         if (!lai_strcmp(lai_exec_string_access(&id),
-                         lai_exec_string_access(pnp_id))) {    
+                         lai_exec_string_access(pnp_id))) {
             ret = 0;
         }
     }
@@ -683,7 +683,7 @@ lai_nsnode_t *lai_ns_iterate(struct lai_ns_iterator *iter) {
 }
 
 lai_nsnode_t *lai_ns_child_iterate(struct lai_ns_child_iterator *iter) {
-    while (iter->i < iter->parent->children.elem_capacity) {
+    while (iter->i < (size_t) iter->parent->children.elem_capacity) {
         lai_nsnode_t *n = iter->parent->children.elem_ptr_tab[iter->i++];
         if (n)
             return n;

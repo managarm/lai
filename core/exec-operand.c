@@ -367,14 +367,16 @@ void lai_operand_emplace(lai_state_t *state,
 // Returns immediate objects and indices as-is (i.e., without load from a name).
 // Returns a view of an existing object and not a clone of the object.
 void lai_exec_get_objectref(lai_state_t *state, struct lai_operand *src, lai_variable_t *object) {
-    LAI_ENSURE(src->tag == LAI_OPERAND_OBJECT);
+		(void) state;
+		LAI_ENSURE(src->tag == LAI_OPERAND_OBJECT);
     lai_var_assign(object, &src->object);
 }
 
 // Load an integer.
 // Returns immediate objects as-is.
 void lai_exec_get_integer(lai_state_t *state, struct lai_operand *src, lai_variable_t *object) {
-    LAI_ENSURE(src->tag == LAI_OPERAND_OBJECT);
+		(void) state;
+		LAI_ENSURE(src->tag == LAI_OPERAND_OBJECT);
     lai_variable_t temp = {0};
     lai_var_assign(&temp, &src->object);
     if(temp.type != LAI_INTEGER)
@@ -393,7 +395,7 @@ static void lai_write_buffer(lai_nsnode_t *handle, lai_variable_t *source) {
     size_t size = handle->bf_size;
     uint8_t *data = lai_exec_buffer_access(&buffer_handle->object);
 
-    int n = 0; // Number of bits that have been written.
+    size_t n = 0; // Number of bits that have been written.
     while (n < size) {
         // First bit (of the current byte) that will be overwritten.
         int bit = (offset + n) & 7;
@@ -422,7 +424,7 @@ static void lai_read_buffer(lai_variable_t *dest, lai_nsnode_t *handle) {
 	dest->type = LAI_INTEGER;
 	dest->integer = 0;
 
-	int n = 0;
+	size_t n = 0;
 	while(n < size) {
 		int bit = (offset + n) & 7;
 		int m = size - n;

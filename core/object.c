@@ -223,7 +223,7 @@ lai_api_error_t lai_obj_to_buffer(lai_variable_t *out, lai_variable_t *object){
     case LAI_TYPE_BUFFER:
         lai_obj_clone(out, object);
         break;
-    
+
     case LAI_TYPE_STRING: {
         size_t len = lai_exec_string_length(object);
         if(len == 0){
@@ -236,7 +236,7 @@ lai_api_error_t lai_obj_to_buffer(lai_variable_t *out, lai_variable_t *object){
         }
         break;
     }
-    
+
     default:
         lai_warn("lai_obj_to_buffer() unsupported object type %d",
                    object->type);
@@ -302,14 +302,14 @@ lai_api_error_t lai_obj_to_string(lai_variable_t *out, lai_variable_t *object, s
         size_t buffer_length = 0;
         uint8_t *buffer = lai_exec_buffer_access(object);
         for(uint64_t i = 0; i < lai_exec_buffer_size(object); i++){
-            if(buffer[i] == '\0') 
+            if(buffer[i] == '\0')
                 break;
             buffer_length++;
         }
-        
+
         if(buffer_length == 0){
             lai_create_string(out, 0);
-        } else if(size == ~(uint64_t)(0)){
+        } else if(size == ~(uint32_t)(0)){
             // Copy until the '\0'
             lai_create_string(out, buffer_length + 1);
             char *string = lai_exec_string_access(out);
@@ -324,11 +324,11 @@ lai_api_error_t lai_obj_to_string(lai_variable_t *out, lai_variable_t *object, s
                 char *string = lai_exec_string_access(out);
                 memcpy(string, buffer, buffer_length);
             }
-            
+
         }
         break;
     }
-    
+
     default:
         lai_warn("lai_obj_to_string() unsupported object type %d",
                    object->type);
@@ -366,7 +366,7 @@ lai_api_error_t lai_obj_to_decimal_string(lai_variable_t *out, lai_variable_t *o
     case LAI_STRING:
         lai_obj_clone(out, object);
         break;
-    
+
     default:
         lai_warn("lai_obj_to_decimal_string() unsupported object type %d",
                    object->type);
@@ -408,7 +408,7 @@ lai_api_error_t lai_obj_to_hex_string(lai_variable_t *out, lai_variable_t *objec
     case LAI_STRING:
         lai_obj_clone(out, object);
         break;
-    
+
     default:
         lai_warn("lai_obj_to_decimal_string() unsupported object type %d",
                    object->type);
@@ -694,9 +694,11 @@ static void lai_clone_package(lai_variable_t *dest, lai_variable_t *src) {
     size_t n = src->pkg_ptr->size;
     if (lai_create_pkg(dest, n))
         lai_panic("unable to allocate memory for package object.");
-    for (int i = 0; i < n; i++)
+    for (size_t i = 0; i < n; i++)
         lai_obj_clone(&dest->pkg_ptr->elems[i], &src->pkg_ptr->elems[i]);
 }
+
+extern void lai_swap_object(lai_variable_t *first, lai_variable_t *second); // from core/variable.c
 
 // lai_obj_clone(): Copies an object
 void lai_obj_clone(lai_variable_t *dest, lai_variable_t *source) {
