@@ -129,7 +129,7 @@ lai_api_error_t lai_acpi_reset(){
         if(!laihost_map)
             lai_panic("laihost_map is required for lai_acpi_reset");
         laihost_map(fadt->reset_register.base, 1); // We only need 1 byte mapped
-        uint8_t *reg = (uint8_t *)((uint32_t) fadt->reset_register.base);
+        uint8_t *reg = (uint8_t *)((uintptr_t) fadt->reset_register.base);
         *reg = fadt->reset_command;
         break;
     }

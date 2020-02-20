@@ -367,16 +367,16 @@ void lai_operand_emplace(lai_state_t *state,
 // Returns immediate objects and indices as-is (i.e., without load from a name).
 // Returns a view of an existing object and not a clone of the object.
 void lai_exec_get_objectref(lai_state_t *state, struct lai_operand *src, lai_variable_t *object) {
-		(void) state;
-		LAI_ENSURE(src->tag == LAI_OPERAND_OBJECT);
+    (void) state;
+    LAI_ENSURE(src->tag == LAI_OPERAND_OBJECT);
     lai_var_assign(object, &src->object);
 }
 
 // Load an integer.
 // Returns immediate objects as-is.
 void lai_exec_get_integer(lai_state_t *state, struct lai_operand *src, lai_variable_t *object) {
-		(void) state;
-		LAI_ENSURE(src->tag == LAI_OPERAND_OBJECT);
+    (void) state;
+    LAI_ENSURE(src->tag == LAI_OPERAND_OBJECT);
     lai_variable_t temp = {0};
     lai_var_assign(&temp, &src->object);
     if(temp.type != LAI_INTEGER)

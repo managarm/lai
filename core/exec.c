@@ -1018,8 +1018,8 @@ static size_t lai_parse_varint(size_t *out, uint8_t *code, int *pc, int limit) {
 }
 
 static int lai_parse_name(struct lai_amlname *out, uint8_t *code, int *pc, int limit) {
-		(void) limit;
-		*pc += lai_amlname_parse(out, code + *pc);
+    (void) limit;
+    *pc += lai_amlname_parse(out, code + *pc);
     return 0;
 }
 
@@ -1831,9 +1831,9 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
     {
         int data_pc;
         size_t n = 0; // Length of null-terminated string.
-        while (pc + n < (uint32_t) block->limit && method[pc + n])
+        while (pc + n < (size_t) block->limit && method[pc + n])
             n++;
-        if (pc + n == (uint32_t) block->limit)
+        if (pc + n == (size_t) block->limit)
             lai_panic("unterminated string in AML code");
         data_pc = pc;
         pc += n + 1;

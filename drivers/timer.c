@@ -11,7 +11,7 @@ static uint32_t read_timer_value(){
     if(timer_block.address_space == ACPI_GAS_IO){
         return laihost_ind(timer_block.base);
     } else if(timer_block.address_space == ACPI_GAS_MMIO){
-        uint32_t *reg = (uint32_t *)((uint32_t) timer_block.base);
+        uint32_t *reg = (uint32_t *)((uintptr_t) timer_block.base);
         return *reg;
     } else {
         lai_panic("Unknown ACPI Timer address space");

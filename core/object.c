@@ -309,7 +309,7 @@ lai_api_error_t lai_obj_to_string(lai_variable_t *out, lai_variable_t *object, s
 
         if(buffer_length == 0){
             lai_create_string(out, 0);
-        } else if(size == ~(uint32_t)(0)){
+        } else if(size == ~(size_t)(0)){
             // Copy until the '\0'
             lai_create_string(out, buffer_length + 1);
             char *string = lai_exec_string_access(out);
