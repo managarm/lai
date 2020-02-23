@@ -385,7 +385,7 @@ static lai_api_error_t lai_exec_reduce_op(int opcode, lai_state_t *state, struct
 						break;
 					}
 					case LAI_BUFFER:{
-						size_t length = lai_exec_buffer_size(&operand1_convert_temp);
+						// size_t length = lai_exec_buffer_size(&operand1_convert_temp);
 						lai_api_error_t error = lai_create_string(&operand1_convert, 0);
 						if(error != LAI_ERROR_NONE) {
 							lai_warn("failed to allocate memory for AML string");
@@ -615,7 +615,7 @@ static lai_api_error_t lai_exec_reduce_op(int opcode, lai_state_t *state, struct
         lai_variable_t index = {0};
         lai_exec_get_objectref(state, &operands[0], &object);
         lai_exec_get_integer(state, &operands[1], &index);
-        int n = index.integer;
+        size_t n = index.integer;
 
         switch (object.type) {
             case LAI_STRING:
@@ -796,13 +796,13 @@ static lai_api_error_t lai_exec_reduce_op(int opcode, lai_state_t *state, struct
         lai_exec_get_objectref(state, &operands[0], &operand);
         LAI_CLEANUP_VAR lai_variable_t size_var = LAI_VAR_INITIALIZER;
         lai_exec_get_integer(state, &operands[1], &size_var);
-        
+
         lai_api_error_t error = lai_obj_to_string(&result, &operand, size_var.integer);
         if(error != LAI_ERROR_NONE)
             lai_panic("Failed ToString: %s", lai_api_error_to_string(error));
 
         lai_operand_emplace(state, &operands[2], &result);
-        break; 
+        break;
     }
     case (EXTOP_PREFIX << 8) | CONDREF_OP: {
         struct lai_operand *operand = &operands[0];
@@ -856,7 +856,7 @@ static lai_api_error_t lai_exec_reduce_op(int opcode, lai_state_t *state, struct
 
         if(!fatal_type.integer)
             fatal_type.integer = 0;
-        
+
         if(!fatal_data.integer)
             fatal_data.integer = 0;
 
@@ -882,7 +882,7 @@ static lai_api_error_t lai_exec_reduce_op(int opcode, lai_state_t *state, struct
     case (EXTOP_PREFIX << 8) | FROM_BCD_OP: {
         LAI_CLEANUP_VAR lai_variable_t operand = LAI_VAR_INITIALIZER;
         lai_exec_get_objectref(state, &operands[0], &operand);
-        
+
         result.type = LAI_INTEGER;
 
         uint64_t power_of_ten = 1;
@@ -899,7 +899,7 @@ static lai_api_error_t lai_exec_reduce_op(int opcode, lai_state_t *state, struct
         }
 
         lai_operand_emplace(state, &operands[1], &result);
-        break; 
+        break;
     }
     case (EXTOP_PREFIX << 8) | TO_BCD_OP: {
         LAI_CLEANUP_VAR lai_variable_t operand = LAI_VAR_INITIALIZER;
@@ -1018,6 +1018,7 @@ static size_t lai_parse_varint(size_t *out, uint8_t *code, int *pc, int limit) {
 }
 
 static int lai_parse_name(struct lai_amlname *out, uint8_t *code, int *pc, int limit) {
+    (void) limit;
     *pc += lai_amlname_parse(out, code + *pc);
     return 0;
 }
@@ -1111,7 +1112,7 @@ static lai_api_error_t lai_exec_process(lai_state_t *state) {
             int initial_size = block->limit - block->pc;
             if (initial_size < 0)
                 lai_panic("buffer initializer has negative size");
-            if (initial_size > lai_exec_buffer_size(&result))
+            if (initial_size > (int) lai_exec_buffer_size(&result))
                 lai_panic("buffer initializer overflows buffer");
             memcpy(lai_exec_buffer_access(&result), method + block->pc, initial_size);
 
@@ -1137,9 +1138,9 @@ static lai_api_error_t lai_exec_process(lai_state_t *state) {
             struct lai_operand *initializer = &frame[1];
             LAI_ENSURE(initializer->tag == LAI_OPERAND_OBJECT);
 
-            if (item->pkg_index == lai_exec_pkg_size(&package->object))
+            if (item->pkg_index == (int) lai_exec_pkg_size(&package->object))
                 lai_panic("package initializer overflows its size");
-            LAI_ENSURE(item->pkg_index < lai_exec_pkg_size(&package->object));
+            LAI_ENSURE(item->pkg_index < (int) lai_exec_pkg_size(&package->object));
 
             lai_exec_pkg_store(&initializer->object, &package->object, item->pkg_index);
             item->pkg_index++;
@@ -1566,7 +1567,7 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
     int want_result = lai_mode_flags[parse_mode] & LAI_MF_RESULT;
 
     if (parse_mode == LAI_IMMEDIATE_BYTE_MODE) {
-        uint8_t value;
+        uint8_t value = 0;
         if (lai_parse_u8(&value, method, &pc, limit))
             return LAI_ERROR_EXECUTION_FAILURE;
 
@@ -1580,7 +1581,7 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
         result->object.integer = value;
         return LAI_ERROR_NONE;
     } else if (parse_mode == LAI_IMMEDIATE_WORD_MODE) {
-        uint16_t value;
+        uint16_t value = 0;
         if (lai_parse_u16(&value, method, &pc, limit))
             return LAI_ERROR_EXECUTION_FAILURE;
 
@@ -1594,7 +1595,7 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
         result->object.integer = value;
         return LAI_ERROR_NONE;
     } else if(parse_mode == LAI_IMMEDIATE_DWORD_MODE){
-        uint32_t value;
+        uint32_t value = 0;
         if (lai_parse_u32(&value, method, &pc, limit))
             return LAI_ERROR_EXECUTION_FAILURE;
 
@@ -1783,7 +1784,7 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
     case WORDPREFIX:
     case DWORDPREFIX:
     case QWORDPREFIX: {
-        uint64_t value;
+        uint64_t value = 0;
         switch (opcode) {
             case BYTEPREFIX: {
                 uint8_t temp;
@@ -1830,9 +1831,9 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
     {
         int data_pc;
         size_t n = 0; // Length of null-terminated string.
-        while (pc + n < block->limit && method[pc + n])
+        while (pc + n < (size_t) block->limit && method[pc + n])
             n++;
-        if (pc + n == block->limit)
+        if (pc + n == (size_t) block->limit)
             lai_panic("unterminated string in AML code");
         data_pc = pc;
         pc += n + 1;
@@ -2016,11 +2017,11 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
     /* If/Else Conditional */
     case IF_OP:
     {
-        int if_pc;
-        int else_pc;
+        int if_pc = 0;
+        int else_pc = 0;
         int has_else = 0;
-        size_t if_size;
-        size_t else_size;
+        size_t if_size = 0;
+        size_t else_size = 0;
         if (lai_parse_varint(&if_size, method, &pc, limit))
             return LAI_ERROR_EXECUTION_FAILURE;
         if_pc = pc;

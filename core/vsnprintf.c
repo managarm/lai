@@ -152,7 +152,7 @@ void lai_vsnprintf(char *buf, size_t len, const char *fmt, va_list arg) {
 
 			case 'P':
 			case 'p': {
-				i = (uint64_t)(va_arg(arg, void *));
+				i = (uintptr_t)(va_arg(arg, void *));
 
 				char *c = num_fmt(i, 16, padding, pad_with, 0, upper, 16);
 				while (*c) {
@@ -189,4 +189,3 @@ end:
 
 	*buf++ = '\0';
 }
-

@@ -9,7 +9,7 @@
 
 // laihost_free_package(): Frees a package object and all its children
 static void laihost_free_package(lai_variable_t *object) {
-    for(int i = 0; i < object->pkg_ptr->size; i++)
+    for(size_t i = 0; i < object->pkg_ptr->size; i++)
         lai_var_finalize(&object->pkg_ptr->elems[i]);
     laihost_free(object->pkg_ptr->elems);
     laihost_free(object->pkg_ptr);

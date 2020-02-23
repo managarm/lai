@@ -50,6 +50,7 @@ int lai_do_osi_method(lai_variable_t *args, lai_variable_t *result) {
 
 // same for both of the functions below.
 int lai_do_os_method(lai_variable_t *args, lai_variable_t *result) {
+    (void) args;
     if (lai_create_c_string(result, lai_emulated_os))
         lai_panic("could not allocate memory for string");
     lai_debug("_OS_ returned '%s'", lai_emulated_os);
@@ -57,6 +58,7 @@ int lai_do_os_method(lai_variable_t *args, lai_variable_t *result) {
 }
 
 int lai_do_rev_method(lai_variable_t *args, lai_variable_t *result) {
+    (void) args;
     result->type = LAI_INTEGER;
     result->integer = lai_implemented_version;
 
