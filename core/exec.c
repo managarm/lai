@@ -442,6 +442,17 @@ static lai_api_error_t lai_exec_reduce_op(int opcode, lai_state_t *state, struct
         lai_operand_mutate(state, &operands[2], &result);
         break;
     }
+    case MOD_OP: {
+        lai_variable_t lhs = {0};
+        lai_variable_t rhs = {0};
+        lai_exec_get_integer(state, &operands[0], &lhs);
+        lai_exec_get_integer(state, &operands[1], &rhs);
+
+        result.type = LAI_INTEGER;
+        result.integer = lhs.integer % rhs.integer;
+        lai_operand_mutate(state, &operands[2], &result);
+        break;
+    }
     case MULTIPLY_OP:
     {
         lai_variable_t lhs = {0};
@@ -2795,6 +2806,7 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
 	}
     case ADD_OP:
     case SUBTRACT_OP:
+    case MOD_OP:
     case MULTIPLY_OP:
     case AND_OP:
     case OR_OP:
