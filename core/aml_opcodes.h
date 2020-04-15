@@ -58,6 +58,7 @@
 #define FINDSETLEFTBIT_OP   0x81
 #define FINDSETRIGHTBIT_OP  0x82
 #define DEREF_OP			0x83
+#define MOD_OP              0x85
 #define SIZEOF_OP			0x87
 #define INDEX_OP			0x88
 #define DWORDFIELD_OP			0x8A
