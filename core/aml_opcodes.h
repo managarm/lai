@@ -97,6 +97,9 @@
 #define SLEEP_OP			0x22
 #define ACQUIRE_OP			0x23
 #define RELEASE_OP			0x27
+#define SIGNAL_OP           0x24
+#define WAIT_OP             0x25
+#define RESET_OP            0x26
 #define FROM_BCD_OP         0x28
 #define TO_BCD_OP           0x29
 #define DEBUG_OP			0x31
