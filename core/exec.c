@@ -940,18 +940,39 @@ static lai_api_error_t lai_exec_reduce_op(int opcode, lai_state_t *state, struct
         break;
     }
 
-    case (EXTOP_PREFIX << 8) | SIGNAL_OP: {
-        lai_debug("Signal() is a stub");
+    case (EXTOP_PREFIX << 8) | WAIT_OP: {
+        LAI_CLEANUP_VAR lai_variable_t timeout = LAI_VAR_INITIALIZER;
+        LAI_ENSURE(operands[0].tag == LAI_RESOLVED_NAME);
+        lai_exec_get_integer(state, &operands[1], &timeout);
+
+        lai_nsnode_t *node = operands[0].handle;
+        LAI_ENSURE(node->type == LAI_NAMESPACE_EVENT);
+
+        if (lai_event_wait(&node->evt_sync, timeout.integer)) {
+            result.type = LAI_INTEGER;
+            result.integer = 1;
+        } else {
+            result.type = LAI_INTEGER;
+            result.integer = 0;
+        }
         break;
     }
-    case (EXTOP_PREFIX << 8) | WAIT_OP: {
-        lai_debug("Wait() is a stub");
-        result.type = LAI_INTEGER;
-        result.integer = 0;
+    case (EXTOP_PREFIX << 8) | SIGNAL_OP: {
+        LAI_ENSURE(operands[0].tag == LAI_RESOLVED_NAME);
+
+        lai_nsnode_t *node = operands[0].handle;
+        LAI_ENSURE(node->type == LAI_NAMESPACE_EVENT);
+
+        lai_event_signal(&node->evt_sync);
         break;
     }
     case (EXTOP_PREFIX << 8) | RESET_OP: {
-        lai_debug("Reset() is a stub");
+        LAI_ENSURE(operands[0].tag == LAI_RESOLVED_NAME);
+
+        lai_nsnode_t *node = operands[0].handle;
+        LAI_ENSURE(node->type == LAI_NAMESPACE_EVENT);
+
+        lai_event_reset(&node->evt_sync);
         break;
     }
 
@@ -3097,20 +3118,6 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
         break;
     }
 
-    case (EXTOP_PREFIX << 8) | SIGNAL_OP: {
-        if (lai_exec_reserve_stack(state))
-            return LAI_ERROR_OUT_OF_MEMORY;
-        lai_exec_commit_pc(state, pc);
-
-        lai_stackitem_t *op_item = lai_exec_push_stack(state);
-        op_item->kind = LAI_OP_STACKITEM;
-        op_item->op_opcode = opcode;
-        op_item->opstack_frame = state->opstack_ptr;
-        op_item->op_arg_modes[0] = LAI_REFERENCE_MODE;
-        op_item->op_arg_modes[1] = 0;
-        op_item->op_want_result = want_result;
-        break;
-    }
     case (EXTOP_PREFIX << 8) | WAIT_OP: {
         if (lai_exec_reserve_stack(state))
             return LAI_ERROR_OUT_OF_MEMORY;
@@ -3123,6 +3130,20 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
         op_item->op_arg_modes[0] = LAI_REFERENCE_MODE;
         op_item->op_arg_modes[1] = LAI_OBJECT_MODE;
         op_item->op_arg_modes[2] = 0;
+        op_item->op_want_result = want_result;
+        break;
+    }
+    case (EXTOP_PREFIX << 8) | SIGNAL_OP: {
+        if (lai_exec_reserve_stack(state))
+            return LAI_ERROR_OUT_OF_MEMORY;
+        lai_exec_commit_pc(state, pc);
+
+        lai_stackitem_t *op_item = lai_exec_push_stack(state);
+        op_item->kind = LAI_OP_STACKITEM;
+        op_item->op_opcode = opcode;
+        op_item->opstack_frame = state->opstack_ptr;
+        op_item->op_arg_modes[0] = LAI_REFERENCE_MODE;
+        op_item->op_arg_modes[1] = 0;
         op_item->op_want_result = want_result;
         break;
     }

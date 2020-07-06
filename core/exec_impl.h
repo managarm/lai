@@ -148,8 +148,83 @@ static inline void lai_mutex_unlock(struct lai_sync_state *sync) {
 
     if(v & LAI_MUTEX_CONTENDED) {
         if(!laihost_sync_wake)
-            lai_panic("laihost_sync_wake() is needed to lock contended mutex");
+            lai_panic("laihost_sync_wake() is needed to unlock contended mutex");
         laihost_sync_wake(sync);
+    }
+}
+
+#define LAI_EVENT_COUNT   0x7FFFFFFFu
+#define LAI_EVENT_WAITERS 0x80000000u
+
+static inline int lai_event_wait(struct lai_sync_state *sync, int64_t deadline) {
+    unsigned int v = __atomic_load_n(&sync->val, __ATOMIC_RELAXED);
+    for (;;) {
+        if (v & LAI_EVENT_COUNT) {
+            LAI_ENSURE(!(v & LAI_EVENT_WAITERS));
+
+            // Decrement the event count.
+            if (__atomic_compare_exchange_n(&sync->val, &v, v - 1, 0,
+                    __ATOMIC_ACQUIRE, __ATOMIC_RELAXED))
+                return 0;
+        } else {
+            // Try to set the waiters bit.
+            if (!(v & LAI_EVENT_WAITERS)) {
+                if (!__atomic_compare_exchange_n(&sync->val, &v, LAI_EVENT_WAITERS, 0,
+                        __ATOMIC_ACQUIRE, __ATOMIC_RELAXED))
+                    continue;
+            }
+
+            // Block this thread.
+            if(!laihost_sync_wait)
+                lai_panic("laihost_sync_wait() is needed to wait for contended event");
+            if(laihost_sync_wait(sync, LAI_MUTEX_LOCKED | LAI_MUTEX_CONTENDED, deadline))
+                return 1;
+        }
+    }
+}
+
+static inline void lai_event_signal(struct lai_sync_state *sync) {
+    unsigned int v = __atomic_load_n(&sync->val, __ATOMIC_RELAXED);
+    for (;;) {
+        if (!(v & LAI_EVENT_WAITERS)) {
+            // Increment the event count.
+            LAI_ENSURE(!((v + 1) & ~LAI_EVENT_COUNT)); // Avoid overflows.
+            if (__atomic_compare_exchange_n(&sync->val, &v, v + 1, 0,
+                    __ATOMIC_ACQUIRE, __ATOMIC_RELAXED))
+                return;
+        } else {
+            LAI_ENSURE(!(v & LAI_EVENT_COUNT));
+
+            // Try to unset the waiters bit.
+            if (!__atomic_compare_exchange_n(&sync->val, &v, 1, 0,
+                    __ATOMIC_ACQUIRE, __ATOMIC_RELAXED))
+                continue;
+
+            // Unblock a waiter.
+            if(!laihost_sync_wake)
+                lai_panic("laihost_sync_wake() is needed to signal contended event");
+            laihost_sync_wake(sync);
+            return;
+        }
+    }
+}
+
+static inline void lai_event_reset(struct lai_sync_state *sync) {
+    unsigned int v = __atomic_load_n(&sync->val, __ATOMIC_RELAXED);
+    for (;;) {
+        if (!(v & LAI_EVENT_WAITERS)) {
+            // Try to reset the event count to zero.
+            if (v & LAI_EVENT_COUNT) {
+                if (!__atomic_compare_exchange_n(&sync->val, &v, 0, 0,
+                        __ATOMIC_ACQUIRE, __ATOMIC_RELAXED))
+                    continue;
+            }
+        } else {
+            LAI_ENSURE(!(v & LAI_EVENT_COUNT));
+        }
+
+        // The event count must be zero here (in both cases).
+        return;
     }
 }
 

@@ -126,6 +126,9 @@ typedef struct lai_nsnode
         struct { // LAI_NAMESPACE_MUTEX
             struct lai_sync_state mut_sync;
         };
+        struct { // LAI_NAMESPACE_EVENT
+            struct lai_sync_state evt_sync;
+        };
     };
 
 	// Stores a list of all namespace nodes created by the same method.
