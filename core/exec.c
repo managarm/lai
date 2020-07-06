@@ -912,16 +912,31 @@ static lai_api_error_t lai_exec_reduce_op(int opcode, lai_state_t *state, struct
         lai_panic("FatalOp in AML, Type: %02x, Data %08X, Arg: %x\n", fatal_type.integer, fatal_data.integer, fatal_arg.integer);
         break;
     }
-    case (EXTOP_PREFIX << 8) | ACQUIRE_OP:
-    {
-        lai_debug("Acquire() is a stub");
-        result.type = LAI_INTEGER;
-        result.integer = 1;
+
+    case (EXTOP_PREFIX << 8) | ACQUIRE_OP: {
+        LAI_CLEANUP_VAR lai_variable_t timeout = LAI_VAR_INITIALIZER;
+        LAI_ENSURE(operands[0].tag == LAI_RESOLVED_NAME);
+        lai_exec_get_integer(state, &operands[1], &timeout);
+
+        lai_nsnode_t *node = operands[0].handle;
+        LAI_ENSURE(node->type == LAI_NAMESPACE_MUTEX);
+
+        if (lai_mutex_lock(&node->mut_sync, timeout.integer)) {
+            result.type = LAI_INTEGER;
+            result.integer = 1;
+        } else {
+            result.type = LAI_INTEGER;
+            result.integer = 0;
+        }
         break;
     }
-    case (EXTOP_PREFIX << 8) | RELEASE_OP:
-    {
-        lai_debug("Release() is a stub");
+    case (EXTOP_PREFIX << 8) | RELEASE_OP: {
+        LAI_ENSURE(operands[0].tag == LAI_RESOLVED_NAME);
+
+        lai_nsnode_t *node = operands[0].handle;
+        LAI_ENSURE(node->type == LAI_NAMESPACE_MUTEX);
+
+        lai_mutex_unlock(&node->mut_sync);
         break;
     }
 

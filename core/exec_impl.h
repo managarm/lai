@@ -105,6 +105,55 @@ void lai_exec_get_objectref(lai_state_t *, struct lai_operand *, lai_variable_t 
 void lai_exec_get_integer(lai_state_t *, struct lai_operand *, lai_variable_t *);
 
 // --------------------------------------------------------------------------------------
+// Synchronization functions.
+// --------------------------------------------------------------------------------------
+
+#define LAI_MUTEX_BITS      3u
+#define LAI_MUTEX_LOCKED    1u
+#define LAI_MUTEX_CONTENDED 2u
+
+static inline int lai_mutex_lock(struct lai_sync_state *sync, int64_t deadline) {
+    unsigned int v = __atomic_load_n(&sync->val, __ATOMIC_RELAXED);
+    for (;;) {
+        LAI_ENSURE(!(v & ~LAI_MUTEX_BITS));
+
+        if(!(v & LAI_MUTEX_LOCKED)) {
+            // Try to lock the mutex.
+            if(__atomic_compare_exchange_n(&sync->val, &v,
+                    LAI_MUTEX_LOCKED, 0,
+                    __ATOMIC_ACQUIRE, __ATOMIC_RELAXED))
+                return 0;
+        }else{
+            // Try to switch the mutex to contended state.
+            if(!(v & LAI_MUTEX_CONTENDED)) {
+                if(!__atomic_compare_exchange_n(&sync->val, &v,
+                        LAI_MUTEX_LOCKED | LAI_MUTEX_CONTENDED, 0,
+                        __ATOMIC_RELAXED, __ATOMIC_RELAXED))
+                    continue;
+            }
+
+            // Block this thread.
+            if(!laihost_sync_wait)
+                lai_panic("laihost_sync_wait() is needed to lock contended mutex");
+            if(laihost_sync_wait(sync, LAI_MUTEX_LOCKED | LAI_MUTEX_CONTENDED, deadline))
+                return 1;
+        }
+    }
+}
+
+static inline void lai_mutex_unlock(struct lai_sync_state *sync) {
+    unsigned int v = __atomic_exchange_n(&sync->val, 0, __ATOMIC_RELEASE);
+    LAI_ENSURE(!(v & ~LAI_MUTEX_BITS));
+    LAI_ENSURE(v & LAI_MUTEX_LOCKED);
+
+    if(v & LAI_MUTEX_CONTENDED) {
+        if(!laihost_sync_wake)
+            lai_panic("laihost_sync_wake() is needed to lock contended mutex");
+        laihost_sync_wake(sync);
+    }
+}
+
+// --------------------------------------------------------------------------------------
 // Inline function for context stack manipulation.
 // --------------------------------------------------------------------------------------
 

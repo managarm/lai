@@ -123,6 +123,9 @@ typedef struct lai_nsnode
             const struct lai_opregion_override *op_override;
             void *op_userptr;
         };
+        struct { // LAI_NAMESPACE_MUTEX
+            struct lai_sync_state mut_sync;
+        };
     };
 
 	// Stores a list of all namespace nodes created by the same method.
