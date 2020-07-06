@@ -5,6 +5,7 @@
 
 #pragma once
 
+#include <lai/error.h>
 #include <lai/internal-util.h>
 
 #ifdef __cplusplus
@@ -73,6 +74,10 @@ typedef struct lai_nsnode
     size_t size;            // valid for scopes, methods, etc.
 
     lai_variable_t object;        // for Name()
+
+    // Implements the Notify() AML operator.
+    lai_api_error_t (*notify_override)(struct lai_nsnode *, int, void *);
+    void *notify_userptr;
 
     uint8_t method_flags;        // for Methods only, includes ARG_COUNT in lowest three bits
     // Allows the OS to override methods. Mainly useful for _OSI, _OS and _REV.

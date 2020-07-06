@@ -850,6 +850,29 @@ static lai_api_error_t lai_exec_reduce_op(int opcode, lai_state_t *state, struct
         lai_operand_emplace(state, &operands[2], &result);
         break;
     }
+
+    case NOTIFY_OP: {
+        LAI_CLEANUP_VAR lai_variable_t code = LAI_VAR_INITIALIZER;
+        LAI_ENSURE(operands[0].tag == LAI_RESOLVED_NAME);
+        lai_exec_get_integer(state, &operands[1], &code);
+
+        lai_nsnode_t *node = operands[0].handle;
+        LAI_ENSURE(node->type == LAI_NAMESPACE_DEVICE
+                || node->type == LAI_NAMESPACE_PROCESSOR
+                || node->type == LAI_NAMESPACE_THERMALZONE);
+
+        if (node->notify_override) {
+            lai_api_error_t error;
+            error = node->notify_override(node, code.integer, node->notify_userptr);
+            // TODO: for now, there no errors defined.
+            //       Add a way for the host to signal Notify() failure.
+            LAI_ENSURE(!error);
+        } else {
+            return LAI_ERROR_MISSING_NOTIFY;
+        }
+        break;
+    }
+
     case (EXTOP_PREFIX << 8) | CONDREF_OP: {
         struct lai_operand *operand = &operands[0];
         struct lai_operand *target = &operands[1];
@@ -3057,6 +3080,23 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
         op_item->op_want_result = want_result;
         break;
     }
+
+    case NOTIFY_OP: {
+        if (lai_exec_reserve_stack(state))
+            return LAI_ERROR_OUT_OF_MEMORY;
+        lai_exec_commit_pc(state, pc);
+
+        lai_stackitem_t *op_item = lai_exec_push_stack(state);
+        op_item->kind = LAI_OP_STACKITEM;
+        op_item->op_opcode = opcode;
+        op_item->opstack_frame = state->opstack_ptr;
+        op_item->op_arg_modes[0] = LAI_REFERENCE_MODE;
+        op_item->op_arg_modes[1] = LAI_OBJECT_MODE;
+        op_item->op_arg_modes[2] = 0;
+        op_item->op_want_result = want_result;
+        break;
+    }
+
     case (EXTOP_PREFIX << 8) | CONDREF_OP: {
         if (lai_exec_reserve_stack(state))
             return LAI_ERROR_OUT_OF_MEMORY;

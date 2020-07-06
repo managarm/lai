@@ -692,15 +692,19 @@ lai_nsnode_t *lai_ns_child_iterate(struct lai_ns_child_iterator *iter) {
     return NULL;
 }
 
-lai_api_error_t lai_ns_override_opregion(lai_nsnode_t *node, const struct lai_opregion_override *override, void *userptr){
-    if(node == NULL){
-        lai_warn("node passed to lai_ns_override_opregion is NULL");
-        return LAI_ERROR_ILLEGAL_ARGUMENTS;
-    }
-    if(node->type != LAI_NAMESPACE_OPREGION){
-        lai_warn("Tried to override opregion functions for non-opregion");
-        return LAI_ERROR_TYPE_MISMATCH;
-    }
+lai_api_error_t lai_ns_override_notify(lai_nsnode_t *node,
+        lai_api_error_t (*override)(lai_nsnode_t *, int, void *), void *userptr) {
+    LAI_ENSURE(node);
+
+    node->notify_override = override;
+    node->notify_userptr = userptr;
+    return LAI_ERROR_NONE;
+}
+
+lai_api_error_t lai_ns_override_opregion(lai_nsnode_t *node,
+        const struct lai_opregion_override *override, void *userptr){
+    LAI_ENSURE(node);
+    LAI_ENSURE(node->type == LAI_NAMESPACE_OPREGION);
 
     node->op_override = override;
     node->op_userptr = userptr;
