@@ -698,6 +698,56 @@ static lai_api_error_t lai_exec_reduce_op(int opcode, lai_state_t *state, struct
         lai_operand_mutate(state, &operands[2], &result);
         break;
     }
+    case MATCH_OP: {
+        LAI_CLEANUP_VAR lai_variable_t package = LAI_VAR_INITIALIZER;
+        lai_exec_get_objectref(state, &operands[0], &package);
+        if(package.type != LAI_PACKAGE)
+            return LAI_ERROR_UNEXPECTED_RESULT;
+
+        LAI_CLEANUP_VAR lai_variable_t op1_var = LAI_VAR_INITIALIZER;
+        lai_exec_get_integer(state, &operands[1], &op1_var);
+        size_t op1 = op1_var.integer;
+
+        LAI_CLEANUP_VAR lai_variable_t object1 = LAI_VAR_INITIALIZER;
+        lai_exec_get_objectref(state, &operands[2], &object1);
+
+        LAI_CLEANUP_VAR lai_variable_t op2_var = LAI_VAR_INITIALIZER;
+        lai_exec_get_integer(state, &operands[3], &op2_var);
+        size_t op2 = op2_var.integer;
+
+        LAI_CLEANUP_VAR lai_variable_t object2 = LAI_VAR_INITIALIZER;
+        lai_exec_get_objectref(state, &operands[4], &object2);
+
+        LAI_CLEANUP_VAR lai_variable_t start_index_var = LAI_VAR_INITIALIZER;
+        lai_exec_get_integer(state, &operands[5], &start_index_var);
+        size_t start_index = start_index_var.integer;
+
+        result.type = LAI_INTEGER;
+        result.integer = ~((uint64_t)0); // OnesOp
+
+        size_t package_size = lai_exec_pkg_size(&package);
+        for(size_t i = start_index; i < package_size; i++){
+            LAI_CLEANUP_VAR lai_variable_t object = LAI_VAR_INITIALIZER;
+            lai_exec_pkg_load(&object, &package, i);
+
+            int a = 0;
+            lai_api_error_t res = lai_obj_exec_match_op(op1, &object, &object1, &a);
+            if(res != LAI_ERROR_NONE)
+                return LAI_ERROR_ILLEGAL_ARGUMENTS;
+
+            int b = 0;
+            res = lai_obj_exec_match_op(op2, &object, &object2, &b);
+            if(res != LAI_ERROR_NONE)
+                return LAI_ERROR_ILLEGAL_ARGUMENTS;
+
+            if(a && b) {
+                result.integer = i;
+                break; 
+            }
+        }
+
+        break;
+    }
     case DEREF_OP:
     {
         lai_variable_t ref = {0};
@@ -3034,6 +3084,25 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
         op_item->op_arg_modes[1] = LAI_OBJECT_MODE;
         op_item->op_arg_modes[2] = LAI_REFERENCE_MODE;
         op_item->op_arg_modes[3] = 0;
+        op_item->op_want_result = want_result;
+        break;
+    }
+    case MATCH_OP: {
+        if (lai_exec_reserve_stack(state))
+            return LAI_ERROR_OUT_OF_MEMORY;
+        lai_exec_commit_pc(state, pc);
+
+        lai_stackitem_t *op_item = lai_exec_push_stack(state);
+        op_item->kind = LAI_OP_STACKITEM;
+        op_item->op_opcode = opcode;
+        op_item->opstack_frame = state->opstack_ptr;
+        op_item->op_arg_modes[0] = LAI_OBJECT_MODE;
+        op_item->op_arg_modes[1] = LAI_IMMEDIATE_BYTE_MODE;
+        op_item->op_arg_modes[2] = LAI_OBJECT_MODE;
+        op_item->op_arg_modes[3] = LAI_IMMEDIATE_BYTE_MODE;
+        op_item->op_arg_modes[4] = LAI_OBJECT_MODE;
+        op_item->op_arg_modes[5] = LAI_OBJECT_MODE;
+        op_item->op_arg_modes[6] = 0;
         op_item->op_want_result = want_result;
         break;
     }
