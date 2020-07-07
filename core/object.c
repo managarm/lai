@@ -776,3 +776,122 @@ int lai_objecttype_ns(lai_nsnode_t* node){
     }
     return 0;
 }
+
+lai_api_error_t lai_obj_exec_match_op(int op, lai_variable_t* var, lai_variable_t* obj, int* out){
+    LAI_CLEANUP_VAR lai_variable_t compare_obj = LAI_VAR_INITIALIZER;
+    int result = 0;
+
+    if(var->type == LAI_INTEGER) {
+        lai_api_error_t err = lai_obj_to_integer(&compare_obj, obj);
+        if(err != LAI_ERROR_NONE)
+            return err;
+
+        switch (op) {
+            case 0: // MTR: Always True
+                result = 1;
+                break;
+            case 1: // MEQ: Equals
+                result = (var->integer == compare_obj.integer);
+                break;
+            case 2: // MLE: Less than or equal
+                result = (var->integer <= compare_obj.integer);
+                break;
+            case 3: // MLT: Less than
+                result = (var->integer < compare_obj.integer);
+                break;
+            case 4: // MGE: Greater than or equal
+                result = (var->integer >= compare_obj.integer);
+                break;
+            case 5: // MGT: Greater than
+                result = (var->integer > compare_obj.integer);
+                break;
+        
+            default:
+                lai_warn("lai_obj_exec_match_op: Illegal op passed %d", op);
+                return LAI_ERROR_UNEXPECTED_RESULT;
+        }
+    } else if (var->type == LAI_BUFFER || var->type == LAI_STRING) {
+        char* var_data = NULL;
+        char* obj_data = NULL;
+
+        size_t var_size = 0;
+        size_t obj_size = 0;
+
+        if(var->type == LAI_BUFFER) {
+            lai_api_error_t err = lai_obj_to_buffer(&compare_obj, obj);
+            if(err != LAI_ERROR_NONE)
+                return err;
+            
+            var_data = lai_exec_buffer_access(var);
+            obj_data = lai_exec_buffer_access(&compare_obj);
+
+            var_size = lai_exec_buffer_size(var);
+            obj_size = lai_exec_buffer_size(&compare_obj);
+        } else {
+            lai_api_error_t err = lai_obj_to_hex_string(&compare_obj, obj);
+            if(err != LAI_ERROR_NONE)
+                return err;
+            
+            var_data = lai_exec_string_access(var);
+            obj_data = lai_exec_string_access(&compare_obj);
+
+            var_size = lai_exec_string_length(var);
+            obj_size = lai_exec_string_length(&compare_obj);
+        }
+
+        int compare = memcmp(var_data, obj_data, (var_size > obj_size) ? obj_size : var_size);
+
+        switch (op) {
+            case 0: // MTR: Always True
+                result = 1;
+                break;
+            case 1: // MEQ: Equals
+                result = (result == 0 && var_size == obj_size);
+                break;
+            case 2: // MLE: Less than or equal
+                if (compare == 0){
+                    result = var_size > obj_size;
+                } else {
+                    result = (compare > 0);
+                }
+
+                result = !result; // (a <= b) = !(a > b) 
+                break;
+            case 3: // MLT: Less than
+                if (compare == 0){
+                    result = var_size < obj_size;
+                } else {
+                    result = (compare < 0);
+                }
+
+                break;
+            case 4: // MGE: Greater than or equal
+                if (compare == 0){
+                    result = var_size < obj_size;
+                } else {
+                    result = (compare < 0);
+                }
+
+                result = !result; // (a >= 0) = !(a < b);
+                break;
+            case 5: // MGT: Greater than
+                if (compare == 0){
+                    result = var_size > obj_size;
+                } else {
+                    result = (compare > 0);
+                }
+
+                break;
+            default:
+                lai_warn("lai_obj_exec_match_op: Illegal op passed %d", op);
+                return LAI_ERROR_UNEXPECTED_RESULT;
+        }
+    } else {
+        lai_warn("lai_obj_exec_match_op: Illegal object type passed %d", var->type);
+        return LAI_ERROR_UNEXPECTED_RESULT;
+    }
+
+    *out = result;
+
+    return LAI_ERROR_NONE;
+}

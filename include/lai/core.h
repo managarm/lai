@@ -122,6 +122,8 @@ void lai_obj_clone(lai_variable_t *, lai_variable_t *);
 int lai_objecttype_ns(lai_nsnode_t*);
 int lai_objecttype_obj(lai_variable_t*);
 
+lai_api_error_t lai_obj_exec_match_op(int, lai_variable_t*, lai_variable_t*, int*);
+
 #define LAI_CLEANUP_VAR __attribute__((cleanup(lai_var_finalize)))
 #define LAI_VAR_INITIALIZER {0}
 

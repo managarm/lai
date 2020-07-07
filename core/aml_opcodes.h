@@ -62,6 +62,7 @@
 #define NOTIFY_OP           0x86
 #define SIZEOF_OP			0x87
 #define INDEX_OP			0x88
+#define MATCH_OP            0x89
 #define DWORDFIELD_OP			0x8A
 #define WORDFIELD_OP			0x8B
 #define BYTEFIELD_OP			0x8C
