@@ -6,6 +6,7 @@
 #include <lai/core.h>
 #include "libc.h"
 #include "exec_impl.h"
+#include "aml_opcodes.h"
 
 int lai_create_string(lai_variable_t *object, size_t length) {
     object->type = LAI_STRING;
@@ -410,7 +411,7 @@ lai_api_error_t lai_obj_to_hex_string(lai_variable_t *out, lai_variable_t *objec
         break;
 
     default:
-        lai_warn("lai_obj_to_decimal_string() unsupported object type %d",
+        lai_warn("lai_obj_to_hex_string() unsupported object type %d",
                    object->type);
         return LAI_ERROR_ILLEGAL_ARGUMENTS;
     }
@@ -426,7 +427,7 @@ lai_api_error_t lai_mutate_string(lai_variable_t *target, lai_variable_t *object
         case LAI_TYPE_STRING: {
             size_t length = lai_strlen(lai_exec_string_access(object));
             if (lai_obj_resize_string(target, length))
-                lai_panic("could not resize string in lai_exec_mutate_ns()");
+                lai_panic("could not resize string in lai_mutate_string()");
             lai_strcpy(lai_exec_string_access(target),
                    lai_exec_string_access(object));
             break;
@@ -436,7 +437,7 @@ lai_api_error_t lai_mutate_string(lai_variable_t *target, lai_variable_t *object
             // Need space for 16 hex digits + one null-terminator.
             // TODO: This depends on the integer width.
             if (lai_obj_resize_string(target, 17))
-                lai_panic("could not resize string in lai_exec_mutate_ns()");
+                lai_panic("could not resize string in lai_mutate_string()");
             char *s = lai_exec_string_access(target);
 
             lai_snprintf(s, 17, "%016lX", object->integer);
@@ -787,22 +788,22 @@ lai_api_error_t lai_obj_exec_match_op(int op, lai_variable_t* var, lai_variable_
             return err;
 
         switch (op) {
-            case 0: // MTR: Always True
+            case MATCH_MTR: // MTR: Always True
                 result = 1;
                 break;
-            case 1: // MEQ: Equals
+            case MATCH_MEQ: // MEQ: Equals
                 result = (var->integer == compare_obj.integer);
                 break;
-            case 2: // MLE: Less than or equal
+            case MATCH_MLE: // MLE: Less than or equal
                 result = (var->integer <= compare_obj.integer);
                 break;
-            case 3: // MLT: Less than
+            case MATCH_MLT: // MLT: Less than
                 result = (var->integer < compare_obj.integer);
                 break;
-            case 4: // MGE: Greater than or equal
+            case MATCH_MGE: // MGE: Greater than or equal
                 result = (var->integer >= compare_obj.integer);
                 break;
-            case 5: // MGT: Greater than
+            case MATCH_MGT: // MGT: Greater than
                 result = (var->integer > compare_obj.integer);
                 break;
         
@@ -842,13 +843,13 @@ lai_api_error_t lai_obj_exec_match_op(int op, lai_variable_t* var, lai_variable_
         int compare = memcmp(var_data, obj_data, (var_size > obj_size) ? obj_size : var_size);
 
         switch (op) {
-            case 0: // MTR: Always True
+            case MATCH_MTR: // MTR: Always True
                 result = 1;
                 break;
-            case 1: // MEQ: Equals
+            case MATCH_MEQ: // MEQ: Equals
                 result = (result == 0 && var_size == obj_size);
                 break;
-            case 2: // MLE: Less than or equal
+            case MATCH_MLE: // MLE: Less than or equal
                 if (compare == 0){
                     result = var_size > obj_size;
                 } else {
@@ -857,7 +858,7 @@ lai_api_error_t lai_obj_exec_match_op(int op, lai_variable_t* var, lai_variable_
 
                 result = !result; // (a <= b) = !(a > b) 
                 break;
-            case 3: // MLT: Less than
+            case MATCH_MLT: // MLT: Less than
                 if (compare == 0){
                     result = var_size < obj_size;
                 } else {
@@ -865,7 +866,7 @@ lai_api_error_t lai_obj_exec_match_op(int op, lai_variable_t* var, lai_variable_
                 }
 
                 break;
-            case 4: // MGE: Greater than or equal
+            case MATCH_MGE: // MGE: Greater than or equal
                 if (compare == 0){
                     result = var_size < obj_size;
                 } else {
@@ -874,7 +875,7 @@ lai_api_error_t lai_obj_exec_match_op(int op, lai_variable_t* var, lai_variable_
 
                 result = !result; // (a >= 0) = !(a < b);
                 break;
-            case 5: // MGT: Greater than
+            case MATCH_MGT: // MGT: Greater than
                 if (compare == 0){
                     result = var_size > obj_size;
                 } else {

@@ -129,3 +129,11 @@
 // Methods
 #define METHOD_ARGC_MASK		0x07
 #define METHOD_SERIALIZED		0x08
+
+// Match Comparison Type
+#define MATCH_MTR               0x0
+#define MATCH_MEQ               0x1
+#define MATCH_MLE               0x2
+#define MATCH_MLT               0x3
+#define MATCH_MGE               0x4
+#define MATCH_MGT               0x5

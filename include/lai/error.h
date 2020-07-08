@@ -9,6 +9,7 @@
 extern "C" {
 #endif
 
+// Don't forget to add new errors to lai_api_error_to_string in error.c
 typedef enum lai_api_error {
     LAI_ERROR_NONE,
     LAI_ERROR_OUT_OF_MEMORY,

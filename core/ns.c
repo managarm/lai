@@ -748,7 +748,6 @@ enum lai_node_type lai_ns_get_node_type(lai_nsnode_t *node){
         return LAI_NODETYPE_OPREGION;
     default:
         return LAI_NODETYPE_NULL;
-        break;
     }
 }
 
