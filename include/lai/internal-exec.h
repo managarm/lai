@@ -173,6 +173,7 @@ struct lai_operand {
 #define LAI_INVOKE_STACKITEM           9 // Parse a method invocation.
 #define LAI_RETURN_STACKITEM          10 // Parse a return operand
 #define LAI_BANKFIELD_STACKITEM       11 // Parse a BankValue and FieldList
+#define LAI_VARPACKAGE_STACKITEM      12
 
 struct lai_invocation {
     lai_variable_t arg[7];
@@ -222,6 +223,7 @@ typedef struct lai_stackitem_ {
         };
         struct {
             int pkg_index;
+            int pkg_phase; // 0: Parse size, 1: Create Object, 2: Enumerate items
             uint8_t pkg_want_result;
         };
         struct {

@@ -1299,8 +1299,31 @@ static lai_api_error_t lai_exec_process(lai_state_t *state) {
         } else {
             return lai_exec_parse(LAI_OBJECT_MODE, state);
         }
-    } else if (item->kind == LAI_PACKAGE_STACKITEM) {
+    } else if (item->kind == LAI_PACKAGE_STACKITEM || item->kind == LAI_VARPACKAGE_STACKITEM) {
         struct lai_operand *frame = lai_exec_get_opstack(state, item->opstack_frame);
+        if (item->pkg_phase == 0){
+            lai_api_error_t error = LAI_ERROR_NONE;
+            if (item->kind == LAI_PACKAGE_STACKITEM)
+                error = lai_exec_parse(LAI_IMMEDIATE_BYTE_MODE, state);
+            else
+                error = lai_exec_parse(LAI_OBJECT_MODE, state);
+
+            item->pkg_phase++;
+
+            return error;
+        } else if (item->pkg_phase == 1) {
+            LAI_CLEANUP_VAR lai_variable_t size = LAI_VAR_INITIALIZER;
+            lai_exec_get_integer(state, &frame[1], &size);
+
+            lai_exec_pop_opstack_back(state);
+            
+            if (lai_create_pkg(&frame[0].object, size.integer))
+                lai_panic("could not allocate memory for package");
+
+            item->pkg_phase++;
+            
+            return LAI_ERROR_NONE;
+        }
 
         if (state->opstack_ptr == item->opstack_frame + 2) {
             struct lai_operand *package = &frame[0];
@@ -2046,13 +2069,43 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
         buf_item->buf_want_result = want_result;
         break;
     }
+    case VARPACKAGE_OP:
+    {
+        int data_pc;
+        size_t encoded_size; // Size of the package initializer.
+        if (lai_parse_varint(&encoded_size, method, &pc, limit))
+            return LAI_ERROR_EXECUTION_FAILURE;
+        data_pc = pc;
+        pc = opcode_pc + 1 + encoded_size;
+
+        if (lai_exec_reserve_opstack(state)
+                || lai_exec_reserve_blkstack(state)
+                || lai_exec_reserve_stack(state))
+            return LAI_ERROR_OUT_OF_MEMORY;
+        lai_exec_commit_pc(state, pc);
+
+        // Note that not all elements of the package need to be initialized.
+
+        struct lai_blkitem *blkitem = lai_exec_push_blkstack(state);
+        blkitem->pc = data_pc;
+        blkitem->limit = opcode_pc + 1 + encoded_size;
+
+        lai_stackitem_t *pkg_item = lai_exec_push_stack(state);
+        pkg_item->kind = LAI_VARPACKAGE_STACKITEM;
+        pkg_item->opstack_frame = state->opstack_ptr;
+        pkg_item->pkg_index = 0;
+        pkg_item->pkg_want_result = want_result;
+        pkg_item->pkg_phase = 0;
+
+        struct lai_operand *opstack_pkg = lai_exec_push_opstack(state);
+        opstack_pkg->tag = LAI_OPERAND_OBJECT;
+        break;
+    }
     case PACKAGE_OP:
     {
         int data_pc;
         size_t encoded_size; // Size of the package initializer.
-        uint8_t num_ents; // The number of elements of the package.
-        if (lai_parse_varint(&encoded_size, method, &pc, limit)
-                || lai_parse_u8(&num_ents, method, &pc, limit))
+        if (lai_parse_varint(&encoded_size, method, &pc, limit))
             return LAI_ERROR_EXECUTION_FAILURE;
         data_pc = pc;
         pc = opcode_pc + 1 + encoded_size;
@@ -2074,11 +2127,10 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
         pkg_item->opstack_frame = state->opstack_ptr;
         pkg_item->pkg_index = 0;
         pkg_item->pkg_want_result = want_result;
+        pkg_item->pkg_phase = 0;
 
         struct lai_operand *opstack_pkg = lai_exec_push_opstack(state);
         opstack_pkg->tag = LAI_OPERAND_OBJECT;
-        if (lai_create_pkg(&opstack_pkg->object, num_ents))
-            lai_panic("could not allocate memory for package");
         break;
     }
 
