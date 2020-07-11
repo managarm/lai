@@ -748,6 +748,48 @@ static lai_api_error_t lai_exec_reduce_op(int opcode, lai_state_t *state, struct
 
         break;
     }
+    case CONCATRES_OP:
+    {
+        LAI_CLEANUP_VAR lai_variable_t buf1_var = LAI_VAR_INITIALIZER;
+        lai_exec_get_objectref(state, &operands[0], &buf1_var);
+
+        LAI_CLEANUP_VAR lai_variable_t buf2_var = LAI_VAR_INITIALIZER;
+        lai_exec_get_objectref(state, &operands[1], &buf2_var);
+
+        size_t buf1_size = lai_exec_buffer_size(&buf1_var);
+        const char* buf1 = lai_exec_buffer_access(&buf1_var);
+
+        size_t buf2_size = lai_exec_buffer_size(&buf2_var);
+        const char* buf2 = lai_exec_buffer_access(&buf2_var);
+
+        // Forbidden as per spec
+        if (buf1_size == 1 || buf2_size == 1)
+            return LAI_ERROR_UNEXPECTED_RESULT;
+
+        if (buf1_size == 0)
+            buf1_size = 2; // Make it 2 so memcpy will actually copy 0 zero bytes since it is empty
+
+        if (buf2_size == 0)
+            buf2_size = 2;
+
+        size_t result_size = (buf1_size - 2) + (buf2_size - 2) + 2; // (buf1_size - end tag) + (buf2_size - end tag) + end tag
+        lai_create_buffer(&result, result_size);
+        char* result_buffer = lai_exec_buffer_access(&result);
+
+        memcpy(result_buffer, buf1, buf1_size - 2);
+        memcpy(result_buffer + (buf1_size - 2), buf2, buf2_size - 2);
+        result_buffer[(buf1_size - 2) + (buf2_size - 2)] = 0x79; // Small End Tag
+
+        // Calculate checksum to put into the End Tag
+        uint8_t check = 0;
+        for (size_t i = 0; i < (result_size - 1); i++)
+            check += result_buffer[i];
+
+        result_buffer[(buf1_size - 2) + (buf2_size - 2) + 1] = 256 - check;
+
+        lai_operand_emplace(state, &operands[2], &result);
+        break;
+    }
     case DEREF_OP:
     {
         lai_variable_t ref = {0};
@@ -3155,6 +3197,22 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
         op_item->op_arg_modes[4] = LAI_OBJECT_MODE;
         op_item->op_arg_modes[5] = LAI_OBJECT_MODE;
         op_item->op_arg_modes[6] = 0;
+        op_item->op_want_result = want_result;
+        break;
+    }
+    case CONCATRES_OP: {
+        if (lai_exec_reserve_stack(state))
+            return LAI_ERROR_OUT_OF_MEMORY;
+        lai_exec_commit_pc(state, pc);
+
+        lai_stackitem_t *op_item = lai_exec_push_stack(state);
+        op_item->kind = LAI_OP_STACKITEM;
+        op_item->op_opcode = opcode;
+        op_item->opstack_frame = state->opstack_ptr;
+        op_item->op_arg_modes[0] = LAI_OBJECT_MODE;
+        op_item->op_arg_modes[1] = LAI_OBJECT_MODE;
+        op_item->op_arg_modes[2] = LAI_REFERENCE_MODE;
+        op_item->op_arg_modes[3] = 0;
         op_item->op_want_result = want_result;
         break;
     }

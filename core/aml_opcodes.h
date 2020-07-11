@@ -58,6 +58,7 @@
 #define FINDSETLEFTBIT_OP   0x81
 #define FINDSETRIGHTBIT_OP  0x82
 #define DEREF_OP			0x83
+#define CONCATRES_OP        0x84
 #define MOD_OP              0x85
 #define NOTIFY_OP           0x86
 #define SIZEOF_OP			0x87
