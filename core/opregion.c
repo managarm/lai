@@ -84,7 +84,7 @@ static void eval_bbn(lai_nsnode_t *opregion, uint64_t *bbn, lai_state_t * state)
             // PCI bus number is in the _BBN object.
             lai_nsnode_t *bbn_handle = lai_resolve_search(opregion, "_BBN");
             if (bbn_handle) {
-                if (lai_eval(&bus_number, bbn_handle, &state))
+                if (lai_eval(&bus_number, bbn_handle, state))
                     lai_panic("could not evaluate _BBN of OperationRegion()");
                 if (bbn){
                     *bbn = bus_number.integer;
