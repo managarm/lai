@@ -14,11 +14,9 @@
 
 #include <lai/helpers/pci.h>
 #include <lai/helpers/resource.h>
+#include <lai/acpispec/hw.h>
 #include "../core/libc.h"
 #include "../core/eval.h"
-
-#define PCI_PNP_ID        "PNP0A03"
-#define PCIE_PNP_ID       "PNP0A08"
 
 int lai_pci_route(acpi_resource_t *dest, uint16_t seg, uint8_t bus, uint8_t slot, uint8_t function) {
 
@@ -206,8 +204,8 @@ lai_nsnode_t *lai_pci_find_device(lai_nsnode_t *bus, uint8_t slot, uint8_t funct
 lai_nsnode_t *lai_pci_find_bus(uint16_t seg, uint8_t bus, lai_state_t *state){
     LAI_CLEANUP_VAR lai_variable_t pci_pnp_id = LAI_VAR_INITIALIZER;
     LAI_CLEANUP_VAR lai_variable_t pcie_pnp_id = LAI_VAR_INITIALIZER;
-    lai_eisaid(&pci_pnp_id, PCI_PNP_ID);
-    lai_eisaid(&pcie_pnp_id, PCIE_PNP_ID);
+    lai_eisaid(&pci_pnp_id, ACPI_PCI_PNP_ID);
+    lai_eisaid(&pcie_pnp_id, ACPI_PCIE_PNP_ID);
 
     lai_nsnode_t *sb_handle = lai_resolve_path(NULL, "\\_SB_");
     LAI_ENSURE(sb_handle);
@@ -221,18 +219,14 @@ lai_nsnode_t *lai_pci_find_bus(uint16_t seg, uint8_t bus, lai_state_t *state){
 
         LAI_CLEANUP_VAR lai_variable_t bus_number = LAI_VAR_INITIALIZER;
         uint64_t bbn_result = 0;
-        
-        if(node->name[0]=='P'&&node->name[1]=='C'&&node->name[2]=='I'&&node->name[3]>='0'&&node->name[3]<='9'){//only evaluate _BBN if is PCI root node
-            lai_nsnode_t *bbn_handle = lai_resolve_path(node, "_BBN");
-            if (bbn_handle) {
-                if (lai_eval(&bus_number, bbn_handle, state)) {
-                    lai_warn("failed to evaluate _BBN");
-                    continue;
-                }
-                lai_obj_get_integer(&bus_number, &bbn_result);
+        lai_nsnode_t *bbn_handle = lai_resolve_path(node, "_BBN");
+        if (bbn_handle) {
+            if (lai_eval(&bus_number, bbn_handle, state)) {
+                lai_warn("failed to evaluate _BBN");
+                continue;
             }
+            lai_obj_get_integer(&bus_number, &bbn_result);
         }
-        
 
         LAI_CLEANUP_VAR lai_variable_t seg_number = LAI_VAR_INITIALIZER;
         uint64_t seg_result = 0;

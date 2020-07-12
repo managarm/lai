@@ -74,6 +74,7 @@ lai_nsnode_t *lai_enum(char *, size_t);
 void lai_eisaid(lai_variable_t *, const char *);
 lai_nsnode_t *lai_ns_iterate(struct lai_ns_iterator *);
 lai_nsnode_t *lai_ns_child_iterate(struct lai_ns_child_iterator *);
+int lai_is_pci_root_bus(lai_nsnode_t *,lai_state_t *);
 
 // Namespace functions.
 

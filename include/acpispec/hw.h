@@ -30,6 +30,9 @@ extern "C" {
 #define ACPI_EC_STATUS_SCI_EVT 0x20 // SCI event pending
 #define ACPI_EC_STATUS_SMI_EVT 0x40 // SMI event pending
 
+#define ACPI_PCI_PNP_ID        "PNP0A03"
+#define ACPI_PCIE_PNP_ID       "PNP0A08"
+
 #ifdef __cplusplus
 }
 #endif

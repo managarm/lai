@@ -759,3 +759,11 @@ uint8_t lai_ns_get_opregion_address_space(lai_nsnode_t *node){
     LAI_ENSURE(node->type == LAI_NAMESPACE_OPREGION);
     return node->op_address_space;
 }
+
+int lai_is_pci_root_bus(lai_nsnode_t *dev,lai_state_t *state){
+    LAI_CLEANUP_VAR lai_variable_t pci_pnp_id = LAI_VAR_INITIALIZER;
+    LAI_CLEANUP_VAR lai_variable_t pcie_pnp_id = LAI_VAR_INITIALIZER;
+    lai_eisaid(&pci_pnp_id, ACPI_PCI_PNP_ID);
+    lai_eisaid(&pcie_pnp_id, ACPI_PCIE_PNP_ID);
+    return lai_check_device_pnp_id(dev, &pci_pnp_id, state) || lai_check_device_pnp_id(dev, &pcie_pnp_id, state);
+}

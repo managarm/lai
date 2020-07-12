@@ -77,8 +77,27 @@ static size_t lai_calculate_access_width(lai_nsnode_t *field) {
     return access_size;
 }
 
-static void lai_get_pci_params(lai_nsnode_t *opregion, uint64_t *seg, uint64_t *bbn, uint64_t *adr) {
+static void eval_bbn(lai_nsnode_t *opregion, uint64_t *bbn, lai_state_t * state){
     LAI_CLEANUP_VAR lai_variable_t bus_number = LAI_VAR_INITIALIZER;
+    while(opregion){
+        if(lai_is_pci_root_bus(opregion,state)){
+            // PCI bus number is in the _BBN object.
+            lai_nsnode_t *bbn_handle = lai_resolve_search(opregion, "_BBN");
+            if (bbn_handle) {
+                if (lai_eval(&bus_number, bbn_handle, &state))
+                    lai_panic("could not evaluate _BBN of OperationRegion()");
+                if (bbn){
+                    *bbn = bus_number.integer;
+                    return;
+                }
+            }
+        }else{
+            opregion=opregion->parent;
+        }
+    }
+}
+
+static void lai_get_pci_params(lai_nsnode_t *opregion, uint64_t *seg, uint64_t *bbn, uint64_t *adr) {
     LAI_CLEANUP_VAR lai_variable_t seg_number = LAI_VAR_INITIALIZER;
     LAI_CLEANUP_VAR lai_variable_t address_number = LAI_VAR_INITIALIZER;
 
@@ -94,17 +113,7 @@ static void lai_get_pci_params(lai_nsnode_t *opregion, uint64_t *seg, uint64_t *
             *seg = seg_number.integer;
     }
     
-    if(opregion->name[0]=='P'&&opregion->name[1]=='C'&&opregion->name[2]=='I'&&opregion->name[3]>='0'&&opregion->name[3]<='9'){//only evaluate _BBN if is PCI root node
-        // PCI bus number is in the _BBN object.
-        lai_nsnode_t *bbn_handle = lai_resolve_search(opregion, "_BBN");
-        if (bbn_handle) {
-            if (lai_eval(&bus_number, bbn_handle, &state))
-                lai_panic("could not evaluate _BBN of OperationRegion()");
-            if (bbn)
-                *bbn = bus_number.integer;
-        }
-    }
-    
+    eval_bbn(opregion,bbn,&state);
 
     // Device slot/function is in the _ADR object.
     lai_nsnode_t *adr_handle = lai_resolve_search(opregion, "_ADR");
