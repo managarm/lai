@@ -22,6 +22,8 @@
 extern "C" {
 #endif
 
+#define LAI_REVISION    0x20200712
+
 #define ACPI_MAX_RESOURCES          512
 
 // Convert a lai_api_error_t to a human readable string
