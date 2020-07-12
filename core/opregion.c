@@ -91,6 +91,7 @@ static void eval_bbn(lai_nsnode_t *opregion, uint64_t *bbn, lai_state_t * state)
                     return;
                 }
             }
+            return;
         }else{
             opregion=opregion->parent;
         }
