@@ -14,7 +14,7 @@
 
 #include <lai/helpers/pci.h>
 #include <lai/helpers/resource.h>
-#include <lai/acpispec/hw.h>
+#include <acpispec/hw.h>
 #include "../core/libc.h"
 #include "../core/eval.h"
 
