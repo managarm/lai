@@ -712,9 +712,9 @@ lai_api_error_t lai_ns_override_opregion(lai_nsnode_t *node,
 }
 
 enum lai_node_type lai_ns_get_node_type(lai_nsnode_t *node){
-    if(node == NULL){
+    if(!node){
         lai_warn("node passed to lai_ns_get_node_type is NULL");
-        return LAI_ERROR_ILLEGAL_ARGUMENTS;
+        return LAI_NODETYPE_NULL;
     }
 
     switch (node->type){
