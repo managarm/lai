@@ -488,6 +488,9 @@ void lai_create_namespace(void) {
 
     // Load the DSDT.
     void *dsdt_table = laihost_scan("DSDT", 0);
+    if (!dsdt_table)
+        lai_panic("unable to find ACPI DSDT.");
+    
     void *dsdt_amls = lai_load_table(dsdt_table, 0);
     lai_init_state(&state);
     lai_populate(root_node, dsdt_amls, &state);
