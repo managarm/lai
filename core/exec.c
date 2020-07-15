@@ -1729,7 +1729,7 @@ static inline int lai_parse_u8(uint8_t *out, uint8_t *code, int *pc, int limit) 
 static inline int lai_parse_u16(uint16_t *out, uint8_t *code, int *pc, int limit) {
     if (*pc + 2 > limit)
         return 1;
-    *out = code[*pc] | (code[*pc + 1] << 8);
+    *out = ((uint16_t)code[*pc]) | (((uint16_t)code[*pc + 1]) << 8);
     *pc += 2;
     return 0;
 }
@@ -1737,7 +1737,8 @@ static inline int lai_parse_u16(uint16_t *out, uint8_t *code, int *pc, int limit
 static inline int lai_parse_u32(uint32_t *out, uint8_t *code, int *pc, int limit) {
     if (*pc + 4 > limit)
         return 1;
-    *out = code[*pc] | (code[*pc + 1] << 8) | (code[*pc + 2] << 16) | (code[*pc + 3] << 24);
+    *out = ((uint32_t)code[*pc]) | (((uint32_t)code[*pc + 1]) << 8)
+           | (((uint32_t)code[*pc + 2]) << 16) | (((uint32_t)code[*pc + 3]) << 24);
     *pc += 4;
     return 0;
 }
