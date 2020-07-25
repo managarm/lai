@@ -56,8 +56,10 @@ static size_t lai_calculate_access_width(lai_nsnode_t *field) {
         case FIELD_QWORD_ACCESS: access_size = 64; break;
         case FIELD_ANY_ACCESS: {
             _Static_assert(sizeof(int) == 4, "int is not 32 bits");
-            // this rounds up to the next power of 2
-            access_size = 1 << (32 - __builtin_clz(field->fld_size - 1));
+            // This rounds up to the next power of 2.
+            access_size = 1;
+            if(field->fld_size > 1)
+                access_size = 1 << (32 - __builtin_clz(field->fld_size - 1));
 
             size_t max_access_width = 32;
             if (opregion->op_address_space == ACPI_OPREGION_MEMORY)
