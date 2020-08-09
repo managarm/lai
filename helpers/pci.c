@@ -17,9 +17,6 @@
 #include "../core/libc.h"
 #include "../core/eval.h"
 
-#define PCI_PNP_ID        "PNP0A03"
-#define PCIE_PNP_ID       "PNP0A08"
-
 int lai_pci_route(acpi_resource_t *dest, uint16_t seg, uint8_t bus, uint8_t slot, uint8_t function) {
 
     uint8_t pin = (uint8_t)laihost_pci_readb(seg, bus, slot, function, 0x3D);
@@ -206,8 +203,8 @@ lai_nsnode_t *lai_pci_find_device(lai_nsnode_t *bus, uint8_t slot, uint8_t funct
 lai_nsnode_t *lai_pci_find_bus(uint16_t seg, uint8_t bus, lai_state_t *state){
     LAI_CLEANUP_VAR lai_variable_t pci_pnp_id = LAI_VAR_INITIALIZER;
     LAI_CLEANUP_VAR lai_variable_t pcie_pnp_id = LAI_VAR_INITIALIZER;
-    lai_eisaid(&pci_pnp_id, PCI_PNP_ID);
-    lai_eisaid(&pcie_pnp_id, PCIE_PNP_ID);
+    lai_eisaid(&pci_pnp_id, ACPI_PCI_ROOT_BUS_PNP_ID);
+    lai_eisaid(&pcie_pnp_id, ACPI_PCIE_ROOT_BUS_PNP_ID);
 
     lai_nsnode_t *sb_handle = lai_resolve_path(NULL, "\\_SB_");
     LAI_ENSURE(sb_handle);
