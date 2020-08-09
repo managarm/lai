@@ -77,6 +77,23 @@ static size_t lai_calculate_access_width(lai_nsnode_t *field) {
     return access_size;
 }
 
+static lai_nsnode_t *lai_find_parent_root_of(lai_nsnode_t *node, lai_state_t *state){
+    LAI_CLEANUP_VAR lai_variable_t pci_id = LAI_VAR_INITIALIZER;
+    LAI_CLEANUP_VAR lai_variable_t pcie_id = LAI_VAR_INITIALIZER;
+
+    lai_eisaid(&pci_id, ACPI_PCI_ROOT_BUS_PNP_ID);
+    lai_eisaid(&pcie_id, ACPI_PCIE_ROOT_BUS_PNP_ID);
+
+    while(node) {
+        if(lai_check_device_pnp_id(node, &pci_id, state) || lai_check_device_pnp_id(node, &pcie_id, state))
+            return node;
+
+        node = lai_ns_get_parent(node);
+    }
+
+    return NULL;
+}
+
 static void lai_get_pci_params(lai_nsnode_t *opregion, uint64_t *seg, uint64_t *bbn, uint64_t *adr) {
     LAI_CLEANUP_VAR lai_variable_t bus_number = LAI_VAR_INITIALIZER;
     LAI_CLEANUP_VAR lai_variable_t seg_number = LAI_VAR_INITIALIZER;
@@ -85,8 +102,20 @@ static void lai_get_pci_params(lai_nsnode_t *opregion, uint64_t *seg, uint64_t *
     LAI_CLEANUP_STATE lai_state_t state;
     lai_init_state(&state); // XXX: take the state as an argument instead?
 
+    lai_nsnode_t *device = lai_ns_get_parent(opregion);
+    if(!device)
+        lai_panic("lai_get_pci_params: Couldn't get device");
+
+    lai_nsnode_t *bus = lai_ns_get_parent(device);
+    if(!bus)
+        lai_panic("lai_get_pci_params: Couldn't get bus");
+    
+    lai_nsnode_t *root_bus = lai_find_parent_root_of(bus, &state);
+    if(!root_bus)
+        lai_panic("lai_get_pci_params: Couldn't get root bus");
+
     // PCI seg number is in the _SEG object.
-    lai_nsnode_t *seg_handle = lai_resolve_search(opregion, "_SEG");
+    lai_nsnode_t *seg_handle = lai_resolve_search(root_bus, "_SEG");
     if (seg_handle) {
         if (lai_eval(&seg_number, seg_handle, &state))
             lai_panic("could not evaluate _SEG of OperationRegion()");
@@ -95,7 +124,7 @@ static void lai_get_pci_params(lai_nsnode_t *opregion, uint64_t *seg, uint64_t *
     }
 
     // PCI bus number is in the _BBN object.
-    lai_nsnode_t *bbn_handle = lai_resolve_search(opregion, "_BBN");
+    lai_nsnode_t *bbn_handle = lai_resolve_search(root_bus, "_BBN");
     if (bbn_handle) {
         if (lai_eval(&bus_number, bbn_handle, &state))
             lai_panic("could not evaluate _BBN of OperationRegion()");
