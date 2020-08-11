@@ -136,7 +136,7 @@ static void lai_exec_reduce_node(int opcode, lai_state_t *state, struct lai_oper
             lai_variable_t offset = {0};
             lai_variable_t size = {0};
             lai_exec_get_integer(state, &operands[1], &offset);
-            lai_exec_get_integer(state, &operands[2], &offset);
+            lai_exec_get_integer(state, &operands[2], &size);
             LAI_ENSURE(operands[0].tag == LAI_RESOLVED_NAME);
             LAI_ENSURE(operands[3].tag == LAI_UNRESOLVED_NAME);
 
@@ -742,7 +742,7 @@ static lai_api_error_t lai_exec_reduce_op(int opcode, lai_state_t *state, struct
 
             if(a && b) {
                 result.integer = i;
-                break; 
+                break;
             }
         }
 
@@ -1358,12 +1358,12 @@ static lai_api_error_t lai_exec_process(lai_state_t *state) {
             lai_exec_get_integer(state, &frame[1], &size);
 
             lai_exec_pop_opstack_back(state);
-            
+
             if (lai_create_pkg(&frame[0].object, size.integer))
                 lai_panic("could not allocate memory for package");
 
             item->pkg_phase++;
-            
+
             return LAI_ERROR_NONE;
         }
 
