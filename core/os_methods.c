@@ -5,6 +5,7 @@
  */
 
 #include <lai/core.h>
+#include "util-macros.h"
 #include "exec_impl.h"
 #include "libc.h"
 
@@ -23,7 +24,7 @@ static const char *supported_osi_strings[] = {
     "Windows 2009",        /* Windows 7 */
     "Windows 2012",        /* Windows 8 */
     "Windows 2013",        /* Windows 8.1 */
-    "Windows 2015",        /* Windows 10 */
+    "Windows 2015"         /* Windows 10 */
 };
 
 // Pretend to be windows when we execute the OSI() method.
@@ -31,7 +32,7 @@ int lai_do_osi_method(lai_variable_t *args, lai_variable_t *result) {
     const char *query = lai_exec_string_access(&args[0]);
 
     uint32_t osi_return = 0;
-    for (size_t i = 0; i < (sizeof(supported_osi_strings) / sizeof(uint64_t)); i++) {
+    for (size_t i = 0; i < LAI_SIZEOF_ARRAY(supported_osi_strings); i++) {
         if (!lai_strcmp(query, supported_osi_strings[i])) {
             osi_return = 0xFFFFFFFF;
             break;
