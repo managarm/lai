@@ -2559,6 +2559,24 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
             lai_list_link(&invocation->per_method_list, &node->per_method_item);
         break;
     }
+    case EXTERNAL_OP: {
+        struct lai_amlname amln;
+        uint8_t object_type;
+        uint8_t argument_count;
+        if (lai_parse_name(&amln, method, &pc, limit)
+                || lai_parse_u8(&object_type, method, &pc, limit)
+                || lai_parse_u8(&argument_count, method, &pc, limit))
+            return LAI_ERROR_EXECUTION_FAILURE;
+
+        lai_exec_commit_pc(state, pc);
+
+        if (lai_current_instance()->trace & LAI_TRACE_OP){
+            char* path = lai_stringify_amlname(&amln);
+            lai_debug("lai_exec_parse: ExternalOp, Name: %s, Object type: %02X, Argument Count: %01X", path, object_type, argument_count);
+            laihost_free(path);
+        }
+        break;
+    }
     case NAME_OP: {
         if (lai_exec_reserve_stack(state))
             return LAI_ERROR_OUT_OF_MEMORY;

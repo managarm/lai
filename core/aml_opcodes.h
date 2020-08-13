@@ -20,6 +20,7 @@
 #define PACKAGE_OP			0x12
 #define VARPACKAGE_OP			0x13
 #define METHOD_OP			0x14
+#define EXTERNAL_OP         0x15
 #define DUAL_PREFIX			0x2E
 #define MULTI_PREFIX			0x2F
 #define EXTOP_PREFIX			0x5B
