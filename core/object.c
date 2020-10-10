@@ -342,12 +342,13 @@ lai_api_error_t lai_obj_to_string(lai_variable_t *out, lai_variable_t *object, s
 lai_api_error_t lai_obj_to_decimal_string(lai_variable_t *out, lai_variable_t *object){
     switch (object->type)
     {
-    case LAI_TYPE_INTEGER:{
-        lai_create_string(out, 20);//max length for 64-bit integer is 20 chars
-        char * s = lai_exec_string_access(out);
-        lai_snprintf(s, 21, "%llu", object->integer);//snprintf null terminates
+    case LAI_INTEGER: {
+        lai_create_string(out, 20); // Max length for 64-bit integer is 20 chars
+        char *s = lai_exec_string_access(out);
+        lai_snprintf(s, 21, "%llu", object->integer);// snprintf null terminates
         break;
     }
+
     case LAI_BUFFER: {
         size_t buffer_len = lai_exec_buffer_size(object);
         uint8_t *buffer = lai_exec_buffer_access(object);
@@ -387,12 +388,13 @@ lai_api_error_t lai_obj_to_decimal_string(lai_variable_t *out, lai_variable_t *o
 lai_api_error_t lai_obj_to_hex_string(lai_variable_t *out, lai_variable_t *object){
     switch (object->type)
     {
-    case LAI_TYPE_INTEGER:{
-        lai_create_string(out, 18);//64-bit integer is 8 bytes, each byte takes 2 chars, plus '0x' is 18 chars
-        char * s = lai_exec_string_access(out);
-        lai_snprintf(s, 19, "0x%016X", object->integer);//snprintf null terminates
+    case LAI_INTEGER: {
+        lai_create_string(out, 16); // 64-bit integer is 8 bytes, each byte takes 2 chars, is 16 chars
+        char *s = lai_exec_string_access(out);
+        lai_snprintf(s, 17, "%X", object->integer); // snprintf null terminates
         break;
     }
+
     case LAI_BUFFER: {
         size_t buffer_len = lai_exec_buffer_size(object);
         uint8_t *buffer = lai_exec_buffer_access(object);
