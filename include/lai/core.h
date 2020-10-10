@@ -101,6 +101,11 @@ enum lai_object_type {
     LAI_TYPE_DEVICE,
 };
 
+lai_api_error_t lai_create_string(lai_variable_t *, size_t);
+lai_api_error_t lai_create_c_string(lai_variable_t *, const char *);
+lai_api_error_t lai_create_buffer(lai_variable_t *, size_t);
+lai_api_error_t lai_create_pkg(lai_variable_t *, size_t);
+
 enum lai_object_type lai_obj_get_type(lai_variable_t *object);
 lai_api_error_t lai_obj_get_integer(lai_variable_t *, uint64_t *);
 lai_api_error_t lai_obj_get_pkg(lai_variable_t *, size_t, lai_variable_t *);

@@ -84,12 +84,6 @@ static const uint32_t lai_mode_flags[] = {
     [LAI_OPTIONAL_REFERENCE_MODE] = LAI_MF_RESULT | LAI_MF_RESOLVE | LAI_MF_NULLABLE,
 };
 
-// Allocate a new package.
-int lai_create_string(lai_variable_t *, size_t);
-int lai_create_c_string(lai_variable_t *, const char *);
-int lai_create_buffer(lai_variable_t *, size_t);
-int lai_create_pkg(lai_variable_t *, size_t);
-
 void lai_exec_ref_load(lai_variable_t *, lai_variable_t *);
 void lai_exec_ref_store(lai_variable_t *, lai_variable_t *);
 

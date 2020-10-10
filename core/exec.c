@@ -1318,7 +1318,7 @@ static lai_api_error_t lai_exec_process(lai_state_t *state) {
 
             // Note that not all elements of the buffer need to be initialized.
             LAI_CLEANUP_VAR lai_variable_t result = LAI_VAR_INITIALIZER;
-            if (lai_create_buffer(&result, size.integer))
+            if (lai_create_buffer(&result, size.integer) != LAI_ERROR_NONE)
                  lai_panic("failed to allocate memory for AML buffer");
 
             int initial_size = block->limit - block->pc;
@@ -1359,7 +1359,7 @@ static lai_api_error_t lai_exec_process(lai_state_t *state) {
 
             lai_exec_pop_opstack_back(state);
 
-            if (lai_create_pkg(&frame[0].object, size.integer))
+            if (lai_create_pkg(&frame[0].object, size.integer) != LAI_ERROR_NONE)
                 lai_panic("could not allocate memory for package");
 
             item->pkg_phase++;
@@ -2096,7 +2096,7 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
         if (parse_mode == LAI_DATA_MODE || parse_mode == LAI_OBJECT_MODE) {
             struct lai_operand *opstack_res = lai_exec_push_opstack(state);
             opstack_res->tag = LAI_OPERAND_OBJECT;
-            if(lai_create_string(&opstack_res->object, n))
+            if(lai_create_string(&opstack_res->object, n) != LAI_ERROR_NONE)
                 lai_panic("could not allocate memory for string");
             memcpy(lai_exec_string_access(&opstack_res->object), method + data_pc, n);
         } else
