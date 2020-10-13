@@ -68,6 +68,7 @@ typedef struct lai_variable_t
 
 struct lai_string_head {
     lai_rc_t rc;
+    size_t capacity;
     char *content;
 };
 

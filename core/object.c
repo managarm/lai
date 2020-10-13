@@ -15,8 +15,9 @@ lai_api_error_t lai_create_string(lai_variable_t *object, size_t length) {
         return LAI_ERROR_OUT_OF_MEMORY;
     object->string_ptr->rc = 1;
     object->string_ptr->content = laihost_malloc(length + 1);
+    object->string_ptr->capacity = length + 1;
     if (!object->string_ptr->content) {
-        laihost_free(object->string_ptr);
+        laihost_free(object->string_ptr, sizeof(struct lai_string_head));
         return LAI_ERROR_OUT_OF_MEMORY;
     }
     memset(object->string_ptr->content, 0, length + 1);
@@ -41,7 +42,7 @@ lai_api_error_t lai_create_buffer(lai_variable_t *object, size_t size) {
     object->buffer_ptr->size = size;
     object->buffer_ptr->content = laihost_malloc(size);
     if (!object->buffer_ptr->content) {
-        laihost_free(object->buffer_ptr);
+        laihost_free(object->buffer_ptr, sizeof(struct lai_buffer_head));
         return LAI_ERROR_OUT_OF_MEMORY;
     }
     memset(object->buffer_ptr->content, 0, size);
@@ -57,7 +58,7 @@ lai_api_error_t lai_create_pkg(lai_variable_t *object, size_t n) {
     object->pkg_ptr->size = n;
     object->pkg_ptr->elems = laihost_malloc(n * sizeof(lai_variable_t));
     if (!object->pkg_ptr->elems) {
-        laihost_free(object->pkg_ptr);
+        laihost_free(object->pkg_ptr, sizeof(struct lai_pkg_head));
         return LAI_ERROR_OUT_OF_MEMORY;
     }
     memset(object->pkg_ptr->elems, 0, n * sizeof(lai_variable_t));
@@ -72,8 +73,9 @@ lai_api_error_t lai_obj_resize_string(lai_variable_t *object, size_t length) {
         if (!new_content)
             return LAI_ERROR_OUT_OF_MEMORY;
         lai_strcpy(new_content, object->string_ptr->content);
-        laihost_free(object->string_ptr->content);
+        laihost_free(object->string_ptr->content, object->string_ptr->capacity);
         object->string_ptr->content = new_content;
+        object->string_ptr->capacity = length + 1;
     }
     return LAI_ERROR_NONE;
 }
@@ -87,7 +89,7 @@ lai_api_error_t lai_obj_resize_buffer(lai_variable_t *object, size_t size) {
             return LAI_ERROR_OUT_OF_MEMORY;
         memset(new_content, 0, size);
         memcpy(new_content, object->buffer_ptr->content, object->buffer_ptr->size);
-        laihost_free(object->buffer_ptr->content);
+        laihost_free(object->buffer_ptr->content, object->buffer_ptr->size);
         object->buffer_ptr->content = new_content;
     }
     object->buffer_ptr->size = size;
@@ -107,7 +109,7 @@ lai_api_error_t lai_obj_resize_pkg(lai_variable_t *object, size_t n) {
         memset(new_elems, 0, n * sizeof(lai_variable_t));
         for (unsigned int i = 0; i < object->pkg_ptr->size; i++)
             lai_var_move(&new_elems[i], &object->pkg_ptr->elems[i]);
-        laihost_free(object->pkg_ptr->elems);
+        laihost_free(object->pkg_ptr->elems, object->pkg_ptr->size * sizeof(lai_variable_t));
         object->pkg_ptr->elems = new_elems;
     }
     object->pkg_ptr->size = n;
