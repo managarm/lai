@@ -41,11 +41,11 @@ static void lai_hashtable_grow(struct lai_hashtable *ht, int n, int m) {
     }
 
     if (ht->elem_capacity) {
-        laihost_free(ht->elem_ptr_tab);
-        laihost_free(ht->elem_hash_tab);
+        laihost_free(ht->elem_ptr_tab, ht->elem_capacity * sizeof(void *));
+        laihost_free(ht->elem_hash_tab, ht->elem_capacity * sizeof(int));
     }
     if (ht->bucket_capacity)
-        laihost_free(ht->bucket_tab);
+        laihost_free(ht->bucket_tab, ht->bucket_capacity * sizeof(int));
 
     ht->elem_ptr_tab = new_elem_ptr_tab;
     ht->elem_hash_tab = new_elem_hash_tab;

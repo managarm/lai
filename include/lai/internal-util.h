@@ -9,6 +9,8 @@
 extern "C" {
 #endif
 
+size_t lai_strlen(const char *);
+
 // Even in freestanding environments, GCC requires memcpy(), memmove(), memset()
 // and memcmp() to be present. Thus, we just use them directly.
 void *memcpy(void *, const void *, size_t);
@@ -40,7 +42,7 @@ __attribute__((noreturn)) void lai_panic(const char *, ...);
 
 static inline void lai_cleanup_free_string(char **v) {
     if (*v)
-        laihost_free(*v);
+        laihost_free(*v, lai_strlen(*v) + 1);
 }
 
 #define LAI_CLEANUP_FREE_STRING __attribute__((cleanup(lai_cleanup_free_string)))

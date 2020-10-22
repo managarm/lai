@@ -66,7 +66,7 @@ void lai_install_nsnode(lai_nsnode_t *node) {
         if (!new_capacity)
             new_capacity = 128;
         lai_nsnode_t **new_array;
-        new_array = laihost_realloc(instance->ns_array, sizeof(lai_nsnode_t *) * new_capacity);
+        new_array = laihost_realloc(instance->ns_array, sizeof(lai_nsnode_t *) * new_capacity, sizeof(lai_nsnode_t *) * instance->ns_capacity);
         if (!new_array)
             lai_panic("could not reallocate namespace table");
         instance->ns_array = new_array;
@@ -230,6 +230,10 @@ char *lai_stringify_amlname(const struct lai_amlname *in_amln) {
     }
     str[n++] = '\0';
     LAI_ENSURE(n <= (int) max_length);
+
+    if (n != max_length)
+        str = laihost_realloc(str, n, max_length);
+
     return str;
 }
 

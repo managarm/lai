@@ -237,7 +237,7 @@ static inline int lai_exec_reserve_ctxstack(lai_state_t *state) {
         memcpy(new_stack, state->ctxstack_base,
                (state->ctxstack_ptr + 1) * sizeof(struct lai_ctxitem));
         if (state->ctxstack_base != state->small_ctxstack)
-            laihost_free(state->ctxstack_base);
+            laihost_free(state->ctxstack_base, state->ctxstack_capacity * sizeof(struct lai_ctxitem));
         state->ctxstack_base = new_stack;
         state->ctxstack_capacity = new_capacity;
     }
@@ -269,7 +269,7 @@ static inline void lai_exec_pop_ctxstack_back(lai_state_t *state) {
             lai_var_finalize(&ctxitem->invocation->arg[i]);
         for (int i = 0; i < 8; i++)
             lai_var_finalize(&ctxitem->invocation->local[i]);
-        laihost_free(ctxitem->invocation);
+        laihost_free(ctxitem->invocation, sizeof(*ctxitem->invocation));
     }
     state->ctxstack_ptr -= 1;
 }
@@ -289,7 +289,7 @@ static inline int lai_exec_reserve_blkstack(lai_state_t *state) {
         memcpy(new_stack, state->blkstack_base,
                (state->blkstack_ptr + 1) * sizeof(struct lai_blkitem));
         if (state->blkstack_base != state->small_blkstack)
-            laihost_free(state->blkstack_base);
+            laihost_free(state->blkstack_base, state->blkstack_capacity * sizeof(struct lai_blkitem));
         state->blkstack_base = new_stack;
         state->blkstack_capacity = new_capacity;
     }
@@ -333,7 +333,7 @@ static inline int lai_exec_reserve_stack(lai_state_t *state) {
         memcpy(new_stack, state->stack_base,
                (state->stack_ptr + 1) * sizeof(lai_stackitem_t));
         if (state->stack_base != state->small_stack)
-            laihost_free(state->stack_base);
+            laihost_free(state->stack_base, state->stack_capacity * sizeof(lai_stackitem_t));
         state->stack_base = new_stack;
         state->stack_capacity = new_capacity;
     }
@@ -390,7 +390,7 @@ static inline int lai_exec_reserve_opstack(lai_state_t *state) {
         memcpy(new_stack, state->opstack_base,
                state->opstack_ptr * sizeof(struct lai_operand));
         if (state->opstack_base != state->small_opstack)
-            laihost_free(state->opstack_base);
+            laihost_free(state->opstack_base, state->opstack_capacity * sizeof(struct lai_operand));
         state->opstack_base = new_stack;
         state->opstack_capacity = new_capacity;
     }

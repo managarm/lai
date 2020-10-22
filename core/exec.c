@@ -48,13 +48,13 @@ void lai_finalize_state(lai_state_t *state) {
     lai_exec_pop_opstack(state, state->opstack_ptr);
 
     if (state->ctxstack_base != state->small_ctxstack)
-        laihost_free(state->ctxstack_base);
+        laihost_free(state->ctxstack_base, state->ctxstack_capacity * sizeof(struct lai_ctxitem));
     if (state->blkstack_base != state->small_blkstack)
-        laihost_free(state->blkstack_base);
+        laihost_free(state->blkstack_base, state->blkstack_capacity * sizeof(struct lai_blkitem));
     if (state->stack_base != state->small_stack)
-        laihost_free(state->stack_base);
+        laihost_free(state->stack_base, state->stack_capacity * sizeof(lai_stackitem_t));
     if (state->opstack_base != state->small_opstack)
-        laihost_free(state->opstack_base);
+        laihost_free(state->opstack_base, state->opstack_capacity * sizeof(struct lai_operand));
 }
 
 static int lai_compare(lai_variable_t *lhs, lai_variable_t *rhs) {
@@ -2571,9 +2571,8 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
         lai_exec_commit_pc(state, pc);
 
         if (lai_current_instance()->trace & LAI_TRACE_OP){
-            char* path = lai_stringify_amlname(&amln);
+            LAI_CLEANUP_FREE_STRING char* path = lai_stringify_amlname(&amln);
             lai_debug("lai_exec_parse: ExternalOp, Name: %s, Object type: %02X, Argument Count: %01X", path, object_type, argument_count);
-            laihost_free(path);
         }
         break;
     }
