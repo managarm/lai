@@ -231,7 +231,7 @@ char *lai_stringify_amlname(const struct lai_amlname *in_amln) {
     str[n++] = '\0';
     LAI_ENSURE(n <= (int) max_length);
 
-    if (n != max_length)
+    if (n != (int) max_length)
         str = laihost_realloc(str, n, max_length);
 
     return str;
