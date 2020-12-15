@@ -57,14 +57,6 @@ void lai_finalize_state(lai_state_t *state) {
         laihost_free(state->opstack_base, state->opstack_capacity * sizeof(struct lai_operand));
 }
 
-static int lai_compare(lai_variable_t *lhs, lai_variable_t *rhs) {
-    // TODO: Allow comparsions of strings and buffers as in the spec.
-    if (lhs->type != LAI_INTEGER || rhs->type != LAI_INTEGER)
-        lai_panic("comparsion of object type %d with type %d is not implemented",
-                lhs->type, rhs->type);
-    return lhs->integer - rhs->integer;
-}
-
 static void lai_exec_reduce_node(int opcode, lai_state_t *state, struct lai_operand *operands,
         lai_nsnode_t *ctx_handle) {
     if (lai_current_instance()->trace & LAI_TRACE_OP)
@@ -629,35 +621,59 @@ static lai_api_error_t lai_exec_reduce_op(int opcode, lai_state_t *state, struct
     }
     case LEQUAL_OP:
     {
-        lai_variable_t lhs = {0};
-        lai_variable_t rhs = {0};
-        lai_exec_get_integer(state, &operands[0], &lhs);
-        lai_exec_get_integer(state, &operands[1], &rhs);
+        LAI_CLEANUP_VAR lai_variable_t lhs = LAI_VAR_INITIALIZER;
+        lai_exec_get_objectref(state, &operands[0], &lhs);
+
+        LAI_CLEANUP_VAR lai_variable_t rhs = LAI_VAR_INITIALIZER;
+        lai_exec_get_objectref(state, &operands[1], &rhs);
+
+
+        int res = 0;
+        lai_api_error_t err = lai_obj_exec_match_op(MATCH_MEQ, &lhs, &rhs, &res);
+        if(err != LAI_ERROR_NONE)
+                return LAI_ERROR_ILLEGAL_ARGUMENTS;
 
         result.type = LAI_INTEGER;
-        result.integer = !lai_compare(&lhs, &rhs);
+        result.integer = res;
+
         break;
     }
     case LLESS_OP:
     {
-        lai_variable_t lhs = {0};
-        lai_variable_t rhs = {0};
-        lai_exec_get_integer(state, &operands[0], &lhs);
-        lai_exec_get_integer(state, &operands[1], &rhs);
+        LAI_CLEANUP_VAR lai_variable_t lhs = LAI_VAR_INITIALIZER;
+        lai_exec_get_objectref(state, &operands[0], &lhs);
+
+        LAI_CLEANUP_VAR lai_variable_t rhs = LAI_VAR_INITIALIZER;
+        lai_exec_get_objectref(state, &operands[1], &rhs);
+
+
+        int res = 0;
+        lai_api_error_t err = lai_obj_exec_match_op(MATCH_MLT, &lhs, &rhs, &res);
+        if(err != LAI_ERROR_NONE)
+                return LAI_ERROR_ILLEGAL_ARGUMENTS;
 
         result.type = LAI_INTEGER;
-        result.integer = lai_compare(&lhs, &rhs) < 0;
+        result.integer = res;
+
         break;
     }
     case LGREATER_OP:
     {
-        lai_variable_t lhs = {0};
-        lai_variable_t rhs = {0};
-        lai_exec_get_integer(state, &operands[0], &lhs);
-        lai_exec_get_integer(state, &operands[1], &rhs);
+        LAI_CLEANUP_VAR lai_variable_t lhs = LAI_VAR_INITIALIZER;
+        lai_exec_get_objectref(state, &operands[0], &lhs);
+
+        LAI_CLEANUP_VAR lai_variable_t rhs = LAI_VAR_INITIALIZER;
+        lai_exec_get_objectref(state, &operands[1], &rhs);
+
+
+        int res = 0;
+        lai_api_error_t err = lai_obj_exec_match_op(MATCH_MGT, &lhs, &rhs, &res);
+        if(err != LAI_ERROR_NONE)
+                return LAI_ERROR_ILLEGAL_ARGUMENTS;
 
         result.type = LAI_INTEGER;
-        result.integer = lai_compare(&lhs, &rhs) > 0;
+        result.integer = res;
+
         break;
     }
     case INDEX_OP:
