@@ -386,14 +386,12 @@ void lai_exec_get_integer(lai_state_t *state, struct lai_operand *src, lai_varia
 
 // lai_write_buffer(): Writes to a BufferField.
 static void lai_write_buffer(lai_nsnode_t *handle, lai_variable_t *source) {
-    lai_nsnode_t *buffer_handle = handle->bf_node;
-
     uint64_t value = source->integer;
 
     // Offset that we are writing to, in bytes.
     size_t offset = handle->bf_offset;
     size_t size = handle->bf_size;
-    uint8_t *data = lai_exec_buffer_access(&buffer_handle->object);
+    uint8_t *data = handle->bf_buffer->content;
 
     size_t n = 0; // Number of bits that have been written.
     while (n < size) {
@@ -416,11 +414,10 @@ static void lai_write_buffer(lai_nsnode_t *handle, lai_variable_t *source) {
 
 // lai_read_buffer(): Reads from a BufferField.
 static void lai_read_buffer(lai_variable_t *dest, lai_nsnode_t *handle) {
-	lai_nsnode_t *buffer_handle = handle->bf_node;
-
 	size_t offset = handle->bf_offset;
 	size_t size = handle->bf_size;
-	uint8_t *data = lai_exec_buffer_access(&buffer_handle->object);
+	uint8_t *data = handle->bf_buffer->content;
+    
 	dest->type = LAI_INTEGER;
 	dest->integer = 0;
 

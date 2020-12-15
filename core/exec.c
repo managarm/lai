@@ -95,7 +95,6 @@ static void lai_exec_reduce_node(int opcode, lai_state_t *state, struct lai_oper
         case QWORDFIELD_OP: {
             lai_variable_t offset = {0};
             lai_exec_get_integer(state, &operands[1], &offset);
-            LAI_ENSURE(operands[0].tag == LAI_RESOLVED_NAME);
             LAI_ENSURE(operands[2].tag == LAI_UNRESOLVED_NAME);
 
             struct lai_amlname node_amln;
@@ -105,7 +104,10 @@ static void lai_exec_reduce_node(int opcode, lai_state_t *state, struct lai_oper
             node->type = LAI_NAMESPACE_BUFFER_FIELD;
             lai_do_resolve_new_node(node, operands[2].unres_ctx_handle, &node_amln);
 
-            node->bf_node = operands[0].handle;
+            LAI_CLEANUP_VAR lai_variable_t buf = LAI_VAR_INITIALIZER;
+            lai_operand_load(state, &operands[0], &buf);
+            node->bf_buffer = buf.buffer_ptr;
+            lai_rc_ref(&node->bf_buffer->rc);
 
             switch (opcode) {
                 case BITFIELD_OP: node->bf_size = 1; break;
@@ -137,7 +139,6 @@ static void lai_exec_reduce_node(int opcode, lai_state_t *state, struct lai_oper
             lai_variable_t size = {0};
             lai_exec_get_integer(state, &operands[1], &offset);
             lai_exec_get_integer(state, &operands[2], &size);
-            LAI_ENSURE(operands[0].tag == LAI_RESOLVED_NAME);
             LAI_ENSURE(operands[3].tag == LAI_UNRESOLVED_NAME);
 
             struct lai_amlname node_amln;
@@ -147,7 +148,11 @@ static void lai_exec_reduce_node(int opcode, lai_state_t *state, struct lai_oper
             node->type = LAI_NAMESPACE_BUFFER_FIELD;
             lai_do_resolve_new_node(node, operands[3].unres_ctx_handle, &node_amln);
 
-            node->bf_node = operands[0].handle;
+            LAI_CLEANUP_VAR lai_variable_t buf = LAI_VAR_INITIALIZER;
+            lai_operand_load(state, &operands[0], &buf);
+            node->bf_buffer = buf.buffer_ptr;
+            lai_rc_ref(&node->bf_buffer->rc);
+            
             node->bf_size = size.integer;
             node->bf_offset = offset.integer;
 
@@ -1296,6 +1301,14 @@ static lai_api_error_t lai_exec_process(lai_state_t *state) {
             struct lai_list_item *pmi;
             while ((pmi = lai_list_first(&invocation->per_method_list))) {
                 lai_nsnode_t *node = LAI_CONTAINER_OF(pmi, lai_nsnode_t, per_method_item);
+
+                if(node->type == LAI_NAMESPACE_BUFFER_FIELD) {
+                    if (lai_rc_unref(&node->bf_buffer->rc)) {
+                        laihost_free(node->bf_buffer->content, node->bf_buffer->size);
+                        laihost_free(node->bf_buffer, sizeof(struct lai_buffer_head));
+                    }
+                }
+
                 lai_uninstall_nsnode(node);
                 lai_list_unlink(&node->per_method_item);
             }
@@ -1546,6 +1559,14 @@ static lai_api_error_t lai_exec_process(lai_state_t *state) {
             struct lai_list_item *pmi;
             while ((pmi = lai_list_first(&invocation->per_method_list))) {
                 lai_nsnode_t *node = LAI_CONTAINER_OF(pmi, lai_nsnode_t, per_method_item);
+
+                if(node->type == LAI_NAMESPACE_BUFFER_FIELD) {
+                    if (lai_rc_unref(&node->bf_buffer->rc)) {
+                        laihost_free(node->bf_buffer->content, node->bf_buffer->size);
+                        laihost_free(node->bf_buffer, sizeof(struct lai_buffer_head));
+                    }
+                }
+
                 lai_uninstall_nsnode(node);
                 lai_list_unlink(&node->per_method_item);
             }

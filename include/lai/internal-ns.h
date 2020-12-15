@@ -112,7 +112,7 @@ typedef struct lai_nsnode
         };
 
         struct { // LAI_NAMESPACE_BUFFER_FIELD.
-            struct lai_nsnode *bf_node;
+            struct lai_buffer_head *bf_buffer;
             uint64_t bf_offset; // In bits.
             uint64_t bf_size;   // In bits.
         };
