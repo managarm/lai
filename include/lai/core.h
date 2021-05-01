@@ -132,7 +132,11 @@ int lai_objecttype_obj(lai_variable_t*);
 lai_api_error_t lai_obj_exec_match_op(int, lai_variable_t*, lai_variable_t*, int*);
 
 #define LAI_CLEANUP_VAR __attribute__((cleanup(lai_var_finalize)))
+#ifdef __cplusplus
+#define LAI_VAR_INITIALIZER {}
+#else
 #define LAI_VAR_INITIALIZER {0}
+#endif
 
 void lai_var_finalize(lai_variable_t *);
 void lai_var_move(lai_variable_t *, lai_variable_t *);
