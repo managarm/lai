@@ -148,9 +148,8 @@ lai_api_error_t lai_pci_parse_prt(struct lai_prt_iterator *iter) {
 
         // Find the _CRS entry based on its index.
         struct lai_resource_view view = LAI_RESOURCE_VIEW_INITIALIZER(&crs_buffer);
-        lai_api_error_t e;
         unsigned int current = 0;
-        while(!(e = lai_resource_iterate(&view))) {
+        while(!lai_resource_iterate(&view)) {
             if(current == res_index) {
                 enum lai_resource_type type = lai_resource_get_type(&view);
                 if (type != LAI_RESOURCE_IRQ)
