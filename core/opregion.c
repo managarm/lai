@@ -169,6 +169,9 @@ static uint64_t lai_perform_read(lai_nsnode_t *opregion, size_t access_size, siz
             case ACPI_OPREGION_MEMORY: {
                 if (instance->trace & LAI_TRACE_IO)
                     lai_debug("lai_perform_read: %lu-bit read from MMIO at %lx", access_size, opregion->op_base + offset);
+                if((opregion->op_base + offset) & ((access_size / 8) - 1))
+                    lai_warn("lai_perform_read: Unaligned %lu-bit read from MMIO at %lx", access_size, opregion->op_base + offset);
+
                 void *mmio = laihost_map(opregion->op_base + offset, access_size / 8);
                 switch (access_size) {
                     case 8: value = (*(volatile mmio8_t *)mmio); break;
@@ -227,6 +230,9 @@ static void lai_perform_write(lai_nsnode_t *opregion, size_t access_size, size_t
             case ACPI_OPREGION_MEMORY: {
                 if (instance->trace & LAI_TRACE_IO)
                     lai_debug("lai_perform_write: %lu-bit write of %lx to MMIO at %lx", access_size, value, opregion->op_base + offset);
+                if((opregion->op_base + offset) & ((access_size / 8) - 1))
+                    lai_warn("lai_perform_write: Unaligned %lu-bit write of %lx to MMIO at %lx", access_size, value, opregion->op_base + offset);
+                
                 void *mmio = laihost_map(opregion->op_base + offset, access_size / 8);
                 switch (access_size) {
                     case 8: (*(volatile mmio8_t *)mmio) = value; break;
