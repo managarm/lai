@@ -144,6 +144,10 @@ static void lai_get_pci_params(lai_nsnode_t *opregion, uint64_t *seg, uint64_t *
     }
 }
 
+typedef uint8_t __attribute__((aligned(1))) mmio8_t;
+typedef uint16_t __attribute__((aligned(1))) mmio16_t;
+typedef uint32_t __attribute__((aligned(1))) mmio32_t;
+typedef uint64_t __attribute__((aligned(1))) mmio64_t;
 
 static uint64_t lai_perform_read(lai_nsnode_t *opregion, size_t access_size, size_t offset, uint64_t seg, uint64_t bbn, uint64_t adr) {
     struct lai_instance *instance = lai_current_instance();
@@ -167,10 +171,10 @@ static uint64_t lai_perform_read(lai_nsnode_t *opregion, size_t access_size, siz
                     lai_debug("lai_perform_read: %lu-bit read from MMIO at %lx", access_size, opregion->op_base + offset);
                 void *mmio = laihost_map(opregion->op_base + offset, access_size / 8);
                 switch (access_size) {
-                    case 8: value = (*(volatile uint8_t *)mmio); break;
-                    case 16: value = (*(volatile uint16_t *)mmio); break;
-                    case 32: value = (*(volatile uint32_t *)mmio); break;
-                    case 64: value = (*(volatile uint64_t *)mmio); break;
+                    case 8: value = (*(volatile mmio8_t *)mmio); break;
+                    case 16: value = (*(volatile mmio16_t *)mmio); break;
+                    case 32: value = (*(volatile mmio32_t *)mmio); break;
+                    case 64: value = (*(volatile mmio64_t *)mmio); break;
                     default: lai_panic("invalid access size");
                 }
                 break;
@@ -225,10 +229,10 @@ static void lai_perform_write(lai_nsnode_t *opregion, size_t access_size, size_t
                     lai_debug("lai_perform_write: %lu-bit write of %lx to MMIO at %lx", access_size, value, opregion->op_base + offset);
                 void *mmio = laihost_map(opregion->op_base + offset, access_size / 8);
                 switch (access_size) {
-                    case 8: (*(volatile uint8_t *)mmio) = value; break;
-                    case 16: (*(volatile uint16_t *)mmio) = value; break;
-                    case 32: (*(volatile uint32_t *)mmio) = value; break;
-                    case 64: (*(volatile uint64_t *)mmio) = value; break;
+                    case 8: (*(volatile mmio8_t *)mmio) = value; break;
+                    case 16: (*(volatile mmio16_t *)mmio) = value; break;
+                    case 32: (*(volatile mmio32_t *)mmio) = value; break;
+                    case 64: (*(volatile mmio64_t *)mmio) = value; break;
                     default: lai_panic("invalid access size");
                 }
                 break;
