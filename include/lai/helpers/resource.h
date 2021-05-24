@@ -48,6 +48,10 @@ struct lai_resource_view {
     .address_space = 0, .bit_width = 0, .bit_offset = 0,\
     .gsi = 0}
 
+inline static void lai_initialize_resource_view(struct lai_resource_view *view, lai_variable_t *crs) {
+    *view = (struct lai_resource_view)LAI_RESOURCE_VIEW_INITIALIZER(crs);
+}
+
 lai_api_error_t lai_resource_iterate(struct lai_resource_view *);
 
 enum lai_resource_type lai_resource_get_type(struct lai_resource_view *);

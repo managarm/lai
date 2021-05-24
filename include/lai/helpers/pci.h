@@ -33,6 +33,10 @@ struct lai_prt_iterator {
 
 #define LAI_PRT_ITERATOR_INITIALIZER(prt) {0, prt, 0, 0, 0, NULL, 0, 0, 0, 0}
 
+inline void lai_initialize_prt_iterator(struct lai_prt_iterator *iter, lai_variable_t *prt) {
+    *iter = (struct lai_prt_iterator)LAI_PRT_ITERATOR_INITIALIZER(prt);
+}
+
 lai_api_error_t lai_pci_parse_prt(struct lai_prt_iterator *iter);
 
 #ifdef __cplusplus

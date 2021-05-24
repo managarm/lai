@@ -19,6 +19,10 @@ struct lai_ec_driver {
 
 #define LAI_EC_DRIVER_INITIALIZER {0}
 
+static inline void lai_initialize_ec_driver(struct lai_ec_driver *ec) {
+    *ec = (struct lai_ec_driver)LAI_EC_DRIVER_INITIALIZER;
+}
+
 void lai_early_init_ec(struct lai_ec_driver *);
 void lai_init_ec(lai_nsnode_t *, struct lai_ec_driver *);
 uint8_t lai_read_ec(uint8_t, struct lai_ec_driver *);

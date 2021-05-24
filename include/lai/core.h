@@ -61,6 +61,14 @@ struct lai_ns_child_iterator {
 #define LAI_NS_ITERATOR_INITIALIZER {0}
 #define LAI_NS_CHILD_ITERATOR_INITIALIZER(x) {0, x}
 
+static inline void lai_initialize_ns_iterator(struct lai_ns_iterator *iter) {
+    *iter = (struct lai_ns_iterator)LAI_NS_ITERATOR_INITIALIZER;
+}
+
+static inline void lai_initialize_ns_child_iterator(struct lai_ns_child_iterator *iter, lai_nsnode_t *parent) {
+    *iter = (struct lai_ns_child_iterator)LAI_NS_CHILD_ITERATOR_INITIALIZER(parent);
+}
+
 extern volatile uint16_t lai_last_event;
 
 // The remaining of these functions are OS independent!
@@ -137,6 +145,10 @@ lai_api_error_t lai_obj_exec_match_op(int, lai_variable_t*, lai_variable_t*, int
 #else
 #define LAI_VAR_INITIALIZER {0}
 #endif
+
+static inline void lai_var_initialize(lai_variable_t *var) {
+    *var = (lai_variable_t)LAI_VAR_INITIALIZER;
+}
 
 void lai_var_finalize(lai_variable_t *);
 void lai_var_move(lai_variable_t *, lai_variable_t *);
