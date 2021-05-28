@@ -141,7 +141,7 @@ lai_api_error_t lai_acpi_reset(){
         break;
     case ACPI_GAS_PCI:
         // Spec states that it is at Seg 0, bus 0
-        laihost_pci_writeb(0, 0, fadt->reset_register.base >> 24, fadt->reset_register.base >> 16, fadt->reset_register.base >> 8, fadt->reset_command);
+        laihost_pci_writeb(0, 0, (fadt->reset_register.base >> 32) & 0xFFFF, (fadt->reset_register.base >> 16) & 0xFFFF, fadt->reset_register.base & 0xFFFF, fadt->reset_command);
         break;
     default:
         lai_panic("Unknown FADT reset reg address space type: 0x%02X", fadt->reset_register.address_space);
