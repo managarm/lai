@@ -1,3 +1,8 @@
+/*
+ * Lightweight ACPI Implementation
+ * Copyright (C) 2018-2021 the lai authors
+ */
+
 #include <lai/drivers/timer.h>
 #include <lai/helpers/sci.h>
 
