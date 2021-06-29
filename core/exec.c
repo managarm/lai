@@ -634,7 +634,7 @@ static lai_api_error_t lai_exec_reduce_op(int opcode, lai_state_t *state, struct
                 return LAI_ERROR_ILLEGAL_ARGUMENTS;
 
         result.type = LAI_INTEGER;
-        result.integer = res;
+        result.integer = res ? ~((uint64_t)0) : 0;
 
         break;
     }
@@ -653,7 +653,7 @@ static lai_api_error_t lai_exec_reduce_op(int opcode, lai_state_t *state, struct
                 return LAI_ERROR_ILLEGAL_ARGUMENTS;
 
         result.type = LAI_INTEGER;
-        result.integer = res;
+        result.integer = res ? ~((uint64_t)0) : 0;
 
         break;
     }
@@ -672,7 +672,7 @@ static lai_api_error_t lai_exec_reduce_op(int opcode, lai_state_t *state, struct
                 return LAI_ERROR_ILLEGAL_ARGUMENTS;
 
         result.type = LAI_INTEGER;
-        result.integer = res;
+        result.integer = res ? ~((uint64_t)0) : 0;
 
         break;
     }
