@@ -862,7 +862,7 @@ lai_api_error_t lai_obj_exec_match_op(int op, lai_variable_t* var, lai_variable_
                 result = 1;
                 break;
             case MATCH_MEQ: // MEQ: Equals
-                result = (result == 0 && var_size == obj_size);
+                result = (compare == 0 && var_size == obj_size);
                 break;
             case MATCH_MLE: // MLE: Less than or equal
                 if (compare == 0){
