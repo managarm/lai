@@ -17,7 +17,11 @@ struct lai_ec_driver {
     uint16_t data_port;
 };
 
+#ifdef __cplusplus
+#define LAI_EC_DRIVER_INITIALIZER {}
+#else
 #define LAI_EC_DRIVER_INITIALIZER {0}
+#endif
 
 static inline void lai_initialize_ec_driver(struct lai_ec_driver *ec) {
     *ec = (struct lai_ec_driver)LAI_EC_DRIVER_INITIALIZER;
