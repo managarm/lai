@@ -144,7 +144,7 @@ static void lai_exec_reduce_node(int opcode, lai_state_t *state, struct lai_oper
             lai_operand_load(state, &operands[0], &buf);
             node->bf_buffer = buf.buffer_ptr;
             lai_rc_ref(&node->bf_buffer->rc);
-            
+
             node->bf_size = size.integer;
             node->bf_offset = offset.integer;
 
@@ -963,7 +963,63 @@ static lai_api_error_t lai_exec_reduce_op(int opcode, lai_state_t *state, struct
         lai_operand_emplace(state, &operands[2], &result);
         break;
     }
+    case MID_OP: {
+        LAI_CLEANUP_VAR lai_variable_t object = LAI_VAR_INITIALIZER;
+        lai_exec_get_objectref(state, &operands[0], &object);
+        LAI_CLEANUP_VAR lai_variable_t index = LAI_VAR_INITIALIZER;
+        lai_exec_get_integer(state, &operands[1], &index);
+        LAI_CLEANUP_VAR lai_variable_t length = LAI_VAR_INITIALIZER;
+        lai_exec_get_integer(state, &operands[2], &length);
 
+        size_t strl = 0;
+        size_t n = index.integer;
+        size_t sz = length.integer;
+        if (object.type == LAI_STRING) {
+            strl = lai_exec_string_length(&object);
+        } else if (object.type == LAI_BUFFER) {
+            strl = lai_exec_buffer_size(&object);
+        }
+
+        if (n >= strl) {
+            sz = 0;
+        /*
+         * NOTE: The spec states that "if Index + Length is greater than or equal...",
+         * however ACPICA only checks if is greater than so we do the same.
+         */
+        } else if ((n + sz) > strl) {
+            sz = strl - n;
+        }
+
+        switch (object.type) {
+            case LAI_STRING: {
+                lai_api_error_t error = lai_create_string(&result, sz + 1);
+                if(error != LAI_ERROR_NONE) {
+                    lai_warn("failed to allocate memory for AML buffer");
+                    return error;
+                }
+                char *buffer0 = lai_exec_string_access(&object);
+                char *result_string = lai_exec_string_access(&result);
+                memcpy(result_string, buffer0 + n, sz);
+                result.type = LAI_STRING;
+                break;
+            }
+            case LAI_BUFFER: {
+                lai_api_error_t error = lai_create_buffer(&result, sz);
+                if(error != LAI_ERROR_NONE) {
+                    lai_warn("failed to allocate memory for AML buffer");
+                    return error;
+                }
+                char *buffer0 = lai_exec_buffer_access(&object);
+                char *result_buffer = lai_exec_buffer_access(&result);
+                memcpy(result_buffer, buffer0 + n, sz);
+                result.type = LAI_BUFFER;
+                break;
+            }
+        }
+
+        lai_operand_mutate(state, &operands[3], &result);
+        break;
+    }
     case NOTIFY_OP: {
         LAI_CLEANUP_VAR lai_variable_t code = LAI_VAR_INITIALIZER;
         LAI_ENSURE(operands[0].tag == LAI_RESOLVED_NAME);
@@ -3045,6 +3101,25 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
         op_item->op_arg_modes[1] = LAI_OBJECT_MODE;
         op_item->op_arg_modes[2] = LAI_REFERENCE_MODE;
         op_item->op_arg_modes[3] = 0;
+        op_item->op_want_result = want_result;
+        break;
+    }
+
+    case MID_OP: {
+        if (lai_exec_reserve_stack(state))
+            return LAI_ERROR_OUT_OF_MEMORY;
+
+        lai_exec_commit_pc(state, pc);
+
+        lai_stackitem_t *op_item = lai_exec_push_stack(state);
+        op_item->kind = LAI_OP_STACKITEM;
+        op_item->op_opcode = opcode;
+        op_item->opstack_frame = state->opstack_ptr;
+        op_item->op_arg_modes[0] = LAI_OBJECT_MODE;
+        op_item->op_arg_modes[1] = LAI_OBJECT_MODE;
+        op_item->op_arg_modes[2] = LAI_OBJECT_MODE;
+        op_item->op_arg_modes[3] = LAI_REFERENCE_MODE;
+        op_item->op_arg_modes[4] = 0;
         op_item->op_want_result = want_result;
         break;
     }
