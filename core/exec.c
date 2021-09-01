@@ -982,7 +982,11 @@ static lai_api_error_t lai_exec_reduce_op(int opcode, lai_state_t *state, struct
 
         if (n >= strl) {
             sz = 0;
-        } else if ((n + sz) >= strl) {
+        /*
+         * NOTE: The spec states that "if Index + Length is greater than or equal...",
+         * however ACPICA only checks if is greater than so we do the same.
+         */
+        } else if ((n + sz) > strl) {
             sz = strl - n;
         }
 
