@@ -574,6 +574,30 @@ static lai_api_error_t lai_exec_reduce_op(int opcode, lai_state_t *state, struct
         lai_operand_mutate(state, &operands[3], &div);
         break;
     }
+    case NAND_OP:
+    {
+        lai_variable_t lhs = {0};
+        lai_variable_t rhs = {0};
+        lai_exec_get_integer(state, &operands[0], &lhs);
+        lai_exec_get_integer(state, &operands[1], &rhs);
+
+        result.type = LAI_INTEGER;
+        result.integer = ~(lhs.integer & rhs.integer);
+        lai_operand_mutate(state, &operands[2], &result);
+        break;
+    }
+    case NOR_OP:
+    {
+        lai_variable_t lhs = {0};
+        lai_variable_t rhs = {0};
+        lai_exec_get_integer(state, &operands[0], &lhs);
+        lai_exec_get_integer(state, &operands[1], &rhs);
+
+        result.type = LAI_INTEGER;
+        result.integer = ~(lhs.integer | rhs.integer);
+        lai_operand_mutate(state, &operands[2], &result);
+        break;
+    }
     case INCREMENT_OP: {
         lai_operand_load(state, operands, &result);
         LAI_ENSURE(result.type == LAI_INTEGER);
@@ -3226,7 +3250,9 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
     case OR_OP:
     case XOR_OP:
     case SHR_OP:
-    case SHL_OP: {
+    case SHL_OP:
+    case NAND_OP:
+    case NOR_OP: {
         if (lai_exec_reserve_stack(state))
             return LAI_ERROR_OUT_OF_MEMORY;
         lai_exec_commit_pc(state, pc);
