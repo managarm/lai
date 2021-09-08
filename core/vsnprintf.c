@@ -1,5 +1,5 @@
 /*
- * Lightweight ACPI Implementation
+ * Lightweight AML Interpreter
  * Copyright (C) 2018-2021 the lai authors
  */
 // from https://gitlab.com/qookei/quack
