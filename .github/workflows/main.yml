@@ -15,7 +15,7 @@ jobs:
       run: sudo apt-get update && sudo apt-get install meson build-essential mtools xorriso acpica-tools
 
     - name: Build and test lai
-      run: git clone https://github.com/managarm/lai_tools.git && cd lai_tools && mkdir build && cd build && meson .. && ninja && meson test -v
+      run: git clone https://github.com/managarm/lai_tools.git && rm -rf lai_tools/subprojects/lai && mkdir -p lai_tools/subprojects && ln -s "$(realpath .)" lai_tools/subprojects/lai && mkdir -p lai_tools/build && cd lai_tools/build && meson .. && ninja && meson test -v
 
     - name: Build test image
       run: cd lai_tools/boot_image && make clean all
