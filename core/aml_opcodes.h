@@ -99,6 +99,7 @@
 #define EVENT               0x02
 #define CONDREF_OP			0x12
 #define ARBFIELD_OP			0x13
+#define STALL_OP            0x21
 #define SLEEP_OP			0x22
 #define ACQUIRE_OP			0x23
 #define RELEASE_OP			0x27
