@@ -2124,6 +2124,25 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
         }
         break;
 
+    case (EXTOP_PREFIX << 8) | TIMER_OP:
+        if (lai_exec_reserve_opstack(state))
+            return LAI_ERROR_OUT_OF_MEMORY;
+        lai_exec_commit_pc(state, pc);
+
+        if (parse_mode == LAI_DATA_MODE || parse_mode == LAI_OBJECT_MODE) {
+            if (!laihost_timer)
+                lai_panic("host does not provide timer functions required by Timer()");
+
+            struct lai_operand *result = lai_exec_push_opstack(state);
+            result->tag = LAI_OPERAND_OBJECT;
+            result->object.type = LAI_INTEGER;
+            result->object.integer = laihost_timer();
+        } else {
+            lai_warn("Timer() in execution mode has no effect");
+            LAI_ENSURE(parse_mode == LAI_EXEC_MODE);
+        }
+        break;
+
     case BYTEPREFIX:
     case WORDPREFIX:
     case DWORDPREFIX:

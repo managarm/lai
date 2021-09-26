@@ -110,6 +110,7 @@
 #define REVISION_OP         0x30
 #define DEBUG_OP			0x31
 #define FATAL_OP            0x32
+#define TIMER_OP            0x33
 #define OPREGION			0x80
 #define FIELD				0x81
 #define DEVICE				0x82

@@ -58,6 +58,7 @@ __attribute__((weak)) void laihost_pci_writed(uint16_t, uint8_t, uint8_t, uint8_
 __attribute__((weak)) uint32_t laihost_pci_readd(uint16_t, uint8_t, uint8_t, uint8_t, uint16_t);
 
 __attribute__((weak)) void laihost_sleep(uint64_t);
+__attribute__((weak)) uint64_t laihost_timer(void);
 
 __attribute__((weak)) int laihost_sync_wait(struct lai_sync_state *, unsigned int val,
         int64_t deadline);
