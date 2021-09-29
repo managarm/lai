@@ -57,7 +57,6 @@ __attribute__((weak)) uint16_t laihost_pci_readw(uint16_t, uint8_t, uint8_t, uin
 __attribute__((weak)) void laihost_pci_writed(uint16_t, uint8_t, uint8_t, uint8_t, uint16_t, uint32_t);
 __attribute__((weak)) uint32_t laihost_pci_readd(uint16_t, uint8_t, uint8_t, uint8_t, uint16_t);
 
-__attribute__((weak)) void laihost_stall(uint64_t);
 __attribute__((weak)) void laihost_sleep(uint64_t);
 __attribute__((weak)) uint64_t laihost_timer(void);
 

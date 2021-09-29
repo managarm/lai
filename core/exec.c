@@ -1071,10 +1071,10 @@ static lai_api_error_t lai_exec_reduce_op(int opcode, lai_state_t *state, struct
         break;
     }
     case (EXTOP_PREFIX << 8) | STALL_OP: {
-        if (!laihost_stall && !laihost_timer)
+        if (!laihost_timer)
             lai_panic("host does not provide timer functions required by Stall()");
 
-        lai_variable_t time = {0};
+        LAI_CLEANUP_VAR lai_variable_t time = {0};
         lai_exec_get_integer(state, &operands[0], &time);
 
         if (!time.integer)
@@ -1084,21 +1084,17 @@ static lai_api_error_t lai_exec_reduce_op(int opcode, lai_state_t *state, struct
             lai_warn("buggy BIOS tried to stall for more than 100ms, using sleep instead");
             laihost_sleep(time.integer * 1000);
         } else {
-            // prefer host stall but fallback to timer
-            if (laihost_stall) {
-                laihost_stall(time.integer);
-            } else {
-                uint64_t start_time = laihost_timer();
-                while(laihost_timer() - start_time <= time.integer * 10);
-            }
-        }        
+            // use the timer to stall
+            uint64_t start_time = laihost_timer();
+            while(laihost_timer() - start_time <= time.integer * 10);
+        }
         break;
     }
     case (EXTOP_PREFIX << 8) | SLEEP_OP: {
         if (!laihost_sleep)
             lai_panic("host does not provide timer functions required by Sleep()");
 
-        lai_variable_t time = {0};
+        LAI_CLEANUP_VAR lai_variable_t time = {0};
         lai_exec_get_integer(state, &operands[0], &time);
 
         if (!time.integer)
