@@ -1,4 +1,3 @@
-
 /*
  * Lightweight AML Interpreter
  * Copyright (C) 2018-2021 the lai authors
@@ -7,8 +6,9 @@
 /* System Control Interrupt Initialization */
 
 #include <lai/helpers/sci.h>
-#include "../core/libc.h"
+
 #include "../core/exec_impl.h"
+#include "../core/libc.h"
 
 // read contents of event registers.
 uint16_t lai_get_sci_event(void) {
@@ -110,7 +110,7 @@ int lai_enable_acpi(uint32_t mode) {
     return 0;
 }
 
-int lai_disable_acpi(void){
+int lai_disable_acpi(void) {
     if (!laihost_inw || !laihost_outw)
         lai_panic("lai_read_event() requires port I/O");
 
@@ -127,7 +127,7 @@ int lai_disable_acpi(void){
     pm1a_cnt_block &= ~ACPI_ENABLED;
     laihost_outw(instance->fadt->pm1a_control_block, pm1a_cnt_block);
 
-    if(instance->fadt->pm1b_control_block){
+    if (instance->fadt->pm1b_control_block) {
         uint16_t pm1b_cnt_block = laihost_inw(instance->fadt->pm1b_control_block);
         pm1b_cnt_block &= ~ACPI_ENABLED;
         laihost_outw(instance->fadt->pm1b_control_block, pm1b_cnt_block);
@@ -152,7 +152,7 @@ int lai_evaluate_sta(lai_nsnode_t *node) {
         LAI_CLEANUP_VAR lai_variable_t result = LAI_VAR_INITIALIZER;
         if (lai_eval(&result, handle, &state))
             lai_panic("could not evaluate _STA");
-        if(lai_obj_get_integer(&result, &sta))
+        if (lai_obj_get_integer(&result, &sta))
             lai_panic("_STA returned non-integer object");
     }
 

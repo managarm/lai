@@ -5,6 +5,9 @@
 
 #pragma once
 
+#include <lai/host.h>
+#include <stddef.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -29,12 +32,12 @@ __attribute__((noreturn)) void lai_panic(const char *, ...);
 #define LAI_STRINGIFY(x) #x
 #define LAI_EXPAND_STRINGIFY(x) LAI_STRINGIFY(x)
 
-#define LAI_ENSURE(cond) \
-    do { \
-        if(!(cond)) \
-            lai_panic("assertion failed: " #cond " at " \
-                       __FILE__ ":" LAI_EXPAND_STRINGIFY(__LINE__) "\n"); \
-    } while(0)
+#define LAI_ENSURE(cond)                                                                           \
+    do {                                                                                           \
+        if (!(cond))                                                                               \
+            lai_panic("assertion failed: " #cond " at " __FILE__                                   \
+                      ":" LAI_EXPAND_STRINGIFY(__LINE__) "\n");                                    \
+    } while (0)
 
 //---------------------------------------------------------------------------------------
 // Misc. utility functions.
@@ -53,14 +56,12 @@ static inline void lai_cleanup_free_string(char **v) {
 
 typedef int lai_rc_t;
 
-__attribute__((always_inline))
-inline void lai_rc_ref(lai_rc_t *rc_ptr) {
+__attribute__((always_inline)) inline void lai_rc_ref(lai_rc_t *rc_ptr) {
     lai_rc_t nrefs = (*rc_ptr)++;
     LAI_ENSURE(nrefs > 0);
 }
 
-__attribute__((always_inline))
-inline int lai_rc_unref(lai_rc_t *rc_ptr) {
+__attribute__((always_inline)) inline int lai_rc_unref(lai_rc_t *rc_ptr) {
     lai_rc_t nrefs = --(*rc_ptr);
     LAI_ENSURE(nrefs >= 0);
     return !nrefs;
@@ -84,12 +85,12 @@ struct lai_list {
 //---------------------------------------------------------------------------------------
 
 struct lai_hashtable {
-    int elem_capacity;   // Capacity of elem_{ptr,hash}_tab.
+    int elem_capacity; // Capacity of elem_{ptr,hash}_tab.
     int bucket_capacity; // Size of bucket_tab. *Must* be a power of 2.
-    int num_elems;       // Number of elements in the table.
+    int num_elems; // Number of elements in the table.
     void **elem_ptr_tab; // Stores the pointer of each element.
-    int *elem_hash_tab;  // Stores the hash of each element.
-    int *bucket_tab;     // Indexes into elem_{ptr,hash}_tab.
+    int *elem_hash_tab; // Stores the hash of each element.
+    int *bucket_tab; // Indexes into elem_{ptr,hash}_tab.
 };
 
 #ifdef __cplusplus

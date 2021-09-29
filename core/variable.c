@@ -4,12 +4,13 @@
  */
 
 #include <lai/core.h>
-#include "libc.h"
+
 #include "exec_impl.h"
+#include "libc.h"
 
 // laihost_free_package(): Frees a package object and all its children
 static void laihost_free_package(lai_variable_t *object) {
-    for(size_t i = 0; i < object->pkg_ptr->size; i++)
+    for (size_t i = 0; i < object->pkg_ptr->size; i++)
         lai_var_finalize(&object->pkg_ptr->elems[i]);
     laihost_free(object->pkg_ptr->elems, object->pkg_ptr->size * sizeof(lai_variable_t));
     laihost_free(object->pkg_ptr, sizeof(struct lai_pkg_head));

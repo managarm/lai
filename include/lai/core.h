@@ -9,8 +9,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include <acpispec/resources.h>
 #include <acpispec/hw.h>
+#include <acpispec/resources.h>
 #include <acpispec/tables.h>
 #include <lai/error.h>
 #include <lai/host.h>
@@ -22,9 +22,9 @@
 extern "C" {
 #endif
 
-#define LAI_REVISION    0x20200712
+#define LAI_REVISION 0x20200712
 
-#define ACPI_MAX_RESOURCES          512
+#define ACPI_MAX_RESOURCES 512
 
 // Convert a lai_api_error_t to a human readable string
 const char *lai_api_error_to_string(lai_api_error_t);
@@ -58,14 +58,17 @@ struct lai_ns_child_iterator {
     lai_nsnode_t *parent;
 };
 
-#define LAI_NS_ITERATOR_INITIALIZER {0}
-#define LAI_NS_CHILD_ITERATOR_INITIALIZER(x) {0, x}
+#define LAI_NS_ITERATOR_INITIALIZER                                                                \
+    { 0 }
+#define LAI_NS_CHILD_ITERATOR_INITIALIZER(x)                                                       \
+    { 0, x }
 
 static inline void lai_initialize_ns_iterator(struct lai_ns_iterator *iter) {
     *iter = (struct lai_ns_iterator)LAI_NS_ITERATOR_INITIALIZER;
 }
 
-static inline void lai_initialize_ns_child_iterator(struct lai_ns_child_iterator *iter, lai_nsnode_t *parent) {
+static inline void lai_initialize_ns_child_iterator(struct lai_ns_child_iterator *iter,
+                                                    lai_nsnode_t *parent) {
     *iter = (struct lai_ns_child_iterator)LAI_NS_CHILD_ITERATOR_INITIALIZER(parent);
 }
 
@@ -91,9 +94,11 @@ lai_nsnode_t *lai_ns_get_root();
 lai_nsnode_t *lai_ns_get_parent(lai_nsnode_t *node);
 lai_nsnode_t *lai_ns_get_child(lai_nsnode_t *parent, const char *name);
 lai_api_error_t lai_ns_override_notify(lai_nsnode_t *node,
-        lai_api_error_t (*override)(lai_nsnode_t *, int, void *), void *userptr);
+                                       lai_api_error_t (*override)(lai_nsnode_t *, int, void *),
+                                       void *userptr);
 lai_api_error_t lai_ns_override_opregion(lai_nsnode_t *node,
-        const struct lai_opregion_override *override, void *userptr);
+                                         const struct lai_opregion_override *override,
+                                         void *userptr);
 enum lai_node_type lai_ns_get_node_type(lai_nsnode_t *node);
 
 uint8_t lai_ns_get_opregion_address_space(lai_nsnode_t *node);
@@ -134,16 +139,18 @@ lai_api_error_t lai_mutate_integer(lai_variable_t *, lai_variable_t *);
 lai_api_error_t lai_obj_to_type_string(lai_variable_t *target, lai_nsnode_t *object);
 void lai_obj_clone(lai_variable_t *, lai_variable_t *);
 
-int lai_objecttype_ns(lai_nsnode_t*);
-int lai_objecttype_obj(lai_variable_t*);
+int lai_objecttype_ns(lai_nsnode_t *);
+int lai_objecttype_obj(lai_variable_t *);
 
-lai_api_error_t lai_obj_exec_match_op(int, lai_variable_t*, lai_variable_t*, int*);
+lai_api_error_t lai_obj_exec_match_op(int, lai_variable_t *, lai_variable_t *, int *);
 
 #define LAI_CLEANUP_VAR __attribute__((cleanup(lai_var_finalize)))
 #ifdef __cplusplus
-#define LAI_VAR_INITIALIZER {}
+#define LAI_VAR_INITIALIZER                                                                        \
+    {}
 #else
-#define LAI_VAR_INITIALIZER {0}
+#define LAI_VAR_INITIALIZER                                                                        \
+    { 0 }
 #endif
 
 static inline void lai_var_initialize(lai_variable_t *var) {
@@ -156,8 +163,8 @@ void lai_var_assign(lai_variable_t *, lai_variable_t *);
 
 // Evaluation of namespace nodes (including control methods).
 
-lai_api_error_t lai_eval_args(lai_variable_t *, lai_nsnode_t *, lai_state_t *,
-                              int, lai_variable_t *);
+lai_api_error_t lai_eval_args(lai_variable_t *, lai_nsnode_t *, lai_state_t *, int,
+                              lai_variable_t *);
 lai_api_error_t lai_eval_largs(lai_variable_t *, lai_nsnode_t *, lai_state_t *, ...);
 lai_api_error_t lai_eval_vargs(lai_variable_t *, lai_nsnode_t *, lai_state_t *, va_list);
 lai_api_error_t lai_eval(lai_variable_t *, lai_nsnode_t *, lai_state_t *);

@@ -30,7 +30,7 @@ static void lai_hashtable_grow(struct lai_hashtable *ht, int n, int m) {
         new_elem_ptr_tab[k] = ht->elem_ptr_tab[k];
         new_elem_hash_tab[k] = ht->elem_hash_tab[k];
 
-        for (int i = 0; ; i++) {
+        for (int i = 0;; i++) {
             LAI_ENSURE(i < m);
             int b = (ht->elem_hash_tab[k] + i) & (m - 1);
             if (new_bucket_tab[b] < 0) {
@@ -79,7 +79,7 @@ static inline void lai_hashtable_insert(struct lai_hashtable *ht, int h, void *e
     ht->num_elems++;
 
     // Add an entry in the bucket table.
-    for (int i = 0; ; i++) {
+    for (int i = 0;; i++) {
         LAI_ENSURE(i < ht->bucket_capacity);
         int b = (h + i) & (ht->bucket_capacity - 1);
         if (ht->bucket_tab[b] < 0) {
@@ -93,17 +93,18 @@ struct lai_hashtable_chain {
     int i;
 };
 
-#define LAI_HASHTABLE_CHAIN_INITIALIZER {.i = -1}
+#define LAI_HASHTABLE_CHAIN_INITIALIZER                                                            \
+    { .i = -1 }
 
 // TODO: When searching for a non-existing hash, we alreadys walk through the entire table.
 //       Improve the algorithm to avoid this.
 static inline int lai_hashtable_chain_advance(struct lai_hashtable *ht, int h,
-        struct lai_hashtable_chain *chain) {
+                                              struct lai_hashtable_chain *chain) {
     LAI_ENSURE(chain->i < ht->bucket_capacity);
     for (;;) {
         chain->i++;
         LAI_ENSURE(chain->i >= 0);
-        if(chain->i == ht->bucket_capacity)
+        if (chain->i == ht->bucket_capacity)
             return 1;
         int b = (h + chain->i) & (ht->bucket_capacity - 1);
         int k = ht->bucket_tab[b];
@@ -113,7 +114,7 @@ static inline int lai_hashtable_chain_advance(struct lai_hashtable *ht, int h,
 }
 
 static inline void *lai_hashtable_chain_get(struct lai_hashtable *ht, int h,
-        struct lai_hashtable_chain *chain) {
+                                            struct lai_hashtable_chain *chain) {
     LAI_ENSURE(chain->i >= 0);
     LAI_ENSURE(chain->i < ht->bucket_capacity);
 
@@ -126,7 +127,7 @@ static inline void *lai_hashtable_chain_get(struct lai_hashtable *ht, int h,
 }
 
 static inline void lai_hashtable_chain_remove(struct lai_hashtable *ht, int h,
-        struct lai_hashtable_chain *chain) {
+                                              struct lai_hashtable_chain *chain) {
     LAI_ENSURE(chain->i >= 0);
     LAI_ENSURE(chain->i < ht->bucket_capacity);
 

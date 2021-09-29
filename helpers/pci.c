@@ -1,4 +1,3 @@
-
 /*
  * Lightweight AML Interpreter
  * Copyright (C) 2018-2021 the lai authors
@@ -14,10 +13,12 @@
 
 #include <lai/helpers/pci.h>
 #include <lai/helpers/resource.h>
-#include "../core/libc.h"
-#include "../core/eval.h"
 
-int lai_pci_route(acpi_resource_t *dest, uint16_t seg, uint8_t bus, uint8_t slot, uint8_t function) {
+#include "../core/eval.h"
+#include "../core/libc.h"
+
+int lai_pci_route(acpi_resource_t *dest, uint16_t seg, uint8_t bus, uint8_t slot,
+                  uint8_t function) {
 
     uint8_t pin = (uint8_t)laihost_pci_readb(seg, bus, slot, function, 0x3D);
     if (!pin || pin > 4)
@@ -28,7 +29,8 @@ int lai_pci_route(acpi_resource_t *dest, uint16_t seg, uint8_t bus, uint8_t slot
     return 0;
 }
 
-lai_api_error_t lai_pci_route_pin(acpi_resource_t *dest, uint16_t seg, uint8_t bus, uint8_t slot, uint8_t function, uint8_t pin) {
+lai_api_error_t lai_pci_route_pin(acpi_resource_t *dest, uint16_t seg, uint8_t bus, uint8_t slot,
+                                  uint8_t function, uint8_t pin) {
     LAI_CLEANUP_STATE lai_state_t state;
     lai_init_state(&state);
 
@@ -61,9 +63,8 @@ lai_api_error_t lai_pci_route_pin(acpi_resource_t *dest, uint16_t seg, uint8_t b
     lai_api_error_t err;
 
     while (!(err = lai_pci_parse_prt(&iter))) {
-        if (iter.slot == slot &&
-                (iter.function == function || iter.function == -1) &&
-                iter.pin == pin) {
+        if (iter.slot == slot && (iter.function == function || iter.function == -1)
+            && iter.pin == pin) {
             dest->type = ACPI_RESOURCE_IRQ;
             dest->base = iter.gsi;
             dest->irq_flags = (iter.level_triggered ? 0 : ACPI_SMALL_IRQ_EDGE_TRIGGERED)
@@ -149,8 +150,8 @@ lai_api_error_t lai_pci_parse_prt(struct lai_prt_iterator *iter) {
         // Find the _CRS entry based on its index.
         struct lai_resource_view view = LAI_RESOURCE_VIEW_INITIALIZER(&crs_buffer);
         unsigned int current = 0;
-        while(!lai_resource_iterate(&view)) {
-            if(current == res_index) {
+        while (!lai_resource_iterate(&view)) {
+            if (current == res_index) {
                 enum lai_resource_type type = lai_resource_get_type(&view);
                 if (type != LAI_RESOURCE_IRQ)
                     return LAI_ERROR_UNEXPECTED_RESULT;
@@ -172,10 +173,11 @@ lai_api_error_t lai_pci_parse_prt(struct lai_prt_iterator *iter) {
     }
 }
 
-lai_nsnode_t *lai_pci_find_device(lai_nsnode_t *bus, uint8_t slot, uint8_t function, lai_state_t *state){
+lai_nsnode_t *lai_pci_find_device(lai_nsnode_t *bus, uint8_t slot, uint8_t function,
+                                  lai_state_t *state) {
     LAI_ENSURE(bus);
     LAI_ENSURE(state);
-    
+
     uint64_t device_adr = ((slot << 16) | function);
 
     struct lai_ns_child_iterator iter = LAI_NS_CHILD_ITERATOR_INITIALIZER(bus);
@@ -191,7 +193,7 @@ lai_nsnode_t *lai_pci_find_device(lai_nsnode_t *bus, uint8_t slot, uint8_t funct
             }
             lai_obj_get_integer(&adr, &adr_result);
 
-            if(adr_result == device_adr)
+            if (adr_result == device_adr)
                 return node;
         }
     }
@@ -199,7 +201,7 @@ lai_nsnode_t *lai_pci_find_device(lai_nsnode_t *bus, uint8_t slot, uint8_t funct
     return NULL;
 }
 
-lai_nsnode_t *lai_pci_find_bus(uint16_t seg, uint8_t bus, lai_state_t *state){
+lai_nsnode_t *lai_pci_find_bus(uint16_t seg, uint8_t bus, lai_state_t *state) {
     LAI_CLEANUP_VAR lai_variable_t pci_pnp_id = LAI_VAR_INITIALIZER;
     LAI_CLEANUP_VAR lai_variable_t pcie_pnp_id = LAI_VAR_INITIALIZER;
     lai_eisaid(&pci_pnp_id, ACPI_PCI_ROOT_BUS_PNP_ID);
@@ -210,8 +212,8 @@ lai_nsnode_t *lai_pci_find_bus(uint16_t seg, uint8_t bus, lai_state_t *state){
     struct lai_ns_child_iterator iter = LAI_NS_CHILD_ITERATOR_INITIALIZER(sb_handle);
     lai_nsnode_t *node;
     while ((node = lai_ns_child_iterate(&iter))) {
-        if (lai_check_device_pnp_id(node, &pci_pnp_id, state) &&
-            lai_check_device_pnp_id(node, &pcie_pnp_id, state)) {
+        if (lai_check_device_pnp_id(node, &pci_pnp_id, state)
+            && lai_check_device_pnp_id(node, &pcie_pnp_id, state)) {
             continue;
         }
 
@@ -230,14 +232,14 @@ lai_nsnode_t *lai_pci_find_bus(uint16_t seg, uint8_t bus, lai_state_t *state){
         uint64_t seg_result = 0;
         lai_nsnode_t *seg_handle = lai_resolve_path(node, "_SEG");
         if (seg_handle) {
-            if (lai_eval(&seg_number, seg_handle, state)){
+            if (lai_eval(&seg_number, seg_handle, state)) {
                 lai_warn("failed to evaluate _SEG");
                 continue;
             }
             lai_obj_get_integer(&seg_number, &seg_result);
         }
-        
-        if(seg_result == seg && bbn_result == bus){
+
+        if (seg_result == seg && bbn_result == bus) {
             return node;
         }
     }

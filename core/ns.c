@@ -1,4 +1,3 @@
-
 /*
  * Lightweight AML Interpreter
  * Copyright (C) 2018-2021 the lai authors
@@ -7,11 +6,12 @@
 /* Generic ACPI Namespace Management */
 
 #include <lai/core.h>
+
 #include "aml_opcodes.h"
-#include "ns_impl.h"
+#include "eval.h"
 #include "exec_impl.h"
 #include "libc.h"
-#include "eval.h"
+#include "ns_impl.h"
 #include "util-hash.h"
 
 static int debug_resolution = 0;
@@ -66,7 +66,8 @@ void lai_install_nsnode(lai_nsnode_t *node) {
         if (!new_capacity)
             new_capacity = 128;
         lai_nsnode_t **new_array;
-        new_array = laihost_realloc(instance->ns_array, sizeof(lai_nsnode_t *) * new_capacity, sizeof(lai_nsnode_t *) * instance->ns_capacity);
+        new_array = laihost_realloc(instance->ns_array, sizeof(lai_nsnode_t *) * new_capacity,
+                                    sizeof(lai_nsnode_t *) * instance->ns_capacity);
         if (!new_array)
             lai_panic("could not reallocate namespace table");
         instance->ns_array = new_array;
@@ -204,10 +205,10 @@ char *lai_stringify_amlname(const struct lai_amlname *in_amln) {
     struct lai_amlname amln = *in_amln;
 
     size_t num_segs = (amln.end - amln.it) / 4;
-    size_t max_length = 1              // Leading \ for absolute paths.
+    size_t max_length = 1 // Leading \ for absolute paths.
                         + amln.height // Leading ^ characters.
                         + num_segs * 5 // Segments, seperated by dots.
-                        + 1;          // Null-terminator.
+                        + 1; // Null-terminator.
 
     char *str = laihost_malloc(max_length);
     if (!str)
@@ -219,7 +220,7 @@ char *lai_stringify_amlname(const struct lai_amlname *in_amln) {
     for (int i = 0; i < amln.height; i++)
         str[n++] = '^';
 
-    if(!lai_amlname_done(&amln)) {
+    if (!lai_amlname_done(&amln)) {
         for (;;) {
             lai_amlname_iterate(&amln, &str[n]);
             n += 4;
@@ -229,9 +230,9 @@ char *lai_stringify_amlname(const struct lai_amlname *in_amln) {
         }
     }
     str[n++] = '\0';
-    LAI_ENSURE(n <= (int) max_length);
+    LAI_ENSURE(n <= (int)max_length);
 
-    if (n != (int) max_length)
+    if (n != (int)max_length)
         str = laihost_realloc(str, n, max_length);
 
     return str;
@@ -288,7 +289,7 @@ lai_nsnode_t *lai_do_resolve(lai_nsnode_t *ctx_handle, const struct lai_amlname 
         LAI_ENSURE(lai_amlname_done(&amln));
         segment[4] = '\0';
 
-        if(debug_resolution)
+        if (debug_resolution)
             lai_debug("resolving %s by searching through scopes", segment);
 
         while (current) {
@@ -302,7 +303,7 @@ lai_nsnode_t *lai_do_resolve(lai_nsnode_t *ctx_handle, const struct lai_amlname 
                 node = node->al_target;
                 LAI_ENSURE(node->type != LAI_NAMESPACE_ALIAS);
             }
-            if(debug_resolution) {
+            if (debug_resolution) {
                 LAI_CLEANUP_FREE_STRING char *fullpath = lai_stringify_node_path(node);
                 lai_debug("resolution returns %s", fullpath);
             }
@@ -344,8 +345,8 @@ lai_nsnode_t *lai_do_resolve(lai_nsnode_t *ctx_handle, const struct lai_amlname 
     }
 }
 
-void lai_do_resolve_new_node(lai_nsnode_t *node,
-        lai_nsnode_t *ctx_handle, const struct lai_amlname *in_amln) {
+void lai_do_resolve_new_node(lai_nsnode_t *node, lai_nsnode_t *ctx_handle,
+                             const struct lai_amlname *in_amln) {
     // Make a copy to avoid rendering the original object unusable.
     struct lai_amlname amln = *in_amln;
 
@@ -388,7 +389,7 @@ void lai_do_resolve_new_node(lai_nsnode_t *node,
             LAI_ENSURE(parent);
             if (parent->type == LAI_NAMESPACE_ALIAS) {
                 lai_warn("resolution of new object name traverses Alias(),"
-                        " this is not supported in ACPICA");
+                         " this is not supported in ACPICA");
                 parent = parent->al_target;
                 LAI_ENSURE(parent->type != LAI_NAMESPACE_ALIAS);
             }
@@ -494,7 +495,7 @@ void lai_create_namespace(void) {
     void *dsdt_table = laihost_scan("DSDT", 0);
     if (!dsdt_table)
         lai_panic("unable to find ACPI DSDT.");
-    
+
     void *dsdt_amls = lai_load_table(dsdt_table, 0);
     lai_init_state(&state);
     lai_populate(root_node, dsdt_amls, &state);
@@ -528,7 +529,7 @@ void lai_create_namespace(void) {
 
 static struct lai_aml_segment *lai_load_table(void *ptr, int index) {
     struct lai_aml_segment *amls = laihost_malloc(sizeof(struct lai_aml_segment));
-    if(!amls)
+    if (!amls)
         lai_panic("could not allocate memory for struct lai_aml_segment");
     memset(amls, 0, sizeof(struct lai_aml_segment));
 
@@ -536,11 +537,9 @@ static struct lai_aml_segment *lai_load_table(void *ptr, int index) {
     amls->index = index;
 
     lai_debug("loaded AML table '%c%c%c%c', total %d bytes of AML code.",
-            amls->table->header.signature[0],
-            amls->table->header.signature[1],
-            amls->table->header.signature[2],
-            amls->table->header.signature[3],
-            amls->table->header.length);
+              amls->table->header.signature[0], amls->table->header.signature[1],
+              amls->table->header.signature[2], amls->table->header.signature[3],
+              amls->table->header.length);
     return amls;
 }
 
@@ -573,7 +572,7 @@ lai_nsnode_t *lai_resolve_path(lai_nsnode_t *ctx_handle, const char *path) {
     if (!(*path))
         return current;
 
-    for(;;) {
+    for (;;) {
         char segment[5];
 
         int k;
@@ -610,7 +609,7 @@ lai_nsnode_t *lai_resolve_search(lai_nsnode_t *ctx_handle, const char *segment) 
     LAI_ENSURE(current);
     LAI_ENSURE(current->type != LAI_NAMESPACE_ALIAS); // ctx_handle needs to be resolved.
 
-    if(debug_resolution)
+    if (debug_resolution)
         lai_debug("resolving %s by searching through scopes", segment);
 
     while (current) {
@@ -634,8 +633,7 @@ lai_nsnode_t *lai_resolve_search(lai_nsnode_t *ctx_handle, const char *segment) 
     return NULL;
 }
 
-int lai_check_device_pnp_id(lai_nsnode_t *dev, lai_variable_t *pnp_id,
-                            lai_state_t *state) {
+int lai_check_device_pnp_id(lai_nsnode_t *dev, lai_variable_t *pnp_id, lai_state_t *state) {
 
     lai_variable_t id = {0};
     int ret = 1;
@@ -661,14 +659,12 @@ int lai_check_device_pnp_id(lai_nsnode_t *dev, lai_variable_t *pnp_id,
         }
     }
 
-
     if (id.type == LAI_INTEGER && pnp_id->type == LAI_INTEGER) {
         if (id.integer == pnp_id->integer) {
             ret = 0;
         }
     } else if (id.type == LAI_STRING && pnp_id->type == LAI_STRING) {
-        if (!lai_strcmp(lai_exec_string_access(&id),
-                         lai_exec_string_access(pnp_id))) {
+        if (!lai_strcmp(lai_exec_string_access(&id), lai_exec_string_access(pnp_id))) {
             ret = 0;
         }
     }
@@ -690,7 +686,7 @@ lai_nsnode_t *lai_ns_iterate(struct lai_ns_iterator *iter) {
 }
 
 lai_nsnode_t *lai_ns_child_iterate(struct lai_ns_child_iterator *iter) {
-    while (iter->i < (size_t) iter->parent->children.elem_capacity) {
+    while (iter->i < (size_t)iter->parent->children.elem_capacity) {
         lai_nsnode_t *n = iter->parent->children.elem_ptr_tab[iter->i++];
         if (n)
             return n;
@@ -700,7 +696,8 @@ lai_nsnode_t *lai_ns_child_iterate(struct lai_ns_child_iterator *iter) {
 }
 
 lai_api_error_t lai_ns_override_notify(lai_nsnode_t *node,
-        lai_api_error_t (*override)(lai_nsnode_t *, int, void *), void *userptr) {
+                                       lai_api_error_t (*override)(lai_nsnode_t *, int, void *),
+                                       void *userptr) {
     LAI_ENSURE(node);
 
     node->notify_override = override;
@@ -709,7 +706,8 @@ lai_api_error_t lai_ns_override_notify(lai_nsnode_t *node,
 }
 
 lai_api_error_t lai_ns_override_opregion(lai_nsnode_t *node,
-        const struct lai_opregion_override *override, void *userptr){
+                                         const struct lai_opregion_override *override,
+                                         void *userptr) {
     LAI_ENSURE(node);
     LAI_ENSURE(node->type == LAI_NAMESPACE_OPREGION);
 
@@ -718,51 +716,54 @@ lai_api_error_t lai_ns_override_opregion(lai_nsnode_t *node,
     return LAI_ERROR_NONE;
 }
 
-enum lai_node_type lai_ns_get_node_type(lai_nsnode_t *node){
-    if(!node){
+enum lai_node_type lai_ns_get_node_type(lai_nsnode_t *node) {
+    if (!node) {
         lai_warn("node passed to lai_ns_get_node_type is NULL");
         return LAI_NODETYPE_NULL;
     }
 
-    switch (node->type){
-    case LAI_NAMESPACE_ROOT:
-        return LAI_NODETYPE_ROOT;
-    case LAI_NAMESPACE_NAME:
-        return LAI_NODETYPE_EVALUATABLE;
-    case LAI_NAMESPACE_ALIAS:
-        return LAI_NODETYPE_EVALUATABLE;
-    case LAI_NAMESPACE_FIELD:
-        return LAI_NODETYPE_EVALUATABLE;
-    case LAI_NAMESPACE_METHOD:
-        return LAI_NODETYPE_EVALUATABLE;
-    case LAI_NAMESPACE_DEVICE:
-        return LAI_NODETYPE_DEVICE;
-    case LAI_NAMESPACE_MUTEX:
-        return LAI_NODETYPE_MUTEX;
-    case LAI_NAMESPACE_PROCESSOR:
-        return LAI_NODETYPE_PROCESSOR;
-    case LAI_NAMESPACE_BUFFER_FIELD:
-        return LAI_NODETYPE_EVALUATABLE;
-    case LAI_NAMESPACE_THERMALZONE:
-        return LAI_NODETYPE_THERMALZONE;
-    case LAI_NAMESPACE_EVENT:
-        return LAI_NODETYPE_EVENT;
-    case LAI_NAMESPACE_POWERRESOURCE:
-        return LAI_NODETYPE_POWERRESOURCE;
-    case LAI_NAMESPACE_BANK_FIELD:
-        return LAI_NODETYPE_EVALUATABLE;
-    case LAI_NAMESPACE_OPREGION:
-        return LAI_NODETYPE_OPREGION;
-    default:
-        return LAI_NODETYPE_NULL;
+    switch (node->type) {
+        case LAI_NAMESPACE_ROOT:
+            return LAI_NODETYPE_ROOT;
+        case LAI_NAMESPACE_NAME:
+            return LAI_NODETYPE_EVALUATABLE;
+        case LAI_NAMESPACE_ALIAS:
+            return LAI_NODETYPE_EVALUATABLE;
+        case LAI_NAMESPACE_FIELD:
+            return LAI_NODETYPE_EVALUATABLE;
+        case LAI_NAMESPACE_METHOD:
+            return LAI_NODETYPE_EVALUATABLE;
+        case LAI_NAMESPACE_DEVICE:
+            return LAI_NODETYPE_DEVICE;
+        case LAI_NAMESPACE_MUTEX:
+            return LAI_NODETYPE_MUTEX;
+        case LAI_NAMESPACE_PROCESSOR:
+            return LAI_NODETYPE_PROCESSOR;
+        case LAI_NAMESPACE_BUFFER_FIELD:
+            return LAI_NODETYPE_EVALUATABLE;
+        case LAI_NAMESPACE_THERMALZONE:
+            return LAI_NODETYPE_THERMALZONE;
+        case LAI_NAMESPACE_EVENT:
+            return LAI_NODETYPE_EVENT;
+        case LAI_NAMESPACE_POWERRESOURCE:
+            return LAI_NODETYPE_POWERRESOURCE;
+        case LAI_NAMESPACE_BANK_FIELD:
+            return LAI_NODETYPE_EVALUATABLE;
+        case LAI_NAMESPACE_OPREGION:
+            return LAI_NODETYPE_OPREGION;
+        default:
+            return LAI_NODETYPE_NULL;
     }
 }
 
-void lai_set_acpi_revision(int revision){
-    lai_current_instance()->acpi_revision = (revision == 0) ? (1) : (revision); // For some reason ACPI 1 is encoded as 0 and the rest just normally
+void lai_set_acpi_revision(int revision) {
+    lai_current_instance()->acpi_revision
+        = (revision == 0)
+              ? (1)
+              : (revision); // For some reason ACPI 1 is encoded as 0 and the rest just normally
 }
 
-uint8_t lai_ns_get_opregion_address_space(lai_nsnode_t *node){
+uint8_t lai_ns_get_opregion_address_space(lai_nsnode_t *node) {
     LAI_ENSURE(node->type == LAI_NAMESPACE_OPREGION);
     return node->op_address_space;
 }

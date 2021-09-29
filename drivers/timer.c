@@ -12,11 +12,11 @@ static acpi_gas_t timer_block;
 static int extended_timer = 0;
 static int supported = 0;
 
-uint32_t lai_read_pm_timer_value(){
-    if(timer_block.address_space == ACPI_GAS_IO){
+uint32_t lai_read_pm_timer_value() {
+    if (timer_block.address_space == ACPI_GAS_IO) {
         return laihost_ind(timer_block.base);
-    } else if(timer_block.address_space == ACPI_GAS_MMIO){
-        volatile uint32_t *reg = (volatile uint32_t *)((uintptr_t) timer_block.base);
+    } else if (timer_block.address_space == ACPI_GAS_MMIO) {
+        volatile uint32_t *reg = (volatile uint32_t *)((uintptr_t)timer_block.base);
         return *reg;
     } else {
         lai_panic("Unknown ACPI Timer address space");
@@ -25,24 +25,24 @@ uint32_t lai_read_pm_timer_value(){
     return 0;
 }
 
-lai_api_error_t lai_start_pm_timer(){
+lai_api_error_t lai_start_pm_timer() {
     acpi_fadt_t *fadt = lai_current_instance()->fadt;
 
-    if(fadt->pm_timer_length != 4)
+    if (fadt->pm_timer_length != 4)
         return LAI_ERROR_UNSUPPORTED;
 
     supported = 1;
 
-    if(lai_current_instance()->acpi_revision >= 2 && fadt->x_pm_timer_block.base){
+    if (lai_current_instance()->acpi_revision >= 2 && fadt->x_pm_timer_block.base) {
         timer_block = fadt->x_pm_timer_block;
-        if(timer_block.address_space == ACPI_GAS_MMIO)
+        if (timer_block.address_space == ACPI_GAS_MMIO)
             laihost_map(timer_block.base, 4);
     } else {
         timer_block.address_space = ACPI_GAS_IO;
         timer_block.base = fadt->pm_timer_block;
     }
 
-    if(fadt->flags & (1 << 8))
+    if (fadt->flags & (1 << 8))
         extended_timer = 1;
 
     lai_set_sci_event(lai_get_sci_event() | ACPI_TIMER);
@@ -50,28 +50,28 @@ lai_api_error_t lai_start_pm_timer(){
     return LAI_ERROR_NONE;
 }
 
-lai_api_error_t lai_stop_pm_timer(){
-    if(!supported)
+lai_api_error_t lai_stop_pm_timer() {
+    if (!supported)
         return LAI_ERROR_UNSUPPORTED;
 
     lai_set_sci_event(lai_get_sci_event() & ~ACPI_TIMER);
     return LAI_ERROR_NONE;
 }
 
-lai_api_error_t lai_busy_wait_pm_timer(uint64_t ms){
-    if(!supported)
+lai_api_error_t lai_busy_wait_pm_timer(uint64_t ms) {
+    if (!supported)
         return LAI_ERROR_UNSUPPORTED;
 
     // number of ticks per millisecond 3579.545, rounded up to 3580
     uint32_t goal = lai_read_pm_timer_value() + (ms * 3580);
 
-    if(!extended_timer && goal > 0xFFFFFF){
+    if (!extended_timer && goal > 0xFFFFFF) {
         // TODO: Support goal wraparound with 24bit timers
         lai_warn("Timer wraparound is unsupported for 24bit timers, TODO");
         return LAI_ERROR_UNSUPPORTED;
     }
 
-    while(lai_read_pm_timer_value() < goal)
+    while (lai_read_pm_timer_value() < goal)
         ;
 
     return LAI_ERROR_NONE;
