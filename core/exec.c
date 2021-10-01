@@ -1070,11 +1070,31 @@ static lai_api_error_t lai_exec_reduce_op(int opcode, lai_state_t *state, struct
 
         break;
     }
+    case (EXTOP_PREFIX << 8) | STALL_OP: {
+        if (!laihost_timer)
+            lai_panic("host does not provide timer functions required by Stall()");
+
+        LAI_CLEANUP_VAR lai_variable_t time = {0};
+        lai_exec_get_integer(state, &operands[0], &time);
+
+        if (!time.integer)
+            time.integer = 1;
+
+        if (time.integer > 100) {
+            lai_warn("buggy BIOS tried to stall for more than 100ms, using sleep instead");
+            laihost_sleep(time.integer * 1000);
+        } else {
+            // use the timer to stall
+            uint64_t start_time = laihost_timer();
+            while(laihost_timer() - start_time <= time.integer * 10);
+        }
+        break;
+    }
     case (EXTOP_PREFIX << 8) | SLEEP_OP: {
         if (!laihost_sleep)
             lai_panic("host does not provide timer functions required by Sleep()");
 
-        lai_variable_t time = {0};
+        LAI_CLEANUP_VAR lai_variable_t time = {0};
         lai_exec_get_integer(state, &operands[0], &time);
 
         if (!time.integer)
@@ -2120,6 +2140,25 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
             result->object.integer = LAI_REVISION;
         } else {
             lai_warn("Revision() in execution mode has no effect");
+            LAI_ENSURE(parse_mode == LAI_EXEC_MODE);
+        }
+        break;
+
+    case (EXTOP_PREFIX << 8) | TIMER_OP:
+        if (lai_exec_reserve_opstack(state))
+            return LAI_ERROR_OUT_OF_MEMORY;
+        lai_exec_commit_pc(state, pc);
+
+        if (parse_mode == LAI_DATA_MODE || parse_mode == LAI_OBJECT_MODE) {
+            if (!laihost_timer)
+                lai_panic("host does not provide timer functions required by Timer()");
+
+            struct lai_operand *result = lai_exec_push_opstack(state);
+            result->tag = LAI_OPERAND_OBJECT;
+            result->object.type = LAI_INTEGER;
+            result->object.integer = laihost_timer();
+        } else {
+            lai_warn("Timer() in execution mode has no effect");
             LAI_ENSURE(parse_mode == LAI_EXEC_MODE);
         }
         break;
@@ -3437,6 +3476,7 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
         break;
     }
 
+    case (EXTOP_PREFIX << 8) | STALL_OP:
     case (EXTOP_PREFIX << 8) | SLEEP_OP: {
         if (lai_exec_reserve_stack(state))
             return LAI_ERROR_OUT_OF_MEMORY;
