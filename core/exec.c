@@ -1606,7 +1606,7 @@ static lai_api_error_t lai_exec_process(lai_state_t *state) {
                 blkitem->limit = handle->size;
 
                 // Note: there is no need to reserve() as we pop a stackitem above.
-                lai_stackitem_t *item = lai_exec_push_stack(state);
+                item = lai_exec_push_stack(state);
                 item->kind = LAI_METHOD_STACKITEM;
                 item->mth_want_result = want_result;
             }
