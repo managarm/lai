@@ -1,6 +1,6 @@
 /*
  * Lightweight AML Interpreter
- * Copyright (C) 2018-2021 the lai authors
+ * Copyright (C) 2018-2021 The lai authors
  */
 
 #include <acpispec/tables.h>
@@ -15,7 +15,7 @@ static uint8_t lai_bios_calc_checksum(void *ptr, size_t size) {
 }
 
 lai_api_error_t lai_bios_detect_rsdp_within(uintptr_t base, size_t length,
-        struct lai_rsdp_info *info) {
+                                            struct lai_rsdp_info *info) {
     int e = LAI_ERROR_END_REACHED;
     uint8_t *window = laihost_map(base, length);
     for (size_t off = 0; off < length; off += 16) {
@@ -23,14 +23,14 @@ lai_api_error_t lai_bios_detect_rsdp_within(uintptr_t base, size_t length,
 
         if (memcmp(rsdp->signature, "RSD PTR ", 8))
             continue;
-        
+
         if (lai_bios_calc_checksum(rsdp, sizeof(acpi_rsdp_t)))
             continue;
 
         info->rsdp_address = base + off;
-        if(!rsdp->revision){
+        if (!rsdp->revision) {
             info->acpi_version = 1;
-            
+
             info->rsdt_address = rsdp->rsdt;
             info->xsdt_address = 0;
             e = LAI_ERROR_NONE;
@@ -38,7 +38,7 @@ lai_api_error_t lai_bios_detect_rsdp_within(uintptr_t base, size_t length,
         } else {
             acpi_xsdp_t *xsdp = (acpi_xsdp_t *)rsdp;
 
-            if(lai_bios_calc_checksum(xsdp, sizeof(acpi_xsdp_t)))
+            if (lai_bios_calc_checksum(xsdp, sizeof(acpi_xsdp_t)))
                 continue;
 
             info->acpi_version = 2;
@@ -57,7 +57,7 @@ done:
 lai_api_error_t lai_bios_detect_rsdp(struct lai_rsdp_info *info) {
     int e;
 
-    if(!laihost_map || !laihost_unmap)
+    if (!laihost_map || !laihost_unmap)
         lai_panic("lai_bios_detect_rsdp() needs laihost_map() and laihost_unmap()");
 
     // ACPI specifies that we can find the EBDA through 0x40E.
@@ -69,11 +69,11 @@ lai_api_error_t lai_bios_detect_rsdp(struct lai_rsdp_info *info) {
     uintptr_t ebda_base = ((uintptr_t)bda_data) << 4;
 
     // Regions specified by ACPI: (i) first 1 KiB of EBDA, (ii) 0xE0000 - 0xFFFFF.
-    if(!(e = lai_bios_detect_rsdp_within(ebda_base, 0x400, info)))
+    if (!(e = lai_bios_detect_rsdp_within(ebda_base, 0x400, info)))
         return LAI_ERROR_NONE;
     LAI_ENSURE(e == LAI_ERROR_END_REACHED);
 
-    if(!(e = lai_bios_detect_rsdp_within(0xE0000, 0x20000, info)))
+    if (!(e = lai_bios_detect_rsdp_within(0xE0000, 0x20000, info)))
         return LAI_ERROR_NONE;
     LAI_ENSURE(e == LAI_ERROR_END_REACHED);
 

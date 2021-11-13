@@ -1,6 +1,6 @@
 /*
  * Lightweight AML Interpreter
- * Copyright (C) 2018-2021 the lai authors
+ * Copyright (C) 2018-2021 The lai authors
  */
 
 #pragma once
@@ -50,18 +50,21 @@ __attribute__((weak)) uint8_t laihost_inb(uint16_t);
 __attribute__((weak)) uint16_t laihost_inw(uint16_t);
 __attribute__((weak)) uint32_t laihost_ind(uint16_t);
 
-__attribute__((weak)) void laihost_pci_writeb(uint16_t, uint8_t, uint8_t, uint8_t, uint16_t, uint8_t);
+__attribute__((weak)) void laihost_pci_writeb(uint16_t, uint8_t, uint8_t, uint8_t, uint16_t,
+                                              uint8_t);
 __attribute__((weak)) uint8_t laihost_pci_readb(uint16_t, uint8_t, uint8_t, uint8_t, uint16_t);
-__attribute__((weak)) void laihost_pci_writew(uint16_t, uint8_t, uint8_t, uint8_t, uint16_t, uint16_t);
+__attribute__((weak)) void laihost_pci_writew(uint16_t, uint8_t, uint8_t, uint8_t, uint16_t,
+                                              uint16_t);
 __attribute__((weak)) uint16_t laihost_pci_readw(uint16_t, uint8_t, uint8_t, uint8_t, uint16_t);
-__attribute__((weak)) void laihost_pci_writed(uint16_t, uint8_t, uint8_t, uint8_t, uint16_t, uint32_t);
+__attribute__((weak)) void laihost_pci_writed(uint16_t, uint8_t, uint8_t, uint8_t, uint16_t,
+                                              uint32_t);
 __attribute__((weak)) uint32_t laihost_pci_readd(uint16_t, uint8_t, uint8_t, uint8_t, uint16_t);
 
 __attribute__((weak)) void laihost_sleep(uint64_t);
 __attribute__((weak)) uint64_t laihost_timer(void);
 
 __attribute__((weak)) int laihost_sync_wait(struct lai_sync_state *, unsigned int val,
-        int64_t deadline);
+                                            int64_t deadline);
 __attribute__((weak)) void laihost_sync_wake(struct lai_sync_state *);
 
 __attribute__((weak)) void laihost_handle_amldebug(lai_variable_t *);

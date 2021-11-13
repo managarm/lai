@@ -1,6 +1,6 @@
 /*
  * Lightweight AML Interpreter
- * Copyright (C) 2018-2021 the lai authors
+ * Copyright (C) 2018-2021 The lai authors
  */
 
 #pragma once
@@ -18,9 +18,11 @@ struct lai_ec_driver {
 };
 
 #ifdef __cplusplus
-#define LAI_EC_DRIVER_INITIALIZER {}
+#define LAI_EC_DRIVER_INITIALIZER                                                                  \
+    {}
 #else
-#define LAI_EC_DRIVER_INITIALIZER {0}
+#define LAI_EC_DRIVER_INITIALIZER                                                                  \
+    { 0 }
 #endif
 
 static inline void lai_initialize_ec_driver(struct lai_ec_driver *ec) {

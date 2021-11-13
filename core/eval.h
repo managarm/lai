@@ -1,7 +1,6 @@
-
 /*
  * Lightweight AML Interpreter
- * Copyright (C) 2018-2020 the lai authors
+ * Copyright (C) 2018-2021 The lai authors
  */
 
 #pragma once

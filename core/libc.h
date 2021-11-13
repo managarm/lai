@@ -1,10 +1,12 @@
-
 /*
  * Lightweight AML Interpreter
- * Copyright (C) 2018-2021 the lai authors
+ * Copyright (C) 2018-2021 The lai authors
  */
 
 #pragma once
+
+#include <stdarg.h>
+#include <stddef.h>
 
 // LAI internal header
 
