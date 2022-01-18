@@ -7,6 +7,7 @@
 
 #include <lai/host.h>
 #include <stddef.h>
+#include <stdnoreturn.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -27,7 +28,7 @@ int memcmp(const void *, const void *, size_t);
 
 void lai_debug(const char *, ...);
 void lai_warn(const char *, ...);
-__attribute__((noreturn)) void lai_panic(const char *, ...);
+noreturn void lai_panic(const char *, ...);
 
 #define LAI_STRINGIFY(x) #x
 #define LAI_EXPAND_STRINGIFY(x) LAI_STRINGIFY(x)

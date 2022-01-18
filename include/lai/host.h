@@ -8,6 +8,7 @@
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdnoreturn.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -38,7 +39,7 @@ void *laihost_realloc(void *, size_t newsize, size_t oldsize);
 void laihost_free(void *, size_t);
 
 __attribute__((weak)) void laihost_log(int, const char *);
-__attribute__((weak, noreturn)) void laihost_panic(const char *);
+__attribute__((weak)) noreturn void laihost_panic(const char *);
 
 __attribute__((weak)) void *laihost_scan(const char *, size_t);
 __attribute__((weak)) void *laihost_map(size_t, size_t);
