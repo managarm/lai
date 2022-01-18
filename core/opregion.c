@@ -13,6 +13,7 @@
 #include "exec_impl.h"
 #include "libc.h"
 #include "opregion.h"
+#include <stdalign.h>
 
 // this assumes little endian
 static void lai_buffer_put_at(uint8_t *buffer, uint64_t value, size_t bit_offset, size_t num_bits) {
@@ -155,10 +156,10 @@ static void lai_get_pci_params(lai_nsnode_t *opregion, uint64_t *seg, uint64_t *
     }
 }
 
-typedef uint8_t __attribute__((aligned(1))) mmio8_t;
-typedef uint16_t __attribute__((aligned(1))) mmio16_t;
-typedef uint32_t __attribute__((aligned(1))) mmio32_t;
-typedef uint64_t __attribute__((aligned(1))) mmio64_t;
+typedef uint8_t mmio8_t alignas(1);
+typedef uint16_t mmio16_t alignas(1);
+typedef uint32_t mmio32_t alignas(1);
+typedef uint64_t mmio64_t alignas(1);
 
 static uint64_t lai_perform_read(lai_nsnode_t *opregion, size_t access_size, size_t offset,
                                  uint64_t seg, uint64_t bbn, uint64_t adr) {
