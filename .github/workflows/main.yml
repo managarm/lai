@@ -1,4 +1,4 @@
-name: lai-test
+name: Test LAI and generate test ISO
 
 on: [push, pull_request]
 
@@ -13,15 +13,23 @@ jobs:
 
     - name: Install dependencies
       run: sudo apt-get update && sudo apt-get install meson build-essential mtools xorriso acpica-tools
+    - name: Create tempdir
+      run: mktemp -d > tempdir
+
+    - name: Clone lai_tools
+      run: cd `cat tempdir` && git clone https://github.com/managarm/lai_tools.git
+
+    - name: Symlink lai subproject
+      run: LAIDIR=`pwd -P` && cd `cat tempdir` && rm -rf lai_tools/subprojects/lai && mkdir -p lai_tools/subprojects && ln -s $LAIDIR lai_tools/subprojects/lai
 
     - name: Build and test lai
-      run: git clone https://github.com/managarm/lai_tools.git && rm -rf lai_tools/subprojects/lai && mkdir -p lai_tools/subprojects && ln -s "$(realpath .)" lai_tools/subprojects/lai && mkdir -p lai_tools/build && cd lai_tools/build && meson .. && ninja && meson test -v
+      run: cd `cat tempdir` && mkdir -p lai_tools/build && cd lai_tools/build && meson .. && ninja && meson test -v
 
     - name: Build test image
-      run: cd lai_tools/boot_image && make clean all
+      run: LAIDIR=`pwd -P` && cd `cat tempdir` && cd lai_tools/boot_image && make clean all && mv test.iso $LAIDIR/
 
     - name: Upload test image
       uses: actions/upload-artifact@v1
       with:
         name: lai_test_image.iso
-        path: lai_tools/boot_image/test.iso
+        path: test.iso
