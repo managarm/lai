@@ -53,7 +53,7 @@ lai_nsnode_t *lai_create_nsnode_or_die(void) {
 }
 
 // Installs the nsnode to the namespace.
-void lai_install_nsnode(lai_nsnode_t *node) {
+lai_api_error_t lai_install_nsnode(lai_nsnode_t *node) {
     struct lai_instance *instance = lai_current_instance();
 
     if (instance->trace & LAI_TRACE_NS) {
@@ -86,12 +86,15 @@ void lai_install_nsnode(lai_nsnode_t *node) {
             lai_nsnode_t *child = lai_hashtable_chain_get(&parent->children, h, &chain);
             if (!memcmp(child->name, node->name, 4)) {
                 LAI_CLEANUP_FREE_STRING char *fullpath = lai_stringify_node_path(node);
-                lai_panic("trying to install duplicate namespace node %s", fullpath);
+                lai_warn("trying to install duplicate namespace node %s, ignoring", fullpath);
+                return LAI_ERROR_UNEXPECTED_RESULT;
             }
         }
 
         lai_hashtable_insert(&parent->children, h, node);
     }
+
+    return LAI_ERROR_NONE;
 }
 
 void lai_uninstall_nsnode(lai_nsnode_t *node) {

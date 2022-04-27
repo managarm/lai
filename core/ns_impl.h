@@ -12,7 +12,7 @@
 // Namespace management.
 lai_nsnode_t *lai_create_nsnode(void);
 lai_nsnode_t *lai_create_nsnode_or_die(void);
-void lai_install_nsnode(lai_nsnode_t *node);
+lai_api_error_t lai_install_nsnode(lai_nsnode_t *node);
 void lai_uninstall_nsnode(lai_nsnode_t *node);
 
 // Sets the name and parent of a namespace node.
