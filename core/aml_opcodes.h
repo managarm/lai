@@ -54,6 +54,8 @@
 #define AND_OP 0x7B
 #define OR_OP 0x7D
 #define XOR_OP 0x7F
+#define NAND_OP 0x7C
+#define NOR_OP 0x7E
 #define NOT_OP 0x80
 #define FINDSETLEFTBIT_OP 0x81
 #define FINDSETRIGHTBIT_OP 0x82
