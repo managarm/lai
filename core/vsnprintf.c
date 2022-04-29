@@ -1,6 +1,6 @@
 /*
  * Lightweight AML Interpreter
- * Copyright (C) 2018-2021 The lai authors
+ * Copyright (C) 2018-2022 The lai authors
  */
 // from https://gitlab.com/qookei/quack
 
