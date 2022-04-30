@@ -18,9 +18,6 @@ typedef enum lai_api_error {
     LAI_ERROR_OUT_OF_BOUNDS,
     LAI_ERROR_EXECUTION_FAILURE,
 
-    // Notify() was called on node without override.
-    LAI_ERROR_MISSING_NOTIFY,
-
     LAI_ERROR_ILLEGAL_ARGUMENTS,
 
     /* Evaluating external inputs (e.g., nodes of the ACPI namespace) returned an unexpected result.

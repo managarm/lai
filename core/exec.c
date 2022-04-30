@@ -1067,6 +1067,9 @@ static lai_api_error_t lai_exec_reduce_op(int opcode, lai_state_t *state,
             LAI_ENSURE(node->type == LAI_NAMESPACE_DEVICE || node->type == LAI_NAMESPACE_PROCESSOR
                        || node->type == LAI_NAMESPACE_THERMALZONE);
 
+            if (laihost_handle_global_notify)
+                laihost_handle_global_notify(node, code.integer);
+
             if (node->notify_override) {
                 lai_api_error_t error;
                 error = node->notify_override(node, code.integer, node->notify_userptr);
@@ -1074,7 +1077,8 @@ static lai_api_error_t lai_exec_reduce_op(int opcode, lai_state_t *state,
                 //       Add a way for the host to signal Notify() failure.
                 LAI_ENSURE(!error);
             } else {
-                return LAI_ERROR_MISSING_NOTIFY;
+                LAI_CLEANUP_FREE_STRING char *path = lai_stringify_node_path(node);
+                lai_warn("Unhandled Notify(%s, 0x%lx)", path, code.integer);
             }
             break;
         }

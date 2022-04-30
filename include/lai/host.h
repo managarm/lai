@@ -13,6 +13,9 @@
 extern "C" {
 #endif
 
+struct lai_nsnode;
+typedef struct lai_nsnode lai_nsnode_t;
+
 struct lai_variable_t;
 typedef struct lai_variable_t lai_variable_t;
 
@@ -68,6 +71,7 @@ __attribute__((weak)) int laihost_sync_wait(struct lai_sync_state *, unsigned in
 __attribute__((weak)) void laihost_sync_wake(struct lai_sync_state *);
 
 __attribute__((weak)) void laihost_handle_amldebug(lai_variable_t *);
+__attribute__((weak)) void laihost_handle_global_notify(lai_nsnode_t *, int);
 
 #ifdef __cplusplus
 }

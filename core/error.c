@@ -19,8 +19,6 @@ const char *lai_api_error_to_string(lai_api_error_t error) {
             return "Out of bounds";
         case LAI_ERROR_EXECUTION_FAILURE:
             return "Execution failure";
-        case LAI_ERROR_MISSING_NOTIFY:
-            return "Missing notify";
         case LAI_ERROR_ILLEGAL_ARGUMENTS:
             return "Illegal arguments";
         case LAI_ERROR_UNEXPECTED_RESULT:

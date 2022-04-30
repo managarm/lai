@@ -120,7 +120,8 @@ static void enable_burst(struct lai_ec_driver *driver) {
     if (laihost_inb(driver->data_port) != 0x90)
         lai_panic("Enabling EC Burst Mode Failed");
 
-    // According to the spec ACPI_EC_STATUS_BURST should get set, but it has been observed that it doesn't on real HW. Linux also doesn't check that it gets set
+    // According to the spec ACPI_EC_STATUS_BURST should get set, but it has been observed that it
+    // doesn't on real HW. Linux also doesn't check that it gets set
 }
 
 static void disable_burst(struct lai_ec_driver *driver) {
