@@ -167,6 +167,54 @@ typedef struct acpi_aml_t // AML tables, DSDT and SSDT
     uint8_t data[];
 } __attribute__((packed)) acpi_aml_t;
 
+// Trusted Platform Module Tables
+// TCG ACPI Specification
+
+// TPM 1.2 Client (Section 8.1.2)
+typedef struct acpi_tcpa_client_t
+{
+    acpi_header_t header;
+    uint16_t platform_class;
+    uint32_t log_area_min_len;
+    uint64_t log_area_start_addr;
+} __attribute__((packed)) acpi_tcpa_client_t;
+
+// TPM 1.2 Server (Section 8.2.2)
+typedef struct acpi_tcpa_server_t
+{
+    acpi_header_t header;
+    uint16_t platform_class;
+    uint16_t rsv0;
+    uint32_t log_area_min_len;
+    uint64_t log_area_start_addr;
+    uint16_t spec_revision;
+    uint8_t device_flags;
+    uint8_t interrupt_flags;
+    uint8_t gpe;
+    uint8_t rsv1[3];
+    uint32_t global_sys_interrupt;
+    uint8_t base_address[12];
+    uint32_t rsv2;
+    uint8_t config_address[12];
+    uint8_t pci_segment_no;
+    uint8_t pci_bus_no;
+    uint8_t pci_device_no;
+    uint8_t pci_function_no;
+} __attribute__((packed)) acpi_tcpa_server_t;
+
+// TPM 2.0 (Section 8.3)
+typedef struct acpi_tpm2_t
+{
+    acpi_header_t header;
+    uint16_t platform_class;
+    uint16_t rsv0;
+    uint64_t mmio_area;
+    uint32_t start_method;
+    uint8_t start_method_params[];
+    // OPT: uint32_t log_area_min_len
+    // OPT: uint64_t log_area_start_addr
+} __attribute__((packed)) acpi_tpm2_t;
+
 #ifdef __cplusplus
 }
 #endif
