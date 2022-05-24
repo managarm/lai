@@ -124,13 +124,15 @@ lai_api_error_t lai_enter_sleep(uint8_t sleep_state) {
 
 lai_api_error_t lai_acpi_reset() {
     struct lai_instance *instance = lai_current_instance();
-    if (instance->acpi_revision == 0)
-        lai_panic("Knowing the ACPI revision is needed for lai_acpi_reset");
-
-    if (instance->acpi_revision == 1)
-        return LAI_ERROR_UNSUPPORTED; // ACPI 1 didn't have support for the reset functionalty
-
     acpi_fadt_t *fadt = instance->fadt;
+    if(!fadt) {
+        if(!laihost_scan)
+            lai_panic("laihost_scan is required for lai_acpi_reset");
+
+        fadt = laihost_scan("FACP", 0); // If fadt hasn't been initialized yet get it, AML doesn't have to be scanned for reset
+        if(!fadt)
+            lai_panic("Buggy BIOS does not provide FADT");
+    }
 
     uint32_t fixed_flags = fadt->flags;
     if (!(fixed_flags & (1 << 10))) // System doesn't indicate support for ACPI reset via flags
