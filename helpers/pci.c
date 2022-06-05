@@ -168,7 +168,7 @@ lai_api_error_t lai_pci_parse_prt(struct lai_prt_iterator *iter) {
         }
         return LAI_ERROR_UNEXPECTED_RESULT;
     } else {
-        lai_warn("PRT entry has unexpected type %d", prt_entry_type);
+        lai_warn("PRT entry has unexpected type %ld", prt_entry_type.integer);
         return LAI_ERROR_TYPE_MISMATCH;
     }
 }

@@ -25,9 +25,9 @@ int memcmp(const void *, const void *, size_t);
 // Debugging and logging functions.
 //---------------------------------------------------------------------------------------
 
-void lai_debug(const char *, ...);
-void lai_warn(const char *, ...);
-__attribute__((noreturn)) void lai_panic(const char *, ...);
+__attribute__((format(printf, 1, 2))) void lai_debug(const char *, ...);
+__attribute__((format(printf, 1, 2))) void lai_warn(const char *, ...);
+__attribute__((noreturn, format(printf, 1, 2))) void lai_panic(const char *, ...);
 
 #define LAI_STRINGIFY(x) #x
 #define LAI_EXPAND_STRINGIFY(x) LAI_STRINGIFY(x)

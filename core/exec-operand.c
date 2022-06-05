@@ -144,7 +144,7 @@ void lai_store_ns(lai_nsnode_t *target, lai_variable_t *object) {
             lai_write_buffer(target, object);
             break;
         default:
-            lai_panic("unexpected type %d of named object in lai_store_ns()");
+            lai_panic("unexpected type %d of named object in lai_store_ns()", target->type);
     }
 }
 
@@ -189,7 +189,7 @@ void lai_exec_mutate_ns(lai_nsnode_t *target, lai_variable_t *object) {
             lai_write_buffer(target, object);
             break;
         default:
-            lai_panic("unexpected type %d of named object in lai_exec_mutate_ns()");
+            lai_panic("unexpected type %d of named object in lai_exec_mutate_ns()", target->type);
     }
 }
 
@@ -265,7 +265,7 @@ void lai_operand_mutate(lai_state_t *state, struct lai_operand *dest, lai_variab
                         lai_debug("Debug(): string(\"%s\")", lai_exec_string_access(object));
                         break;
                     case LAI_BUFFER:
-                        lai_debug("Debug(): buffer(%X)", (size_t)lai_exec_buffer_access(object));
+                        lai_debug("Debug(): buffer(%lX)", (size_t)lai_exec_buffer_access(object));
                         break;
                     default:
                         lai_debug("Debug(): type %d", object->type);
@@ -349,7 +349,7 @@ void lai_operand_emplace(lai_state_t *state, struct lai_operand *dest, lai_varia
                         lai_debug("Debug(): string(\"%s\")", lai_exec_string_access(object));
                         break;
                     case LAI_BUFFER:
-                        lai_debug("Debug(): buffer(%X)", (size_t)lai_exec_buffer_access(object));
+                        lai_debug("Debug(): buffer(%lX)", (size_t)lai_exec_buffer_access(object));
                         break;
                     default:
                         lai_debug("Debug(): type %d", object->type);

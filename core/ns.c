@@ -527,7 +527,7 @@ void lai_create_namespace(void) {
         index++;
     }
 
-    lai_debug("ACPI namespace created, total of %d predefined objects.", instance->ns_size);
+    lai_debug("ACPI namespace created, total of %ld predefined objects.", instance->ns_size);
 }
 
 static struct lai_aml_segment *lai_load_table(void *ptr, int index) {
