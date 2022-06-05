@@ -750,7 +750,7 @@ enum lai_node_type lai_ns_get_node_type(lai_nsnode_t *node) {
             return LAI_NODETYPE_EVENT;
         case LAI_NAMESPACE_POWERRESOURCE:
             return LAI_NODETYPE_POWERRESOURCE;
-        case LAI_NAMESPACE_BANK_FIELD:
+        case LAI_NAMESPACE_BANKFIELD:
             return LAI_NODETYPE_EVALUATABLE;
         case LAI_NAMESPACE_OPREGION:
             return LAI_NODETYPE_OPREGION;

@@ -78,6 +78,7 @@ void lai_exec_access(lai_variable_t *object, lai_nsnode_t *src) {
             break;
         case LAI_NAMESPACE_FIELD:
         case LAI_NAMESPACE_INDEXFIELD:
+        case LAI_NAMESPACE_BANKFIELD:
             lai_read_opregion(object, src);
             break;
         case LAI_NAMESPACE_BUFFER_FIELD:
@@ -138,6 +139,7 @@ void lai_store_ns(lai_nsnode_t *target, lai_variable_t *object) {
             break;
         case LAI_NAMESPACE_FIELD:
         case LAI_NAMESPACE_INDEXFIELD:
+        case LAI_NAMESPACE_BANKFIELD:
             lai_write_opregion(target, object);
             break;
         case LAI_NAMESPACE_BUFFER_FIELD:
@@ -183,6 +185,7 @@ void lai_exec_mutate_ns(lai_nsnode_t *target, lai_variable_t *object) {
             break;
         case LAI_NAMESPACE_FIELD:
         case LAI_NAMESPACE_INDEXFIELD:
+        case LAI_NAMESPACE_BANKFIELD:
             lai_write_opregion(target, object);
             break;
         case LAI_NAMESPACE_BUFFER_FIELD:

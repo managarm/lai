@@ -125,12 +125,13 @@ lai_api_error_t lai_enter_sleep(uint8_t sleep_state) {
 lai_api_error_t lai_acpi_reset() {
     struct lai_instance *instance = lai_current_instance();
     acpi_fadt_t *fadt = instance->fadt;
-    if(!fadt) {
-        if(!laihost_scan)
+    if (!fadt) {
+        if (!laihost_scan)
             lai_panic("laihost_scan is required for lai_acpi_reset");
 
-        fadt = laihost_scan("FACP", 0); // If fadt hasn't been initialized yet get it, AML doesn't have to be scanned for reset
-        if(!fadt)
+        fadt = laihost_scan("FACP", 0); // If fadt hasn't been initialized yet get it, AML doesn't
+                                        // have to be scanned for reset
+        if (!fadt)
             lai_panic("Buggy BIOS does not provide FADT");
     }
 

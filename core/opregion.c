@@ -532,11 +532,31 @@ void lai_write_indexfield(lai_nsnode_t *idxf, lai_variable_t *src) {
     lai_write_field(data_field, src); // Write data register.
 }
 
+void lai_read_bankfield(lai_variable_t *destination, lai_nsnode_t *field) {
+    LAI_CLEANUP_VAR lai_variable_t bank = LAI_VAR_INITIALIZER;
+    bank.type = LAI_INTEGER;
+    bank.integer = field->bkf_value;
+
+    lai_write_field(field->bkf_bank_node, &bank);
+    lai_read_field(destination, field);
+}
+
+void lai_write_bankfield(lai_nsnode_t *field, lai_variable_t *source) {
+    LAI_CLEANUP_VAR lai_variable_t bank = LAI_VAR_INITIALIZER;
+    bank.type = LAI_INTEGER;
+    bank.integer = field->bkf_value;
+
+    lai_write_field(field->bkf_bank_node, &bank);
+    lai_write_field(field, source);
+}
+
 void lai_read_opregion(lai_variable_t *destination, lai_nsnode_t *field) {
     if (field->type == LAI_NAMESPACE_FIELD)
         lai_read_field(destination, field);
     else if (field->type == LAI_NAMESPACE_INDEXFIELD)
         lai_read_indexfield(destination, field);
+    else if (field->type == LAI_NAMESPACE_BANKFIELD)
+        lai_read_bankfield(destination, field);
     else
         lai_panic("undefined field read: %s", lai_stringify_node_path(field));
 }
@@ -546,6 +566,8 @@ void lai_write_opregion(lai_nsnode_t *field, lai_variable_t *source) {
         lai_write_field(field, source);
     else if (field->type == LAI_NAMESPACE_INDEXFIELD)
         lai_write_indexfield(field, source);
+    else if (field->type == LAI_NAMESPACE_BANKFIELD)
+        lai_write_bankfield(field, source);
     else
         lai_panic("undefined field write: %s", lai_stringify_node_path(field));
 }

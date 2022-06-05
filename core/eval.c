@@ -36,11 +36,11 @@ uint32_t bswap32(uint32_t dword) {
 }
 
 uint64_t bswap64(uint64_t qword) {
-    return (
-        uint64_t)((qword & ((uint64_t)0xff << 56)) >> 56 | (qword & ((uint64_t)0xff << 48)) >> 40
-                  | (qword & ((uint64_t)0xff << 40)) >> 24 | (qword & ((uint64_t)0xff << 32)) >> 8
-                  | (qword & ((uint64_t)0xff << 24)) << 8 | (qword & ((uint64_t)0xff << 16)) << 24
-                  | (qword & ((uint64_t)0xff << 8)) << 40 | (qword & ((uint64_t)0xff << 0)) << 56);
+    return (uint64_t)(
+        (qword & ((uint64_t)0xff << 56)) >> 56 | (qword & ((uint64_t)0xff << 48)) >> 40
+        | (qword & ((uint64_t)0xff << 40)) >> 24 | (qword & ((uint64_t)0xff << 32)) >> 8
+        | (qword & ((uint64_t)0xff << 24)) << 8 | (qword & ((uint64_t)0xff << 16)) << 24
+        | (qword & ((uint64_t)0xff << 8)) << 40 | (qword & ((uint64_t)0xff << 0)) << 56);
 }
 
 uint8_t char_to_hex(char character) {

@@ -755,7 +755,7 @@ int lai_objecttype_ns(lai_nsnode_t *node) {
         case LAI_NAMESPACE_NAME:
             return lai_objecttype_obj(&node->object);
         case LAI_NAMESPACE_FIELD:
-        case LAI_NAMESPACE_BANK_FIELD:
+        case LAI_NAMESPACE_BANKFIELD:
         case LAI_NAMESPACE_INDEXFIELD:
             return 5;
         case LAI_NAMESPACE_DEVICE:

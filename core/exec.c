@@ -1844,12 +1844,13 @@ static lai_api_error_t lai_exec_process(lai_state_t *state) {
                             return LAI_ERROR_EXECUTION_FAILURE;
 
                         lai_nsnode_t *node = lai_create_nsnode_or_die();
-                        node->type = LAI_NAMESPACE_BANK_FIELD;
-                        node->bkf_region_node = region_node;
+                        node->type = LAI_NAMESPACE_BANKFIELD;
+                        node->fld_region_node = region_node;
+                        node->fld_flags = access_type;
+                        node->fld_size = skip_bits;
+                        node->fld_offset = curr_off;
+
                         node->bkf_bank_node = bank_node;
-                        node->bkf_flags = access_type;
-                        node->bkf_size = skip_bits;
-                        node->bkf_offset = curr_off;
                         node->bkf_value = bank_value;
                         lai_do_resolve_new_node(node, ctx_handle, &field_amln);
                         lai_api_error_t err = lai_install_nsnode(node);
