@@ -2506,8 +2506,11 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
             lai_exec_commit_pc(state, pc);
 
             lai_nsnode_t *scoped_ctx_handle = lai_do_resolve(ctx_handle, &amln);
-            if (!scoped_ctx_handle)
-                lai_panic("could not resolve node referenced in scope");
+            if (!scoped_ctx_handle) {
+                lai_warn("Could not resolve node referenced in Scope");
+
+                return LAI_ERROR_UNEXPECTED_RESULT;
+            }
 
             struct lai_ctxitem *populate_ctxitem = lai_exec_push_ctxstack(state);
             populate_ctxitem->amls = amls;
