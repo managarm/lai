@@ -160,8 +160,7 @@ typedef uint16_t __attribute__((aligned(1))) mmio16_t;
 typedef uint32_t __attribute__((aligned(1))) mmio32_t;
 typedef uint64_t __attribute__((aligned(1))) mmio64_t;
 
-static uint64_t lai_perform_read(lai_nsnode_t *opregion, size_t access_size, size_t offset,
-                                 uint64_t seg, uint64_t bbn, uint64_t adr) {
+static uint64_t lai_perform_read(lai_nsnode_t *opregion, size_t access_size, size_t offset) {
     struct lai_instance *instance = lai_current_instance();
     uint64_t value = 0;
 
@@ -246,6 +245,11 @@ static uint64_t lai_perform_read(lai_nsnode_t *opregion, size_t access_size, siz
                 break;
             }
             case ACPI_OPREGION_PCI: {
+                uint64_t seg = 0; // When _SEG is not present, we default to Segment Group 0
+                uint64_t bbn = 0; // When _BBN is not present, we assume PCI bus 0.
+                uint64_t adr = 0; // When _ADR is not present, again, default to zero.
+                lai_get_pci_params(opregion, &seg, &bbn, &adr);
+
                 uint8_t slot = (uint8_t)(adr >> 16);
                 uint8_t fun = (uint8_t)(adr & 0xFF);
                 if (instance->trace & LAI_TRACE_IO)
@@ -277,7 +281,7 @@ static uint64_t lai_perform_read(lai_nsnode_t *opregion, size_t access_size, siz
 }
 
 static void lai_perform_write(lai_nsnode_t *opregion, size_t access_size, size_t offset,
-                              uint64_t seg, uint64_t bbn, uint64_t adr, uint64_t value) {
+                              uint64_t value) {
     struct lai_instance *instance = lai_current_instance();
     if (opregion->op_override) {
         if (instance->trace & LAI_TRACE_IO)
@@ -360,6 +364,11 @@ static void lai_perform_write(lai_nsnode_t *opregion, size_t access_size, size_t
                 break;
             }
             case ACPI_OPREGION_PCI: {
+                uint64_t seg = 0; // When _SEG is not present, we default to Segment Group 0
+                uint64_t bbn = 0; // When _BBN is not present, we assume PCI bus 0.
+                uint64_t adr = 0; // When _ADR is not present, again, default to zero.
+                lai_get_pci_params(opregion, &seg, &bbn, &adr);
+
                 uint8_t slot = (uint8_t)(adr >> 16);
                 uint8_t fun = (uint8_t)(adr & 0xFF);
                 if (instance->trace & LAI_TRACE_IO)
@@ -388,19 +397,51 @@ static void lai_perform_write(lai_nsnode_t *opregion, size_t access_size, size_t
     }
 }
 
-void lai_read_field_internal(uint8_t *destination, lai_nsnode_t *field) {
-    lai_nsnode_t *opregion = field->fld_region_node;
+static uint64_t lai_perform_indexfield_read(lai_nsnode_t *opregion, size_t access_size,
+                                            size_t offset) {
+    (void)(access_size);
 
+    LAI_ENSURE(opregion->type == LAI_NAMESPACE_INDEXFIELD);
+
+    lai_nsnode_t *index_field = opregion->fld_idxf_index_node;
+    lai_nsnode_t *data_field = opregion->fld_idxf_data_node;
+
+    LAI_CLEANUP_VAR lai_variable_t index = LAI_VAR_INITIALIZER;
+    index.type = LAI_INTEGER;
+    index.integer = offset;
+
+    LAI_CLEANUP_VAR lai_variable_t dest = LAI_VAR_INITIALIZER;
+
+    lai_write_field(index_field, &index); // Write index register.
+    lai_read_field(&dest, data_field); // Read data register.
+
+    LAI_ENSURE(dest.type == LAI_INTEGER);
+    return dest.integer;
+}
+
+static void lai_perform_indexfield_write(lai_nsnode_t *opregion, size_t access_size, size_t offset,
+                                         uint64_t value) {
+    (void)(access_size);
+
+    lai_nsnode_t *index_field = opregion->fld_idxf_index_node;
+    lai_nsnode_t *data_field = opregion->fld_idxf_data_node;
+
+    LAI_CLEANUP_VAR lai_variable_t index = LAI_VAR_INITIALIZER;
+    index.type = LAI_INTEGER;
+    index.integer = offset;
+
+    LAI_CLEANUP_VAR lai_variable_t src = LAI_VAR_INITIALIZER;
+    src.type = LAI_INTEGER;
+    src.integer = value;
+
+    lai_write_field(index_field, &index); // Write index register.
+    lai_write_field(data_field, &src); // Write data register.
+}
+
+void lai_read_field_internal(uint8_t *destination, lai_nsnode_t *field) {
     size_t access_size = lai_calculate_access_width(field);
 
     uint64_t offset = (field->fld_offset & ~(access_size - 1)) / 8;
-
-    uint64_t seg = 0; // When _SEG is not present, we default to Segment Group 0
-    uint64_t bbn = 0; // When _BBN is not present, we assume PCI bus 0.
-    uint64_t adr = 0; // When _ADR is not present, again, default to zero.
-
-    if (opregion->op_address_space == ACPI_OPREGION_PCI)
-        lai_get_pci_params(opregion, &seg, &bbn, &adr);
 
     size_t progress = 0;
     while (progress < field->fld_size) {
@@ -408,7 +449,14 @@ void lai_read_field_internal(uint8_t *destination, lai_nsnode_t *field) {
         size_t access_bits = LAI_MIN(field->fld_size - progress, access_size - bit_offset);
         uint64_t mask = (UINT64_C(1) << access_bits) - 1ull;
 
-        uint64_t value = lai_perform_read(opregion, access_size, offset, seg, bbn, adr);
+        uint64_t value = 0;
+        if (field->type == LAI_NAMESPACE_FIELD || field->type == LAI_NAMESPACE_BANKFIELD) {
+            value = lai_perform_read(field->fld_region_node, access_size, offset);
+        } else if (field->type == LAI_NAMESPACE_INDEXFIELD) {
+            value = lai_perform_indexfield_read(field, access_size, offset);
+        } else {
+            lai_panic("Unknown field type in lai_write_field_internal %d", field->type);
+        }
 
         value = (value >> bit_offset) & mask;
 
@@ -420,18 +468,9 @@ void lai_read_field_internal(uint8_t *destination, lai_nsnode_t *field) {
 }
 
 void lai_write_field_internal(uint8_t *source, lai_nsnode_t *field) {
-    lai_nsnode_t *opregion = field->fld_region_node;
-
     size_t access_size = lai_calculate_access_width(field);
 
     uint64_t offset = (field->fld_offset & ~(access_size - 1)) / 8;
-
-    uint64_t seg = 0; // When _SEG is not present, we default to Segment Group 0
-    uint64_t bbn = 0; // When _BBN is not present, we assume PCI bus 0.
-    uint64_t adr = 0; // When _ADR is not present, again, default to zero.
-
-    if (opregion->op_address_space == ACPI_OPREGION_PCI)
-        lai_get_pci_params(opregion, &seg, &bbn, &adr);
 
     size_t progress = 0;
     while (progress < field->fld_size) {
@@ -442,21 +481,34 @@ void lai_write_field_internal(uint8_t *source, lai_nsnode_t *field) {
         size_t write_flag = (field->fld_flags >> 5) & 0x0F;
 
         uint64_t value;
-        if (write_flag == FIELD_PRESERVE)
-            value = lai_perform_read(opregion, access_size, offset, seg, bbn, adr);
-        else if (write_flag == FIELD_WRITE_ONES)
+        if (write_flag == FIELD_PRESERVE) {
+            if (field->type == LAI_NAMESPACE_FIELD || field->type == LAI_NAMESPACE_BANKFIELD) {
+                value = lai_perform_read(field->fld_region_node, access_size, offset);
+            } else if (field->type == LAI_NAMESPACE_INDEXFIELD) {
+                value = lai_perform_indexfield_read(field, access_size, offset);
+            } else {
+                lai_panic("Unknown field type in lai_write_field_internal %d", field->type);
+            }
+        } else if (write_flag == FIELD_WRITE_ONES) {
             value = 0xFFFFFFFFFFFFFFFF;
-        else if (write_flag == FIELD_WRITE_ZEROES)
+        } else if (write_flag == FIELD_WRITE_ZEROES) {
             value = 0;
-        else
+        } else {
             lai_panic("Invalid field write flag");
+        }
 
         value &= ~mask;
 
         uint64_t new_val = lai_buffer_get_at(source, progress, access_bits);
         value |= (new_val << bit_offset) & mask;
 
-        lai_perform_write(opregion, access_size, offset, seg, bbn, adr, value);
+        if (field->type == LAI_NAMESPACE_FIELD || field->type == LAI_NAMESPACE_BANKFIELD) {
+            lai_perform_write(field->fld_region_node, access_size, offset, value);
+        } else if (field->type == LAI_NAMESPACE_INDEXFIELD) {
+            lai_perform_indexfield_write(field, access_size, offset, value);
+        } else {
+            lai_panic("Unknown field type in lai_write_field_internal %d", field->type);
+        }
 
         progress += access_bits;
         offset += access_size / 8;
@@ -504,57 +556,27 @@ void lai_write_field(lai_nsnode_t *field, lai_variable_t *source) {
     }
 }
 
-/* FIXME: IndexField I/O is broken, as it needs to write to the index
- *        to change the offset. Take care of that for that in
- *        lai_{read,write}_field_internal? */
-
-void lai_read_indexfield(lai_variable_t *dest, lai_nsnode_t *idxf) {
-    lai_nsnode_t *index_field = idxf->idxf_index_node;
-    lai_nsnode_t *data_field = idxf->idxf_data_node;
-
-    lai_variable_t index = {0};
-    index.type = LAI_INTEGER;
-    index.integer = idxf->idxf_offset / 8; // Always byte-aligned.
-
-    lai_write_field(index_field, &index); // Write index register.
-    lai_read_field(dest, data_field); // Read data register.
-}
-
-void lai_write_indexfield(lai_nsnode_t *idxf, lai_variable_t *src) {
-    lai_nsnode_t *index_field = idxf->idxf_index_node;
-    lai_nsnode_t *data_field = idxf->idxf_data_node;
-
-    lai_variable_t index = {0};
-    index.type = LAI_INTEGER;
-    index.integer = idxf->idxf_offset / 8; // Always byte-aligned.
-
-    lai_write_field(index_field, &index); // Write index register.
-    lai_write_field(data_field, src); // Write data register.
-}
-
 void lai_read_bankfield(lai_variable_t *destination, lai_nsnode_t *field) {
     LAI_CLEANUP_VAR lai_variable_t bank = LAI_VAR_INITIALIZER;
     bank.type = LAI_INTEGER;
-    bank.integer = field->bkf_value;
+    bank.integer = field->fld_bkf_value;
 
-    lai_write_field(field->bkf_bank_node, &bank);
+    lai_write_field(field->fld_bkf_bank_node, &bank);
     lai_read_field(destination, field);
 }
 
 void lai_write_bankfield(lai_nsnode_t *field, lai_variable_t *source) {
     LAI_CLEANUP_VAR lai_variable_t bank = LAI_VAR_INITIALIZER;
     bank.type = LAI_INTEGER;
-    bank.integer = field->bkf_value;
+    bank.integer = field->fld_bkf_value;
 
-    lai_write_field(field->bkf_bank_node, &bank);
+    lai_write_field(field->fld_bkf_bank_node, &bank);
     lai_write_field(field, source);
 }
 
 void lai_read_opregion(lai_variable_t *destination, lai_nsnode_t *field) {
-    if (field->type == LAI_NAMESPACE_FIELD)
+    if (field->type == LAI_NAMESPACE_FIELD || field->type == LAI_NAMESPACE_INDEXFIELD)
         lai_read_field(destination, field);
-    else if (field->type == LAI_NAMESPACE_INDEXFIELD)
-        lai_read_indexfield(destination, field);
     else if (field->type == LAI_NAMESPACE_BANKFIELD)
         lai_read_bankfield(destination, field);
     else
@@ -562,10 +584,8 @@ void lai_read_opregion(lai_variable_t *destination, lai_nsnode_t *field) {
 }
 
 void lai_write_opregion(lai_nsnode_t *field, lai_variable_t *source) {
-    if (field->type == LAI_NAMESPACE_FIELD)
+    if (field->type == LAI_NAMESPACE_FIELD || field->type == LAI_NAMESPACE_INDEXFIELD)
         lai_write_field(field, source);
-    else if (field->type == LAI_NAMESPACE_INDEXFIELD)
-        lai_write_indexfield(field, source);
     else if (field->type == LAI_NAMESPACE_BANKFIELD)
         lai_write_bankfield(field, source);
     else

@@ -90,21 +90,23 @@ typedef struct lai_nsnode {
     union {
         struct lai_nsnode *al_target; // LAI_NAMESPACE_ALIAS.
 
-        struct { // LAI_NAMESPACE_FIELD and LAI_NAMESPACE_BANK_FIELD
+        struct { // LAI_NAMESPACE_FIELD and LAI_NAMESPACE_BANK_FIELD and LAI_NAMESPACE_INDEX_FIELD
             struct lai_nsnode *fld_region_node;
             uint64_t fld_offset; // In bits.
             size_t fld_size; // In bits.
             uint8_t fld_flags;
 
-            struct lai_nsnode *bkf_bank_node;
-            uint64_t bkf_value;
-        };
-        struct { // LAI_NAMESPACE_INDEX_FIELD.
-            uint64_t idxf_offset; // In bits.
-            struct lai_nsnode *idxf_index_node;
-            struct lai_nsnode *idxf_data_node;
-            uint8_t idxf_flags;
-            uint8_t idxf_size;
+            union {
+                struct {
+                    struct lai_nsnode *fld_bkf_bank_node;
+                    uint64_t fld_bkf_value;
+                };
+
+                struct {
+                    struct lai_nsnode *fld_idxf_index_node;
+                    struct lai_nsnode *fld_idxf_data_node;
+                };
+            };
         };
         struct { // LAI_NAMESPACE_BUFFER_FIELD.
             struct lai_buffer_head *bf_buffer;
