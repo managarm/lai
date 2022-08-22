@@ -1850,8 +1850,8 @@ static lai_api_error_t lai_exec_process(lai_state_t *state) {
                         node->fld_size = skip_bits;
                         node->fld_offset = curr_off;
 
-                        node->bkf_bank_node = bank_node;
-                        node->bkf_value = bank_value;
+                        node->fld_bkf_bank_node = bank_node;
+                        node->fld_bkf_value = bank_value;
                         lai_do_resolve_new_node(node, ctx_handle, &field_amln);
                         lai_api_error_t err = lai_install_nsnode(node);
                         if (err != LAI_ERROR_NONE)
@@ -2980,11 +2980,11 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
 
                         lai_nsnode_t *node = lai_create_nsnode_or_die();
                         node->type = LAI_NAMESPACE_INDEXFIELD;
-                        node->idxf_index_node = index_node;
-                        node->idxf_data_node = data_node;
-                        node->idxf_flags = access_type;
-                        node->idxf_size = skip_bits;
-                        node->idxf_offset = curr_off;
+                        node->fld_idxf_index_node = index_node;
+                        node->fld_idxf_data_node = data_node;
+                        node->fld_flags = access_type;
+                        node->fld_size = skip_bits;
+                        node->fld_offset = curr_off;
                         lai_do_resolve_new_node(node, ctx_handle, &field_amln);
                         lai_api_error_t err = lai_install_nsnode(node);
                         if (err != LAI_ERROR_NONE)
