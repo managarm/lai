@@ -543,7 +543,7 @@ void lai_write_field(lai_nsnode_t *field, lai_variable_t *source) {
     if (source->type == LAI_BUFFER) {
         lai_write_field_internal(source->buffer_ptr->content, field);
     } else if (source->type == LAI_STRING) {
-        lai_write_field_internal(source->string_ptr->content, field);
+        lai_write_field_internal((uint8_t *)source->string_ptr->content, field);
     } else if (source->type == LAI_INTEGER) {
         uint8_t buf[8];
         memset(buf, 0, 8);
