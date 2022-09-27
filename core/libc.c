@@ -46,7 +46,7 @@ void *lai_calloc(size_t count, size_t item_size) {
     size_t size = count * item_size;
     void *p = laihost_malloc(size);
     if (p)
-        lai_memset(p, 0, size);
+        laihost_memset(p, 0, size);
     return p;
 }
 

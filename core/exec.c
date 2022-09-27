@@ -23,7 +23,7 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state);
 // Param: lai_nsnode_t *method - identifies the control method
 
 void lai_init_state(lai_state_t *state) {
-    lai_memset(state, 0, sizeof(lai_state_t));
+    laihost_memset(state, 0, sizeof(lai_state_t));
     state->ctxstack_base = state->small_ctxstack;
     state->blkstack_base = state->small_blkstack;
     state->stack_base = state->small_stack;
@@ -425,8 +425,8 @@ static lai_api_error_t lai_exec_reduce_op(int opcode, lai_state_t *state,
                     char *buffer0 = lai_exec_buffer_access(&operand0_convert);
                     char *buffer1 = lai_exec_buffer_access(&operand1_convert);
                     char *result_buffer = lai_exec_buffer_access(&result);
-                    lai_memcpy(result_buffer, buffer0, b0size);
-                    lai_memcpy(result_buffer + b0size, buffer1, b0size);
+                    laihost_memcpy(result_buffer, buffer0, b0size);
+                    laihost_memcpy(result_buffer + b0size, buffer1, b0size);
                     result.type = LAI_BUFFER;
                     break;
                 }
@@ -476,8 +476,8 @@ static lai_api_error_t lai_exec_reduce_op(int opcode, lai_state_t *state,
                     char *string0 = lai_exec_string_access(&operand0_convert);
                     char *string1 = lai_exec_string_access(&operand1_convert);
                     char *result_string = lai_exec_string_access(&result);
-                    lai_memcpy(result_string, string0, s0len);
-                    lai_memcpy(result_string + s0len, string1, s1len);
+                    laihost_memcpy(result_string, string0, s0len);
+                    laihost_memcpy(result_string + s0len, string1, s1len);
                     result_string[s0len + s1len + 1] = '\0';
                     result.type = LAI_STRING;
                 }
@@ -827,7 +827,7 @@ static lai_api_error_t lai_exec_reduce_op(int opcode, lai_state_t *state,
 
             if (buf1_size == 0)
                 buf1_size
-                    = 2; // Make it 2 so lai_memcpy will actually copy 0 zero bytes since it is empty
+                    = 2; // Make it 2 so laihost_memcpy will actually copy 0 zero bytes since it is empty
 
             if (buf2_size == 0)
                 buf2_size = 2;
@@ -837,8 +837,8 @@ static lai_api_error_t lai_exec_reduce_op(int opcode, lai_state_t *state,
             lai_create_buffer(&result, result_size);
             char *result_buffer = lai_exec_buffer_access(&result);
 
-            lai_memcpy(result_buffer, buf1, buf1_size - 2);
-            lai_memcpy(result_buffer + (buf1_size - 2), buf2, buf2_size - 2);
+            laihost_memcpy(result_buffer, buf1, buf1_size - 2);
+            laihost_memcpy(result_buffer + (buf1_size - 2), buf2, buf2_size - 2);
             result_buffer[(buf1_size - 2) + (buf2_size - 2)] = 0x79; // Small End Tag
 
             // Calculate checksum to put into the End Tag
@@ -1037,7 +1037,7 @@ static lai_api_error_t lai_exec_reduce_op(int opcode, lai_state_t *state,
                     }
                     char *buffer0 = lai_exec_string_access(&object);
                     char *result_string = lai_exec_string_access(&result);
-                    lai_memcpy(result_string, buffer0 + n, sz);
+                    laihost_memcpy(result_string, buffer0 + n, sz);
                     result.type = LAI_STRING;
                     break;
                 }
@@ -1049,7 +1049,7 @@ static lai_api_error_t lai_exec_reduce_op(int opcode, lai_state_t *state,
                     }
                     char *buffer0 = lai_exec_buffer_access(&object);
                     char *result_buffer = lai_exec_buffer_access(&result);
-                    lai_memcpy(result_buffer, buffer0 + n, sz);
+                    laihost_memcpy(result_buffer, buffer0 + n, sz);
                     result.type = LAI_BUFFER;
                     break;
                 }
@@ -1473,7 +1473,7 @@ static lai_api_error_t lai_exec_process(lai_state_t *state) {
                 lai_panic("buffer initializer has negative size");
             if (initial_size > (int)lai_exec_buffer_size(&result))
                 lai_panic("buffer initializer overflows buffer");
-            lai_memcpy(lai_exec_buffer_access(&result), method + block->pc, initial_size);
+            laihost_memcpy(lai_exec_buffer_access(&result), method + block->pc, initial_size);
 
             if (item->buf_want_result) {
                 // Note: there is no need to reserve() as we pop an operand above.
@@ -1597,7 +1597,7 @@ static lai_api_error_t lai_exec_process(lai_state_t *state) {
 
             // TODO: Make sure that this does not leak memory.
             lai_variable_t args[7];
-            lai_memset(args, 0, sizeof(lai_variable_t) * 7);
+            laihost_memset(args, 0, sizeof(lai_variable_t) * 7);
 
             for (int i = 0; i < argc; i++) {
                 struct lai_operand *operand
@@ -1635,7 +1635,7 @@ static lai_api_error_t lai_exec_process(lai_state_t *state) {
                 method_ctxitem->invocation = laihost_malloc(sizeof(struct lai_invocation));
                 if (!method_ctxitem->invocation)
                     lai_panic("could not allocate memory for method invocation");
-                lai_memset(method_ctxitem->invocation, 0, sizeof(struct lai_invocation));
+                laihost_memset(method_ctxitem->invocation, 0, sizeof(struct lai_invocation));
                 lai_list_init(&method_ctxitem->invocation->per_method_list);
 
                 for (int i = 0; i < argc; i++)
@@ -2265,7 +2265,7 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
                 opstack_res->tag = LAI_OPERAND_OBJECT;
                 if (lai_create_string(&opstack_res->object, n) != LAI_ERROR_NONE)
                     lai_panic("could not allocate memory for string");
-                lai_memcpy(lai_exec_string_access(&opstack_res->object), method + data_pc, n);
+                laihost_memcpy(lai_exec_string_access(&opstack_res->object), method + data_pc, n);
             } else
                 LAI_ENSURE(parse_mode == LAI_EXEC_MODE);
             break;
@@ -3716,7 +3716,7 @@ lai_api_error_t lai_eval_args(lai_variable_t *result, lai_nsnode_t *handle, lai_
                 method_ctxitem->invocation = laihost_malloc(sizeof(struct lai_invocation));
                 if (!method_ctxitem->invocation)
                     lai_panic("could not allocate memory for method invocation");
-                lai_memset(method_ctxitem->invocation, 0, sizeof(struct lai_invocation));
+                laihost_memset(method_ctxitem->invocation, 0, sizeof(struct lai_invocation));
                 lai_list_init(&method_ctxitem->invocation->per_method_list);
 
                 for (int i = 0; i < n; i++)
@@ -3764,7 +3764,7 @@ lai_api_error_t lai_eval_vargs(lai_variable_t *result, lai_nsnode_t *handle, lai
                                va_list vl) {
     int n = 0;
     lai_variable_t args[7];
-    lai_memset(args, 0, sizeof(lai_variable_t) * 7);
+    laihost_memset(args, 0, sizeof(lai_variable_t) * 7);
 
     for (;;) {
         LAI_ENSURE(n < 7 && "ACPI supports at most 7 arguments");

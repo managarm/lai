@@ -16,7 +16,7 @@ extern "C" {
 #endif
 
 __attribute__((always_inline)) inline void lai_namecpy(char *dest, const char *src) {
-    lai_memcpy(dest, src, 4);
+    laihost_memcpy(dest, src, 4);
 }
 
 struct lai_aml_segment {

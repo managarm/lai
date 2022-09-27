@@ -14,13 +14,6 @@ extern "C" {
 
 size_t lai_strlen(const char *);
 
-// Even in freestanding environments, GCC requires lai_memcpy(), lai_memmove(), lai_memset()
-// and lai_memcmp() to be present. Thus, we just use them directly.
-void *lai_memcpy(void *, const void *, size_t);
-void *lai_memmove(void *, const void *, size_t);
-void *lai_memset(void *, int, size_t);
-int lai_memcmp(const void *, const void *, size_t);
-
 //---------------------------------------------------------------------------------------
 // Debugging and logging functions.
 //---------------------------------------------------------------------------------------

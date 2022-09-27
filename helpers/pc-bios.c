@@ -21,7 +21,7 @@ lai_api_error_t lai_bios_detect_rsdp_within(uintptr_t base, size_t length,
     for (size_t off = 0; off < length; off += 16) {
         acpi_rsdp_t *rsdp = (acpi_rsdp_t *)(window + off);
 
-        if (lai_memcmp(rsdp->signature, "RSD PTR ", 8))
+        if (laihost_memcmp(rsdp->signature, "RSD PTR ", 8))
             continue;
 
         if (lai_bios_calc_checksum(rsdp, sizeof(acpi_rsdp_t)))
@@ -63,7 +63,7 @@ lai_api_error_t lai_bios_detect_rsdp(struct lai_rsdp_info *info) {
     // ACPI specifies that we can find the EBDA through 0x40E.
     uint16_t bda_data;
     void *bda_window = laihost_map(0x40E, sizeof(uint16_t));
-    lai_memcpy(&bda_data, bda_window, sizeof(uint16_t));
+    laihost_memcpy(&bda_data, bda_window, sizeof(uint16_t));
     laihost_unmap(bda_window, sizeof(uint16_t));
 
     uintptr_t ebda_base = ((uintptr_t)bda_data) << 4;
