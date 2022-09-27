@@ -41,7 +41,7 @@ lai_nsnode_t *lai_create_nsnode(void) {
         return NULL;
     // here we assume that the host does not return zeroed memory,
     // so lai must zero the returned memory itself.
-    memset(node, 0, sizeof(lai_nsnode_t));
+    lai_memset(node, 0, sizeof(lai_nsnode_t));
     return node;
 }
 
@@ -84,7 +84,7 @@ lai_api_error_t lai_install_nsnode(lai_nsnode_t *node) {
         struct lai_hashtable_chain chain = LAI_HASHTABLE_CHAIN_INITIALIZER;
         while (!lai_hashtable_chain_advance(&parent->children, h, &chain)) {
             lai_nsnode_t *child = lai_hashtable_chain_get(&parent->children, h, &chain);
-            if (!memcmp(child->name, node->name, 4)) {
+            if (!lai_memcmp(child->name, node->name, 4)) {
                 LAI_CLEANUP_FREE_STRING char *fullpath = lai_stringify_node_path(node);
                 lai_warn("trying to install duplicate namespace node %s, ignoring", fullpath);
                 return LAI_ERROR_UNEXPECTED_RESULT;
@@ -144,7 +144,7 @@ lai_nsnode_t *lai_ns_get_child(lai_nsnode_t *parent, const char *name) {
     struct lai_hashtable_chain chain = LAI_HASHTABLE_CHAIN_INITIALIZER;
     while (!lai_hashtable_chain_advance(&parent->children, h, &chain)) {
         lai_nsnode_t *child = lai_hashtable_chain_get(&parent->children, h, &chain);
-        if (!memcmp(child->name, name, 4))
+        if (!lai_memcmp(child->name, name, 4))
             return child;
     }
     return NULL;
@@ -534,7 +534,7 @@ static struct lai_aml_segment *lai_load_table(void *ptr, int index) {
     struct lai_aml_segment *amls = laihost_malloc(sizeof(struct lai_aml_segment));
     if (!amls)
         lai_panic("could not allocate memory for struct lai_aml_segment");
-    memset(amls, 0, sizeof(struct lai_aml_segment));
+    lai_memset(amls, 0, sizeof(struct lai_aml_segment));
 
     amls->table = ptr;
     amls->index = index;

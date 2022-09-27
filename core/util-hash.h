@@ -20,7 +20,7 @@ static void lai_hashtable_grow(struct lai_hashtable *ht, int n, int m) {
     if (!new_elem_ptr_tab || !new_elem_hash_tab || !new_bucket_tab)
         lai_panic("could not allocate memory for children table");
 
-    memset(new_elem_ptr_tab, 0, n * sizeof(void *));
+    lai_memset(new_elem_ptr_tab, 0, n * sizeof(void *));
     for (int i = 0; i < m; i++)
         new_bucket_tab[i] = -1;
 

@@ -21,7 +21,7 @@ lai_api_error_t lai_create_string(lai_variable_t *object, size_t length) {
         laihost_free(object->string_ptr, sizeof(struct lai_string_head));
         return LAI_ERROR_OUT_OF_MEMORY;
     }
-    memset(object->string_ptr->content, 0, length + 1);
+    lai_memset(object->string_ptr->content, 0, length + 1);
     return LAI_ERROR_NONE;
 }
 
@@ -30,7 +30,7 @@ lai_api_error_t lai_create_c_string(lai_variable_t *object, const char *s) {
     lai_api_error_t e = lai_create_string(object, n);
     if (e != LAI_ERROR_NONE)
         return e;
-    memcpy(lai_exec_string_access(object), s, n);
+    lai_memcpy(lai_exec_string_access(object), s, n);
     return LAI_ERROR_NONE;
 }
 
@@ -46,7 +46,7 @@ lai_api_error_t lai_create_buffer(lai_variable_t *object, size_t size) {
         laihost_free(object->buffer_ptr, sizeof(struct lai_buffer_head));
         return LAI_ERROR_OUT_OF_MEMORY;
     }
-    memset(object->buffer_ptr->content, 0, size);
+    lai_memset(object->buffer_ptr->content, 0, size);
     return LAI_ERROR_NONE;
 }
 
@@ -62,7 +62,7 @@ lai_api_error_t lai_create_pkg(lai_variable_t *object, size_t n) {
         laihost_free(object->pkg_ptr, sizeof(struct lai_pkg_head));
         return LAI_ERROR_OUT_OF_MEMORY;
     }
-    memset(object->pkg_ptr->elems, 0, n * sizeof(lai_variable_t));
+    lai_memset(object->pkg_ptr->elems, 0, n * sizeof(lai_variable_t));
     return LAI_ERROR_NONE;
 }
 
@@ -88,8 +88,8 @@ lai_api_error_t lai_obj_resize_buffer(lai_variable_t *object, size_t size) {
         uint8_t *new_content = laihost_malloc(size);
         if (!new_content)
             return LAI_ERROR_OUT_OF_MEMORY;
-        memset(new_content, 0, size);
-        memcpy(new_content, object->buffer_ptr->content, object->buffer_ptr->size);
+        lai_memset(new_content, 0, size);
+        lai_memcpy(new_content, object->buffer_ptr->content, object->buffer_ptr->size);
         laihost_free(object->buffer_ptr->content, object->buffer_ptr->size);
         object->buffer_ptr->content = new_content;
     }
@@ -107,7 +107,7 @@ lai_api_error_t lai_obj_resize_pkg(lai_variable_t *object, size_t n) {
         struct lai_variable_t *new_elems = laihost_malloc(n * sizeof(lai_variable_t));
         if (!new_elems)
             return LAI_ERROR_OUT_OF_MEMORY;
-        memset(new_elems, 0, n * sizeof(lai_variable_t));
+        lai_memset(new_elems, 0, n * sizeof(lai_variable_t));
         for (unsigned int i = 0; i < object->pkg_ptr->size; i++)
             lai_var_move(&new_elems[i], &object->pkg_ptr->elems[i]);
         laihost_free(object->pkg_ptr->elems, object->pkg_ptr->size * sizeof(lai_variable_t));
@@ -219,7 +219,7 @@ lai_api_error_t lai_obj_to_buffer(lai_variable_t *out, lai_variable_t *object) {
         case LAI_TYPE_INTEGER:
             if (lai_create_buffer(out, sizeof(uint64_t)) != LAI_ERROR_NONE)
                 return LAI_ERROR_OUT_OF_MEMORY;
-            memcpy(out->buffer_ptr->content, &object->integer, sizeof(uint64_t));
+            lai_memcpy(out->buffer_ptr->content, &object->integer, sizeof(uint64_t));
             break;
 
         case LAI_TYPE_BUFFER:
@@ -234,7 +234,7 @@ lai_api_error_t lai_obj_to_buffer(lai_variable_t *out, lai_variable_t *object) {
             } else {
                 if (lai_create_buffer(out, len + 1) != LAI_ERROR_NONE)
                     return LAI_ERROR_OUT_OF_MEMORY;
-                memcpy(out->buffer_ptr->content, object->string_ptr->content, len);
+                lai_memcpy(out->buffer_ptr->content, object->string_ptr->content, len);
             }
             break;
         }
@@ -258,8 +258,8 @@ lai_api_error_t lai_mutate_buffer(lai_variable_t *target, lai_variable_t *object
             size_t buffer_size = lai_exec_buffer_size(target);
             if (copy_size > buffer_size)
                 copy_size = buffer_size;
-            memset(lai_exec_buffer_access(target), 0, buffer_size);
-            memcpy(lai_exec_buffer_access(target), lai_exec_buffer_access(object), copy_size);
+            lai_memset(lai_exec_buffer_access(target), 0, buffer_size);
+            lai_memcpy(lai_exec_buffer_access(target), lai_exec_buffer_access(object), copy_size);
             break;
         }
 
@@ -271,8 +271,8 @@ lai_api_error_t lai_mutate_buffer(lai_variable_t *target, lai_variable_t *object
                 copy_size = buffer_size;
             // TODO: bswap() if necessary.
             uint64_t data = object->integer;
-            memset(lai_exec_buffer_access(target), 0, buffer_size);
-            memcpy(lai_exec_buffer_access(target), &data, copy_size);
+            lai_memset(lai_exec_buffer_access(target), 0, buffer_size);
+            lai_memcpy(lai_exec_buffer_access(target), &data, copy_size);
             break;
         }
         case LAI_STRING: {
@@ -280,8 +280,8 @@ lai_api_error_t lai_mutate_buffer(lai_variable_t *target, lai_variable_t *object
             size_t buffer_size = lai_exec_buffer_size(target);
             if (copy_size > buffer_size)
                 copy_size = buffer_size;
-            memset(lai_exec_buffer_access(target), 0, buffer_size);
-            memcpy(lai_exec_buffer_access(target), lai_exec_string_access(object), copy_size);
+            lai_memset(lai_exec_buffer_access(target), 0, buffer_size);
+            lai_memcpy(lai_exec_buffer_access(target), lai_exec_string_access(object), copy_size);
             break;
         }
 
@@ -310,16 +310,16 @@ lai_api_error_t lai_obj_to_string(lai_variable_t *out, lai_variable_t *object, s
                 // Copy until the '\0'
                 lai_create_string(out, buffer_length + 1);
                 char *string = lai_exec_string_access(out);
-                memcpy(string, buffer, buffer_length);
+                lai_memcpy(string, buffer, buffer_length);
             } else {
                 if (size < buffer_length) {
                     lai_create_string(out, size);
                     char *string = lai_exec_string_access(out);
-                    memcpy(string, buffer, size);
+                    lai_memcpy(string, buffer, size);
                 } else {
                     lai_create_string(out, buffer_length);
                     char *string = lai_exec_string_access(out);
-                    memcpy(string, buffer, buffer_length);
+                    lai_memcpy(string, buffer, buffer_length);
                 }
             }
             break;
@@ -666,7 +666,7 @@ lai_api_error_t lai_mutate_integer(lai_variable_t *target, lai_variable_t *objec
             size_t copy_size = lai_exec_buffer_size(object);
             if (copy_size > 8)
                 copy_size = 8;
-            memcpy(&target->integer, lai_exec_buffer_access(object), copy_size);
+            lai_memcpy(&target->integer, lai_exec_buffer_access(object), copy_size);
             // TODO: bswap() if necessary.
             break;
         }
@@ -684,7 +684,7 @@ static void lai_clone_buffer(lai_variable_t *dest, lai_variable_t *source) {
     size_t size = lai_exec_buffer_size(source);
     if (lai_create_buffer(dest, size) != LAI_ERROR_NONE)
         lai_panic("unable to allocate memory for buffer object.");
-    memcpy(lai_exec_buffer_access(dest), lai_exec_buffer_access(source), size);
+    lai_memcpy(lai_exec_buffer_access(dest), lai_exec_buffer_access(source), size);
 }
 
 // lai_clone_string(): Clones a string object
@@ -692,7 +692,7 @@ static void lai_clone_string(lai_variable_t *dest, lai_variable_t *source) {
     size_t n = lai_exec_string_length(source);
     if (lai_create_string(dest, n) != LAI_ERROR_NONE)
         lai_panic("unable to allocate memory for string object.");
-    memcpy(lai_exec_string_access(dest), lai_exec_string_access(source), n);
+    lai_memcpy(lai_exec_string_access(dest), lai_exec_string_access(source), n);
 }
 
 // lai_clone_package(): Clones a package object
@@ -844,7 +844,7 @@ lai_api_error_t lai_obj_exec_match_op(int op, lai_variable_t *var, lai_variable_
             obj_size = lai_exec_string_length(&compare_obj);
         }
 
-        int compare = memcmp(var_data, obj_data, (var_size > obj_size) ? obj_size : var_size);
+        int compare = lai_memcmp(var_data, obj_data, (var_size > obj_size) ? obj_size : var_size);
 
         switch (op) {
             case MATCH_MTR: // MTR: Always True

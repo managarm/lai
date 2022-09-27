@@ -39,7 +39,7 @@ void lai_var_finalize(lai_variable_t *object) {
             break;
     }
 
-    memset(object, 0, sizeof(lai_variable_t));
+    lai_memset(object, 0, sizeof(lai_variable_t));
 }
 
 // Helper function for lai_var_move() and lai_obj_clone().

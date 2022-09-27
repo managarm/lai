@@ -524,7 +524,7 @@ void lai_read_field(lai_variable_t *destination, lai_nsnode_t *field) {
         lai_read_field_internal(var.buffer_ptr->content, field);
     } else {
         uint8_t buf[bytes];
-        memset(buf, 0, bytes);
+        lai_memset(buf, 0, bytes);
         lai_read_field_internal(buf, field);
 
         uint64_t value = 0;
@@ -546,7 +546,7 @@ void lai_write_field(lai_nsnode_t *field, lai_variable_t *source) {
         lai_write_field_internal((uint8_t *)source->string_ptr->content, field);
     } else if (source->type == LAI_INTEGER) {
         uint8_t buf[8];
-        memset(buf, 0, 8);
+        lai_memset(buf, 0, 8);
 
         for (size_t i = 0; i < 8; i++) {
             buf[i] = (source->integer >> (i * 8)) & 0xFF;

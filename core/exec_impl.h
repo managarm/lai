@@ -232,7 +232,7 @@ static inline int lai_exec_reserve_ctxstack(lai_state_t *state) {
             lai_warn("failed to allocate memory for context stack");
             return 1;
         }
-        memcpy(new_stack, state->ctxstack_base,
+        lai_memcpy(new_stack, state->ctxstack_base,
                (state->ctxstack_ptr + 1) * sizeof(struct lai_ctxitem));
         if (state->ctxstack_base != state->small_ctxstack)
             laihost_free(state->ctxstack_base,
@@ -248,7 +248,7 @@ static inline struct lai_ctxitem *lai_exec_push_ctxstack(lai_state_t *state) {
     state->ctxstack_ptr++;
     // Users are expected to call the reserve() function before this one.
     LAI_ENSURE(state->ctxstack_ptr < state->ctxstack_capacity);
-    memset(&state->ctxstack_base[state->ctxstack_ptr], 0, sizeof(struct lai_ctxitem));
+    lai_memset(&state->ctxstack_base[state->ctxstack_ptr], 0, sizeof(struct lai_ctxitem));
     return &state->ctxstack_base[state->ctxstack_ptr];
 }
 
@@ -285,7 +285,7 @@ static inline int lai_exec_reserve_blkstack(lai_state_t *state) {
             lai_warn("failed to allocate memory for block stack");
             return 1;
         }
-        memcpy(new_stack, state->blkstack_base,
+        lai_memcpy(new_stack, state->blkstack_base,
                (state->blkstack_ptr + 1) * sizeof(struct lai_blkitem));
         if (state->blkstack_base != state->small_blkstack)
             laihost_free(state->blkstack_base,
@@ -301,7 +301,7 @@ static inline struct lai_blkitem *lai_exec_push_blkstack(lai_state_t *state) {
     state->blkstack_ptr++;
     // Users are expected to call the reserve() function before this one.
     LAI_ENSURE(state->blkstack_ptr < state->blkstack_capacity);
-    memset(&state->blkstack_base[state->blkstack_ptr], 0, sizeof(struct lai_blkitem));
+    lai_memset(&state->blkstack_base[state->blkstack_ptr], 0, sizeof(struct lai_blkitem));
     return &state->blkstack_base[state->blkstack_ptr];
 }
 
@@ -330,7 +330,7 @@ static inline int lai_exec_reserve_stack(lai_state_t *state) {
             lai_warn("failed to allocate memory for execution stack");
             return 1;
         }
-        memcpy(new_stack, state->stack_base, (state->stack_ptr + 1) * sizeof(lai_stackitem_t));
+        lai_memcpy(new_stack, state->stack_base, (state->stack_ptr + 1) * sizeof(lai_stackitem_t));
         if (state->stack_base != state->small_stack)
             laihost_free(state->stack_base, state->stack_capacity * sizeof(lai_stackitem_t));
         state->stack_base = new_stack;
@@ -384,9 +384,9 @@ static inline int lai_exec_reserve_opstack(lai_state_t *state) {
             lai_warn("failed to allocate memory for operand stack");
             return 1;
         }
-        // TODO: Here, we rely on the fact that moving lai_variable_t via memcpy() is OK.
+        // TODO: Here, we rely on the fact that moving lai_variable_t via lai_memcpy() is OK.
         //       Implement a some sophisticated lai_operand_move()?
-        memcpy(new_stack, state->opstack_base, state->opstack_ptr * sizeof(struct lai_operand));
+        lai_memcpy(new_stack, state->opstack_base, state->opstack_ptr * sizeof(struct lai_operand));
         if (state->opstack_base != state->small_opstack)
             laihost_free(state->opstack_base, state->opstack_capacity * sizeof(struct lai_operand));
         state->opstack_base = new_stack;
@@ -410,7 +410,7 @@ static inline struct lai_operand *lai_exec_push_opstack(lai_state_t *state) {
     // Users are expected to call the reserve() function before this one.
     LAI_ENSURE(state->opstack_ptr < state->opstack_capacity);
     struct lai_operand *object = &state->opstack_base[state->opstack_ptr];
-    memset(object, 0, sizeof(struct lai_operand));
+    lai_memset(object, 0, sizeof(struct lai_operand));
     state->opstack_ptr++;
     return object;
 }
