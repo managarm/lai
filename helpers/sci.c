@@ -12,10 +12,13 @@
 
 // read contents of event registers.
 uint16_t lai_get_sci_event(void) {
-    if (!laihost_inw || !laihost_outw)
-        lai_panic("lai_read_event() requires port I/O");
-
     struct lai_instance *instance = lai_current_instance();
+
+    if (!instance->fadt->pm1a_event_block && !instance->fadt->pm1b_event_block)
+        return 0;
+
+    if (!laihost_inw || !laihost_outw)
+        lai_panic("lai_get_sci_event() requires port I/O");
 
     uint16_t a = 0, b = 0;
     if (instance->fadt->pm1a_event_block) {
@@ -31,10 +34,13 @@ uint16_t lai_get_sci_event(void) {
 
 // set event enable registers
 void lai_set_sci_event(uint16_t value) {
-    if (!laihost_inw || !laihost_outw)
-        lai_panic("lai_set_event() requires port I/O");
-
     struct lai_instance *instance = lai_current_instance();
+
+    if (!instance->fadt->pm1a_event_block && !instance->fadt->pm1b_event_block)
+        return;
+
+    if (!laihost_inw || !laihost_outw)
+        lai_panic("lai_set_sci_event() requires port I/O");
 
     uint16_t a = instance->fadt->pm1a_event_block + (instance->fadt->pm1_event_length / 2);
     uint16_t b = instance->fadt->pm1b_event_block + (instance->fadt->pm1_event_length / 2);
@@ -59,10 +65,12 @@ int lai_enable_acpi(uint32_t mode) {
 
     struct lai_instance *instance = lai_current_instance();
 
-    if (!laihost_inw || !laihost_outb)
-        lai_panic("lai_enable_acpi() requires port I/O");
-    if (!laihost_sleep)
-        lai_panic("host does not provide timer functions required by lai_enable_acpi()");
+    if (instance->fadt->smi_command_port) {
+        if (!laihost_inw || !laihost_outb)
+            lai_panic("lai_enable_acpi() requires port I/O");
+        if (!laihost_sleep)
+            lai_panic("host does not provide timer functions required by lai_enable_acpi()");
+    }
 
     /* first run \._SB_._INI */
     handle = lai_resolve_path(NULL, "\\_SB_._INI");
@@ -92,14 +100,16 @@ int lai_enable_acpi(uint32_t mode) {
     }
 
     /* enable ACPI SCI */
-    laihost_outb(instance->fadt->smi_command_port, instance->fadt->acpi_enable);
-    laihost_sleep(10);
-
-    for (size_t i = 0; i < 100; i++) {
-        if (laihost_inw(instance->fadt->pm1a_control_block) & ACPI_ENABLED)
-            break;
-
+    if (instance->fadt->smi_command_port) {
+        laihost_outb(instance->fadt->smi_command_port, instance->fadt->acpi_enable);
         laihost_sleep(10);
+
+        for (size_t i = 0; i < 100; i++) {
+            if (laihost_inw(instance->fadt->pm1a_control_block) & ACPI_ENABLED)
+                break;
+
+            laihost_sleep(10);
+        }
     }
 
     /* set FADT event fields */
@@ -111,10 +121,12 @@ int lai_enable_acpi(uint32_t mode) {
 }
 
 int lai_disable_acpi(void) {
-    if (!laihost_inw || !laihost_outw)
-        lai_panic("lai_read_event() requires port I/O");
-
     struct lai_instance *instance = lai_current_instance();
+
+    if (instance->fadt->pm1a_control_block || instance->fadt->pm1b_control_block) {
+        if (!laihost_inw || !laihost_outw)
+            lai_panic("lai_disable_acpi() requires port I/O");
+    }
 
     lai_debug("attempt to disable ACPI...");
 
@@ -123,9 +135,11 @@ int lai_disable_acpi(void) {
     lai_get_sci_event();
 
     // Clear SCI_EN (APCI_ENABLED in lai) so to stop SCIs from arriving
-    uint16_t pm1a_cnt_block = laihost_inw(instance->fadt->pm1a_control_block);
-    pm1a_cnt_block &= ~ACPI_ENABLED;
-    laihost_outw(instance->fadt->pm1a_control_block, pm1a_cnt_block);
+    if (instance->fadt->pm1a_control_block) {
+        uint16_t pm1a_cnt_block = laihost_inw(instance->fadt->pm1a_control_block);
+        pm1a_cnt_block &= ~ACPI_ENABLED;
+        laihost_outw(instance->fadt->pm1a_control_block, pm1a_cnt_block);
+    }
 
     if (instance->fadt->pm1b_control_block) {
         uint16_t pm1b_cnt_block = laihost_inw(instance->fadt->pm1b_control_block);
@@ -134,7 +148,9 @@ int lai_disable_acpi(void) {
     }
 
     // Send the definitive ACPI_DISABLE command
-    laihost_outb(instance->fadt->smi_command_port, instance->fadt->acpi_disable);
+    if (instance->fadt->smi_command_port) {
+        laihost_outb(instance->fadt->smi_command_port, instance->fadt->acpi_disable);
+    }
 
     lai_debug("Success");
     return 0;
