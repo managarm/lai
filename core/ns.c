@@ -489,6 +489,8 @@ void lai_create_namespace(void) {
         lai_panic("unable to find ACPI FADT.");
     }
 
+    instance->is_hw_reduced = (instance->fadt->flags >> 20) & 1;
+
     lai_nsnode_t *root_node = lai_create_root();
 
     // Create the namespace with all the objects.

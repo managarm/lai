@@ -150,6 +150,8 @@ typedef struct acpi_fadt_t {
     acpi_gas_t x_pm_timer_block;
     acpi_gas_t x_gpe0_block;
     acpi_gas_t x_gpe1_block;
+    acpi_gas_t sleep_control_reg;
+    acpi_gas_t sleep_status_reg;
 } __attribute__((packed)) acpi_fadt_t;
 
 typedef struct acpi_ecdt_t {

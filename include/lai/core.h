@@ -38,6 +38,7 @@ struct lai_instance {
 
     int acpi_revision;
     int trace;
+    int is_hw_reduced;
 
     acpi_fadt_t *fadt;
 };
