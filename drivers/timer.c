@@ -9,6 +9,7 @@
 // ACPI timer runs at 3.579545 MHz
 
 static acpi_gas_t timer_block;
+static volatile uint32_t* timer_mmio_reg = NULL;
 static int extended_timer = 0;
 static int supported = 0;
 
@@ -16,8 +17,7 @@ uint32_t lai_read_pm_timer_value() {
     if (timer_block.address_space == ACPI_GAS_IO) {
         return laihost_ind(timer_block.base);
     } else if (timer_block.address_space == ACPI_GAS_MMIO) {
-        volatile uint32_t *reg = (volatile uint32_t *)((uintptr_t)timer_block.base);
-        return *reg;
+        return *timer_mmio_reg;
     } else {
         lai_panic("Unknown ACPI Timer address space");
     }
@@ -36,7 +36,7 @@ lai_api_error_t lai_start_pm_timer() {
     if (lai_current_instance()->acpi_revision >= 2 && fadt->x_pm_timer_block.base) {
         timer_block = fadt->x_pm_timer_block;
         if (timer_block.address_space == ACPI_GAS_MMIO)
-            laihost_map(timer_block.base, 4);
+            timer_mmio_reg = (volatile uint32_t *)laihost_map(timer_block.base, 4);
     } else {
         timer_block.address_space = ACPI_GAS_IO;
         timer_block.base = fadt->pm_timer_block;
