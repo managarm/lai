@@ -12,10 +12,15 @@
 
 // read contents of event registers.
 uint16_t lai_get_sci_event(void) {
+    struct lai_instance *instance = lai_current_instance();
+
+    if (instance->is_hw_reduced) {
+        lai_warn("lai_get_sci_event: System is HW-Reduced and has no fixed-function hardware");
+        return 0;
+    }
+
     if (!laihost_inw || !laihost_outw)
         lai_panic("lai_read_event() requires port I/O");
-
-    struct lai_instance *instance = lai_current_instance();
 
     uint16_t a = 0, b = 0;
     if (instance->fadt->pm1a_event_block) {
@@ -31,10 +36,15 @@ uint16_t lai_get_sci_event(void) {
 
 // set event enable registers
 void lai_set_sci_event(uint16_t value) {
+    struct lai_instance *instance = lai_current_instance();
+
+    if (instance->is_hw_reduced) {
+        lai_warn("lai_set_sci_event: System is HW-Reduced and has no fixed-function hardware");
+        return;
+    }
+
     if (!laihost_inw || !laihost_outw)
         lai_panic("lai_set_event() requires port I/O");
-
-    struct lai_instance *instance = lai_current_instance();
 
     uint16_t a = instance->fadt->pm1a_event_block + (instance->fadt->pm1_event_length / 2);
     uint16_t b = instance->fadt->pm1b_event_block + (instance->fadt->pm1_event_length / 2);
@@ -58,11 +68,6 @@ int lai_enable_acpi(uint32_t mode) {
     lai_debug("attempt to enable ACPI...");
 
     struct lai_instance *instance = lai_current_instance();
-
-    if (!laihost_inw || !laihost_outb)
-        lai_panic("lai_enable_acpi() requires port I/O");
-    if (!laihost_sleep)
-        lai_panic("host does not provide timer functions required by lai_enable_acpi()");
 
     /* first run \._SB_._INI */
     handle = lai_resolve_path(NULL, "\\_SB_._INI");
@@ -91,32 +96,46 @@ int lai_enable_acpi(uint32_t mode) {
         lai_finalize_state(&state);
     }
 
-    /* enable ACPI SCI */
-    laihost_outb(instance->fadt->smi_command_port, instance->fadt->acpi_enable);
-    laihost_sleep(10);
+    /* ACPI HW-Reduced systems do not have an SCI */
+    if (!lai_current_instance()->is_hw_reduced) {
+        if (!laihost_inw || !laihost_outb)
+            lai_panic("lai_enable_acpi() requires port I/O");
 
-    for (size_t i = 0; i < 100; i++) {
-        if (laihost_inw(instance->fadt->pm1a_control_block) & ACPI_ENABLED)
-            break;
+        if (!laihost_sleep)
+            lai_panic("host does not provide timer functions required by lai_enable_acpi()");
 
+        /* enable ACPI SCI */
+        laihost_outb(instance->fadt->smi_command_port, instance->fadt->acpi_enable);
         laihost_sleep(10);
-    }
 
-    /* set FADT event fields */
-    lai_set_sci_event(ACPI_POWER_BUTTON | ACPI_SLEEP_BUTTON | ACPI_WAKE);
-    lai_get_sci_event();
+        for (size_t i = 0; i < 100; i++) {
+            if (laihost_inw(instance->fadt->pm1a_control_block) & ACPI_ENABLED)
+                break;
+
+            laihost_sleep(10);
+        }
+
+        /* set FADT event fields */
+        lai_set_sci_event(ACPI_POWER_BUTTON | ACPI_SLEEP_BUTTON | ACPI_WAKE);
+        lai_get_sci_event();
+    }
 
     lai_debug("ACPI is now enabled.");
     return 0;
 }
 
 int lai_disable_acpi(void) {
-    if (!laihost_inw || !laihost_outw)
-        lai_panic("lai_read_event() requires port I/O");
-
     struct lai_instance *instance = lai_current_instance();
 
     lai_debug("attempt to disable ACPI...");
+
+    if (instance->is_hw_reduced) {
+        lai_debug("System is HW-Reduced ACPI, cannot disable ACPI mode");
+        return 0;
+    }
+
+    if (!laihost_inw || !laihost_outw)
+        lai_panic("lai_disable_acpi() requires port I/O");
 
     // Disable all SCI events
     lai_set_sci_event(0);
