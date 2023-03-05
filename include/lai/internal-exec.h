@@ -220,6 +220,10 @@ typedef struct lai_stackitem_ {
             uint8_t buf_want_result;
         };
         struct {
+            uint8_t fld_access_type;
+            uint8_t fld_connectfld_phase; // 0: Parse, 1: Get result
+        };
+        struct {
             int pkg_index;
             int pkg_phase; // 0: Parse size, 1: Create Object, 2: Enumerate items
             uint8_t pkg_want_result;
