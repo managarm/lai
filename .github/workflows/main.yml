@@ -32,4 +32,5 @@ jobs:
     - name: Upload test image
       uses: actions/upload-artifact@v1
       with:
+        name: lai_test.iso
         path: lai_test.iso
