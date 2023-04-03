@@ -1,6 +1,6 @@
 /*
  * Lightweight AML Interpreter
- * Copyright (C) 2018-2022 The lai authors
+ * Copyright (C) 2018-2023 The lai authors
  */
 
 #include <lai/drivers/timer.h>
@@ -9,7 +9,7 @@
 // ACPI timer runs at 3.579545 MHz
 
 static acpi_gas_t timer_block;
-static volatile uint32_t* timer_mmio_reg = NULL;
+static volatile uint32_t *timer_mmio_reg = NULL;
 static int extended_timer = 0;
 static int supported = 0;
 
