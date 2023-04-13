@@ -1792,29 +1792,59 @@ static lai_api_error_t lai_exec_process(lai_state_t *state) {
                 return lai_exec_parse(LAI_EXEC_MODE, state);
             }
         }
-    } else if (item->kind == LAI_BANKFIELD_STACKITEM) {
+    } else if (item->kind == LAI_FIELD_STACKITEM || item->kind == LAI_INDEXFIELD_STACKITEM
+               || item->kind == LAI_BANKFIELD_STACKITEM) {
+        int expected_opstack_depth = (item->kind == LAI_FIELD_STACKITEM)        ? 1
+                                     : (item->kind == LAI_INDEXFIELD_STACKITEM) ? 2
+                                     : (item->kind == LAI_BANKFIELD_STACKITEM)  ? 3
+                                                                                : -1;
+        LAI_ENSURE(expected_opstack_depth != -1);
+
+        int connectfield_end_pc = 0;
+        if (item->fld_connectfld_phase == 1) {
+            expected_opstack_depth++;
+
+            connectfield_end_pc = block->pc;
+
+            lai_exec_pop_blkstack_back(state);
+            block = lai_exec_peek_blkstack_back(state);
+        }
+
         int k = state->opstack_ptr - item->opstack_frame;
-        LAI_ENSURE(k <= 3);
-        if (k == 3) { // there's already region_name and bank_name on there
-            LAI_CLEANUP_VAR lai_variable_t bank_value_var = LAI_VAR_INITIALIZER;
-            struct lai_operand *operand;
+        LAI_ENSURE(k <= expected_opstack_depth);
+        if (k == expected_opstack_depth) {
+            lai_nsnode_t *region_node = NULL, *bank_node = NULL;
+            lai_nsnode_t *index_node = NULL, *data_node = NULL;
+            uint64_t bank_value = 0;
 
-            operand = lai_exec_get_opstack(state, item->opstack_frame);
-            lai_nsnode_t *region_node = operand->handle;
+            if (item->kind == LAI_FIELD_STACKITEM) {
+                struct lai_operand *operand = lai_exec_get_opstack(state, item->opstack_frame);
+                region_node = operand->handle;
+            } else if (item->kind == LAI_INDEXFIELD_STACKITEM) {
+                struct lai_operand *operand = lai_exec_get_opstack(state, item->opstack_frame);
+                index_node = operand->handle;
 
-            operand = lai_exec_get_opstack(state, item->opstack_frame + 1);
-            lai_nsnode_t *bank_node = operand->handle;
+                operand = lai_exec_get_opstack(state, item->opstack_frame + 1);
+                data_node = operand->handle;
+            } else if (item->kind == LAI_BANKFIELD_STACKITEM) {
+                LAI_CLEANUP_VAR lai_variable_t bank_value_var = LAI_VAR_INITIALIZER;
+                struct lai_operand *operand = lai_exec_get_opstack(state, item->opstack_frame);
+                region_node = operand->handle;
 
-            operand = lai_exec_get_opstack(state, item->opstack_frame + 2);
-            lai_exec_get_integer(state, operand, &bank_value_var);
-            uint64_t bank_value = bank_value_var.integer;
+                operand = lai_exec_get_opstack(state, item->opstack_frame + 1);
+                bank_node = operand->handle;
 
-            lai_exec_pop_opstack(state, 3);
+                operand = lai_exec_get_opstack(state, item->opstack_frame + 2);
+                lai_exec_get_integer(state, operand, &bank_value_var);
+                bank_value = bank_value_var.integer;
+            }
 
             int pc = block->pc;
 
-            uint8_t access_type = *(method + pc);
-            pc++;
+            if (item->fld_connectfld_phase == 0) { // Only happens the first time
+                item->fld_access_type = *(method + pc);
+                pc++;
+            }
 
             // parse FieldList
             struct lai_amlname field_amln;
@@ -1831,11 +1861,34 @@ static lai_api_error_t lai_exec_process(lai_state_t *state) {
                         break;
                     case 1: // AccessField
                         pc++;
-                        access_type = *(method + pc);
+                        item->fld_access_type = *(method + pc);
                         pc += 2;
                         break;
-                    case 2: // TODO: ConnectField
-                        lai_panic("ConnectField parsing isn't implemented");
+                    case 2: // ConnectField
+                        if (item->fld_connectfld_phase == 0) {
+                            block->pc = pc;
+
+                            if (lai_exec_reserve_blkstack(state))
+                                return LAI_ERROR_OUT_OF_MEMORY;
+
+                            struct lai_blkitem *blk = lai_exec_push_blkstack(state);
+                            blk->pc = pc + 1;
+                            blk->limit = limit;
+
+                            lai_api_error_t error = lai_exec_parse(LAI_OBJECT_MODE, state);
+
+                            item->fld_connectfld_phase++;
+
+                            return error;
+                        } else if (item->fld_connectfld_phase == 1) {
+                            // TODO: Actually handle ConnectField
+                            // struct lai_operand* operand = lai_exec_get_opstack(state,
+                            // item->opstack_frame + expected_opstack_depth - 1);
+
+                            item->fld_connectfld_phase = 0;
+                            pc = connectfield_end_pc;
+                        }
+
                         break;
                     default: // NamedField
                         // TODO: Partially failing to parse a Field() is a bad idea.
@@ -1844,14 +1897,26 @@ static lai_api_error_t lai_exec_process(lai_state_t *state) {
                             return LAI_ERROR_EXECUTION_FAILURE;
 
                         lai_nsnode_t *node = lai_create_nsnode_or_die();
-                        node->type = LAI_NAMESPACE_BANKFIELD;
+
+                        if (item->kind == LAI_FIELD_STACKITEM) {
+                            node->type = LAI_NAMESPACE_FIELD;
+                        } else if (item->kind == LAI_INDEXFIELD_STACKITEM) {
+                            node->type = LAI_NAMESPACE_INDEXFIELD;
+
+                            node->fld_idxf_index_node = index_node;
+                            node->fld_idxf_data_node = data_node;
+                        } else if (item->kind == LAI_BANKFIELD_STACKITEM) {
+                            node->type = LAI_NAMESPACE_BANKFIELD;
+
+                            node->fld_bkf_bank_node = bank_node;
+                            node->fld_bkf_value = bank_value;
+                        }
+
                         node->fld_region_node = region_node;
-                        node->fld_flags = access_type;
+                        node->fld_flags = item->fld_access_type;
                         node->fld_size = skip_bits;
                         node->fld_offset = curr_off;
 
-                        node->fld_bkf_bank_node = bank_node;
-                        node->fld_bkf_value = bank_value;
                         lai_do_resolve_new_node(node, ctx_handle, &field_amln);
                         lai_api_error_t err = lai_install_nsnode(node);
                         if (err != LAI_ERROR_NONE)
@@ -1864,6 +1929,7 @@ static lai_api_error_t lai_exec_process(lai_state_t *state) {
                 }
             }
 
+            lai_exec_pop_opstack(state, expected_opstack_depth);
             lai_exec_pop_blkstack_back(state);
             lai_exec_pop_stack_back(state);
             return LAI_ERROR_NONE;
@@ -1871,7 +1937,7 @@ static lai_api_error_t lai_exec_process(lai_state_t *state) {
             return lai_exec_parse(LAI_OBJECT_MODE, state);
         }
     } else
-        lai_panic("unexpected lai_stackitem_t");
+        lai_panic("unexpected lai_stackitem_t, type: %d", item->kind);
 }
 
 static inline int lai_parse_u8(uint8_t *out, uint8_t *code, int *pc, int limit) {
@@ -2872,63 +2938,30 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
                 || lai_parse_name(&region_amln, method, &pc, limit))
                 return LAI_ERROR_EXECUTION_FAILURE;
 
-            int end_pc = opcode_pc + 2 + pkgsize;
+            int start_pc = pc;
+            pc = opcode_pc + 2 + pkgsize;
 
             lai_nsnode_t *region_node = lai_do_resolve(ctx_handle, &region_amln);
-            if (!region_node) {
-                lai_panic("error parsing field for non-existant OpRegion, ignoring...");
-                pc = end_pc;
-                break;
-            }
+            if (!region_node)
+                lai_panic("could not resolve region of Field()");
 
-            uint8_t access_type = *(method + pc);
-            pc++;
-
-            // parse FieldList
-            struct lai_amlname field_amln;
-            uint64_t curr_off = 0;
-            size_t skip_bits;
-            while (pc < end_pc) {
-                switch (*(method + pc)) {
-                    case 0: // ReservedField
-                        pc++;
-                        // TODO: Partially failing to parse a Field() is a bad idea.
-                        if (lai_parse_varint(&skip_bits, method, &pc, limit))
-                            return LAI_ERROR_EXECUTION_FAILURE;
-                        curr_off += skip_bits;
-                        break;
-                    case 1: // AccessField
-                        pc++;
-                        access_type = *(method + pc);
-                        pc += 2;
-                        break;
-                    case 2: // TODO: ConnectField
-                        lai_panic("ConnectField parsing isn't implemented");
-                        break;
-                    default: // NamedField
-                             // TODO: Partially failing to parse a Field() is a bad idea.
-                        if (lai_parse_name(&field_amln, method, &pc, limit)
-                            || lai_parse_varint(&skip_bits, method, &pc, limit))
-                            return LAI_ERROR_EXECUTION_FAILURE;
-
-                        lai_nsnode_t *node = lai_create_nsnode_or_die();
-                        node->type = LAI_NAMESPACE_FIELD;
-                        node->fld_region_node = region_node;
-                        node->fld_flags = access_type;
-                        node->fld_size = skip_bits;
-                        node->fld_offset = curr_off;
-                        lai_do_resolve_new_node(node, ctx_handle, &field_amln);
-                        lai_api_error_t err = lai_install_nsnode(node);
-                        if (err != LAI_ERROR_NONE)
-                            return err;
-
-                        if (invocation)
-                            lai_list_link(&invocation->per_method_list, &node->per_method_item);
-
-                        curr_off += skip_bits;
-                }
-            }
+            if (lai_exec_reserve_blkstack(state) || lai_exec_reserve_stack(state)
+                || lai_exec_reserve_opstack_n(state, 1))
+                return LAI_ERROR_OUT_OF_MEMORY;
             lai_exec_commit_pc(state, pc);
+
+            struct lai_blkitem *blkitem = lai_exec_push_blkstack(state);
+            blkitem->pc = start_pc;
+            blkitem->limit = pc;
+
+            lai_stackitem_t *field_item = lai_exec_push_stack(state);
+            field_item->kind = LAI_FIELD_STACKITEM;
+            field_item->opstack_frame = state->opstack_ptr;
+            field_item->fld_connectfld_phase = 0;
+
+            struct lai_operand *region_operand = lai_exec_push_opstack(state);
+            region_operand->tag = LAI_RESOLVED_NAME;
+            region_operand->handle = region_node;
 
             break;
         }
@@ -2941,62 +2974,35 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
                 || lai_parse_name(&data_amln, method, &pc, limit))
                 return LAI_ERROR_EXECUTION_FAILURE;
 
-            int end_pc = opcode_pc + 2 + pkgsize;
+            int start_pc = pc;
+            pc = opcode_pc + 2 + pkgsize;
 
             lai_nsnode_t *index_node = lai_do_resolve(ctx_handle, &index_amln);
             lai_nsnode_t *data_node = lai_do_resolve(ctx_handle, &data_amln);
             if (!index_node || !data_node)
-                lai_panic("could not resolve index register of IndexField()");
+                lai_panic("could not resolve index or data register of IndexField()");
 
-            uint8_t access_type = *(method + pc);
-            pc++;
-
-            // parse FieldList
-            struct lai_amlname field_amln;
-            uint64_t curr_off = 0;
-            size_t skip_bits;
-            while (pc < end_pc) {
-                switch (*(method + pc)) {
-                    case 0: // ReservedField
-                        pc++;
-                        // TODO: Partially failing to parse a Field() is a bad idea.
-                        if (lai_parse_varint(&skip_bits, method, &pc, limit))
-                            return LAI_ERROR_EXECUTION_FAILURE;
-                        curr_off += skip_bits;
-                        break;
-                    case 1: // AccessField
-                        pc++;
-                        access_type = *(method + pc);
-                        pc += 2;
-                        break;
-                    case 2: // TODO: ConnectField
-                        lai_panic("ConnectField parsing isn't implemented");
-                        break;
-                    default: // NamedField
-                        // TODO: Partially failing to parse a Field() is a bad idea.
-                        if (lai_parse_name(&field_amln, method, &pc, limit)
-                            || lai_parse_varint(&skip_bits, method, &pc, limit))
-                            return LAI_ERROR_EXECUTION_FAILURE;
-
-                        lai_nsnode_t *node = lai_create_nsnode_or_die();
-                        node->type = LAI_NAMESPACE_INDEXFIELD;
-                        node->fld_idxf_index_node = index_node;
-                        node->fld_idxf_data_node = data_node;
-                        node->fld_flags = access_type;
-                        node->fld_size = skip_bits;
-                        node->fld_offset = curr_off;
-                        lai_do_resolve_new_node(node, ctx_handle, &field_amln);
-                        lai_api_error_t err = lai_install_nsnode(node);
-                        if (err != LAI_ERROR_NONE)
-                            return err;
-
-                        if (invocation)
-                            lai_list_link(&invocation->per_method_list, &node->per_method_item);
-
-                        curr_off += skip_bits;
-                }
-            }
+            if (lai_exec_reserve_blkstack(state) || lai_exec_reserve_stack(state)
+                || lai_exec_reserve_opstack_n(state, 2))
+                return LAI_ERROR_OUT_OF_MEMORY;
             lai_exec_commit_pc(state, pc);
+
+            struct lai_blkitem *blkitem = lai_exec_push_blkstack(state);
+            blkitem->pc = start_pc;
+            blkitem->limit = pc;
+
+            lai_stackitem_t *indexfield_item = lai_exec_push_stack(state);
+            indexfield_item->kind = LAI_INDEXFIELD_STACKITEM;
+            indexfield_item->opstack_frame = state->opstack_ptr;
+            indexfield_item->fld_connectfld_phase = 0;
+
+            struct lai_operand *index_operand = lai_exec_push_opstack(state);
+            index_operand->tag = LAI_RESOLVED_NAME;
+            index_operand->handle = index_node;
+
+            struct lai_operand *data_operand = lai_exec_push_opstack(state);
+            data_operand->tag = LAI_RESOLVED_NAME;
+            data_operand->handle = data_node;
 
             break;
         }
@@ -3030,6 +3036,7 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
             lai_stackitem_t *bankfield_item = lai_exec_push_stack(state);
             bankfield_item->kind = LAI_BANKFIELD_STACKITEM;
             bankfield_item->opstack_frame = state->opstack_ptr;
+            bankfield_item->fld_connectfld_phase = 0;
 
             struct lai_operand *region_operand = lai_exec_push_opstack(state);
             region_operand->tag = LAI_RESOLVED_NAME;

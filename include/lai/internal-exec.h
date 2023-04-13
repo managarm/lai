@@ -170,6 +170,8 @@ struct lai_operand {
 #define LAI_RETURN_STACKITEM 10 // Parse a return operand
 #define LAI_BANKFIELD_STACKITEM 11 // Parse a BankValue and FieldList
 #define LAI_VARPACKAGE_STACKITEM 12
+#define LAI_FIELD_STACKITEM 13
+#define LAI_INDEXFIELD_STACKITEM 14
 
 struct lai_invocation {
     lai_variable_t arg[7];
@@ -216,6 +218,10 @@ typedef struct lai_stackitem_ {
         };
         struct {
             uint8_t buf_want_result;
+        };
+        struct {
+            uint8_t fld_access_type;
+            uint8_t fld_connectfld_phase; // 0: Parse, 1: Get result
         };
         struct {
             int pkg_index;
