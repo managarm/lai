@@ -169,8 +169,12 @@ int lai_evaluate_sta(lai_nsnode_t *node) {
         lai_init_state(&state);
 
         LAI_CLEANUP_VAR lai_variable_t result = LAI_VAR_INITIALIZER;
-        if (lai_eval(&result, handle, &state))
-            lai_panic("could not evaluate _STA");
+        lai_api_error_t err = lai_eval(&result, handle, &state);
+        if (err != LAI_ERROR_NONE) {
+            lai_warn("could not evaluate _STA, ignoring device");
+            return 0; // ACPI_STA_PRESENT is not set, so the device will be ignored
+        }
+
         if (lai_obj_get_integer(&result, &sta))
             lai_panic("_STA returned non-integer object");
     }
