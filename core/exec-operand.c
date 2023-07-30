@@ -376,14 +376,20 @@ void lai_exec_get_objectref(lai_state_t *state, struct lai_operand *src, lai_var
 
 // Load an integer.
 // Returns immediate objects as-is.
-void lai_exec_get_integer(lai_state_t *state, struct lai_operand *src, lai_variable_t *object) {
+lai_api_error_t lai_exec_get_integer(lai_state_t *state, struct lai_operand *src,
+                                     lai_variable_t *object) {
     (void)state;
     LAI_ENSURE(src->tag == LAI_OPERAND_OBJECT);
     lai_variable_t temp = {0};
     lai_var_assign(&temp, &src->object);
+    if (temp.type == 0)
+        return LAI_ERROR_EXECUTION_FAILURE; // Unitialized variable, so error out
+
     if (temp.type != LAI_INTEGER)
         lai_panic("lai_load_integer() expects an integer, not a value of type %d", temp.type);
     lai_var_move(object, &temp);
+
+    return LAI_ERROR_NONE;
 }
 
 // lai_write_buffer(): Writes to a BufferField.

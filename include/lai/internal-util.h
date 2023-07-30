@@ -39,6 +39,14 @@ __attribute__((noreturn, format(printf, 1, 2))) void lai_panic(const char *, ...
                       ":" LAI_EXPAND_STRINGIFY(__LINE__) "\n");                                    \
     } while (0)
 
+#define LAI_TRY(expr)                                                                              \
+    ({                                                                                             \
+        lai_api_error_t try_res_ = (expr);                                                         \
+        if (try_res_ != LAI_ERROR_NONE)                                                            \
+            return try_res_;                                                                       \
+        try_res_;                                                                                  \
+    })
+
 //---------------------------------------------------------------------------------------
 // Misc. utility functions.
 //---------------------------------------------------------------------------------------

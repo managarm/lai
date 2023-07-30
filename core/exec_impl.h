@@ -95,7 +95,7 @@ void lai_operand_mutate(lai_state_t *, struct lai_operand *, lai_variable_t *);
 void lai_operand_emplace(lai_state_t *, struct lai_operand *, lai_variable_t *);
 
 void lai_exec_get_objectref(lai_state_t *, struct lai_operand *, lai_variable_t *);
-void lai_exec_get_integer(lai_state_t *, struct lai_operand *, lai_variable_t *);
+lai_api_error_t lai_exec_get_integer(lai_state_t *, struct lai_operand *, lai_variable_t *);
 
 // --------------------------------------------------------------------------------------
 // Synchronization functions.
