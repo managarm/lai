@@ -75,9 +75,7 @@ static lai_api_error_t lai_exec_reduce_node(int opcode, lai_state_t *state,
             node->type = LAI_NAMESPACE_NAME;
             lai_do_resolve_new_node(node, ctx_handle, &amln);
             lai_var_move(&node->object, &object);
-            lai_api_error_t err = lai_install_nsnode(node);
-            if (err != LAI_ERROR_NONE)
-                return err;
+            LAI_TRY(lai_install_nsnode(node));
 
             struct lai_ctxitem *ctxitem = lai_exec_peek_ctxstack_back(state);
             if (ctxitem->invocation)
@@ -134,9 +132,7 @@ static lai_api_error_t lai_exec_reduce_node(int opcode, lai_state_t *state,
                     break;
             }
 
-            lai_api_error_t err = lai_install_nsnode(node);
-            if (err != LAI_ERROR_NONE)
-                return err;
+            LAI_TRY(lai_install_nsnode(node));
 
             struct lai_ctxitem *ctxitem = lai_exec_peek_ctxstack_back(state);
             if (ctxitem->invocation)
@@ -166,9 +162,7 @@ static lai_api_error_t lai_exec_reduce_node(int opcode, lai_state_t *state,
             node->bf_size = size.integer;
             node->bf_offset = offset.integer;
 
-            lai_api_error_t err = lai_install_nsnode(node);
-            if (err != LAI_ERROR_NONE)
-                return err;
+            LAI_TRY(lai_install_nsnode(node));
 
             struct lai_ctxitem *ctxitem = lai_exec_peek_ctxstack_back(state);
             if (ctxitem->invocation)
@@ -195,9 +189,7 @@ static lai_api_error_t lai_exec_reduce_node(int opcode, lai_state_t *state,
             node->op_base = base.integer;
             node->op_length = size.integer;
 
-            lai_api_error_t err = lai_install_nsnode(node);
-            if (err != LAI_ERROR_NONE)
-                return err;
+            LAI_TRY(lai_install_nsnode(node));
 
             struct lai_ctxitem *ctxitem = lai_exec_peek_ctxstack_back(state);
             if (ctxitem->invocation)
@@ -1857,9 +1849,7 @@ static lai_api_error_t lai_exec_process(lai_state_t *state) {
                         node->fld_bkf_bank_node = bank_node;
                         node->fld_bkf_value = bank_value;
                         lai_do_resolve_new_node(node, ctx_handle, &field_amln);
-                        lai_api_error_t err = lai_install_nsnode(node);
-                        if (err != LAI_ERROR_NONE)
-                            return err;
+                        LAI_TRY(lai_install_nsnode(node));
 
                         if (invocation)
                             lai_list_link(&invocation->per_method_list, &node->per_method_item);
@@ -2547,9 +2537,7 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
             lai_nsnode_t *node = lai_create_nsnode_or_die();
             node->type = LAI_NAMESPACE_DEVICE;
             lai_do_resolve_new_node(node, ctx_handle, &amln);
-            lai_api_error_t err = lai_install_nsnode(node);
-            if (err != LAI_ERROR_NONE)
-                return err;
+            LAI_TRY(lai_install_nsnode(node));
 
             if (invocation)
                 lai_list_link(&invocation->per_method_list, &node->per_method_item);
@@ -2594,9 +2582,7 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
             node->pblk_len = pblk_len;
 
             lai_do_resolve_new_node(node, ctx_handle, &amln);
-            lai_api_error_t err = lai_install_nsnode(node);
-            if (err != LAI_ERROR_NONE)
-                return err;
+            LAI_TRY(lai_install_nsnode(node));
 
             if (invocation)
                 lai_list_link(&invocation->per_method_list, &node->per_method_item);
@@ -2636,9 +2622,7 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
             lai_nsnode_t *node = lai_create_nsnode_or_die();
             node->type = LAI_NAMESPACE_POWERRESOURCE;
             lai_do_resolve_new_node(node, ctx_handle, &amln);
-            lai_api_error_t err = lai_install_nsnode(node);
-            if (err != LAI_ERROR_NONE)
-                return err;
+            LAI_TRY(lai_install_nsnode(node));
 
             if (invocation)
                 lai_list_link(&invocation->per_method_list, &node->per_method_item);
@@ -2674,9 +2658,7 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
             lai_nsnode_t *node = lai_create_nsnode_or_die();
             node->type = LAI_NAMESPACE_THERMALZONE;
             lai_do_resolve_new_node(node, ctx_handle, &amln);
-            lai_api_error_t err = lai_install_nsnode(node);
-            if (err != LAI_ERROR_NONE)
-                return err;
+            LAI_TRY(lai_install_nsnode(node));
 
             if (invocation)
                 lai_list_link(&invocation->per_method_list, &node->per_method_item);
@@ -2716,9 +2698,7 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
             node->amls = amls;
             node->pointer = method + nested_pc;
             node->size = pc - nested_pc;
-            lai_api_error_t err = lai_install_nsnode(node);
-            if (err != LAI_ERROR_NONE)
-                return err;
+            LAI_TRY(lai_install_nsnode(node));
 
             if (invocation)
                 lai_list_link(&invocation->per_method_list, &node->per_method_item);
@@ -2774,9 +2754,8 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
                           lai_stringify_amlname(&target_amln));
             lai_do_resolve_new_node(node, ctx_handle, &dest_amln);
 
-            lai_api_error_t err = lai_install_nsnode(node);
-            if (err != LAI_ERROR_NONE)
-                return err;
+            LAI_TRY(lai_install_nsnode(node));
+
             if (invocation)
                 lai_list_link(&invocation->per_method_list, &node->per_method_item);
             break;
@@ -2827,9 +2806,7 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
             lai_nsnode_t *node = lai_create_nsnode_or_die();
             node->type = LAI_NAMESPACE_MUTEX;
             lai_do_resolve_new_node(node, ctx_handle, &amln);
-            lai_api_error_t err = lai_install_nsnode(node);
-            if (err != LAI_ERROR_NONE)
-                return err;
+            LAI_TRY(lai_install_nsnode(node));
 
             if (invocation)
                 lai_list_link(&invocation->per_method_list, &node->per_method_item);
@@ -2845,9 +2822,7 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
             lai_nsnode_t *node = lai_create_nsnode_or_die();
             node->type = LAI_NAMESPACE_EVENT;
             lai_do_resolve_new_node(node, ctx_handle, &amln);
-            lai_api_error_t err = lai_install_nsnode(node);
-            if (err != LAI_ERROR_NONE)
-                return err;
+            LAI_TRY(lai_install_nsnode(node));
 
             if (invocation)
                 lai_list_link(&invocation->per_method_list, &node->per_method_item);
@@ -2922,9 +2897,7 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
                         node->fld_size = skip_bits;
                         node->fld_offset = curr_off;
                         lai_do_resolve_new_node(node, ctx_handle, &field_amln);
-                        lai_api_error_t err = lai_install_nsnode(node);
-                        if (err != LAI_ERROR_NONE)
-                            return err;
+                        LAI_TRY(lai_install_nsnode(node));
 
                         if (invocation)
                             lai_list_link(&invocation->per_method_list, &node->per_method_item);
@@ -2990,9 +2963,7 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
                         node->fld_size = skip_bits;
                         node->fld_offset = curr_off;
                         lai_do_resolve_new_node(node, ctx_handle, &field_amln);
-                        lai_api_error_t err = lai_install_nsnode(node);
-                        if (err != LAI_ERROR_NONE)
-                            return err;
+                        LAI_TRY(lai_install_nsnode(node));
 
                         if (invocation)
                             lai_list_link(&invocation->per_method_list, &node->per_method_item);
