@@ -2408,8 +2408,8 @@ static lai_api_error_t lai_exec_parse(int parse_mode, lai_state_t *state) {
                 lai_exec_pop_stack_back(state);
             }
 
-            // Keep the LAI_LOOP_STACKITEM but reset the PC.
-            pc = loop_item->loop_pred;
+            // Set the PC of the block to its limit, to trigger a recheck of the predicate.
+            lai_exec_peek_blkstack_back(state)->pc = lai_exec_peek_blkstack_back(state)->limit;
             break;
         }
         /* Break Loop */
