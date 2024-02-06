@@ -43,6 +43,11 @@ void laihost_free(void *, size_t);
 __attribute__((weak)) void laihost_log(int, const char *);
 __attribute__((weak, noreturn)) void laihost_panic(const char *);
 
+__attribute__((weak)) void *laihost_memcpy(void *, const void *, size_t);
+__attribute__((weak)) void *laihost_memmove(void *, const void *, size_t);
+__attribute__((weak)) void *laihost_memset(void *, int, size_t);
+__attribute__((weak)) int laihost_memcmp(const void *, const void *, size_t);
+
 __attribute__((weak)) void *laihost_scan(const char *, size_t);
 __attribute__((weak)) void *laihost_map(size_t, size_t);
 __attribute__((weak)) void laihost_unmap(void *, size_t);
