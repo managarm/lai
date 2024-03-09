@@ -482,7 +482,17 @@ void lai_write_field_internal(uint8_t *source, lai_nsnode_t *field) {
 
         uint64_t value;
         if (write_flag == FIELD_PRESERVE) {
-            if (field->type == LAI_NAMESPACE_FIELD || field->type == LAI_NAMESPACE_BANKFIELD) {
+            if (access_size == access_bits) {
+                // Don't needlessly read from the field if we're going to replace all of the bits.
+                // This is more in line with ACPICA's behavior, and the additional reads could've
+                // potentially confused hardware.
+
+                // If we're accessing the whole word, we can't start anywhere else.
+                LAI_ENSURE(bit_offset == 0);
+
+                value = 0;
+            } else if (field->type == LAI_NAMESPACE_FIELD
+                       || field->type == LAI_NAMESPACE_BANKFIELD) {
                 value = lai_perform_read(field->fld_region_node, access_size, offset);
             } else if (field->type == LAI_NAMESPACE_INDEXFIELD) {
                 value = lai_perform_indexfield_read(field, access_size, offset);
