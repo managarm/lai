@@ -1,3 +1,6 @@
+> [!CAUTION]
+> **LAI is currently not actively maintained. We recommend using the excellent [uACPI](https://github.com/uACPI/uACPI) library instead. uACPI is actively maintained and at this point more feature complete than LAI.**
+
 # Lightweight AML Interpreter
 
 LAI is an interpreter for AML, the ACPI Machine Language. AML is an integral component of modern BIOS and UEFI firmware, both on x86(_64) machines and ARM servers.
