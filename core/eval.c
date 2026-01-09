@@ -59,7 +59,7 @@ void lai_eisaid(lai_variable_t *object, const char *id) {
     if (lai_strlen(id) != 7) {
         if (lai_create_string(object, n) != LAI_ERROR_NONE)
             lai_panic("could not allocate memory for string");
-        memcpy(lai_exec_string_access(object), id, n);
+        laihost_memcpy(lai_exec_string_access(object), id, n);
         return;
     }
 
